@@ -32,9 +32,9 @@
 #include "oops/base/ObsLocalizations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/State.h"
-#include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
-#include "oops/generic/PseudoModelState4D.h"
+#include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/interface/ModelAuxControl.h"
 #include "oops/util/abor1_cpp.h"
@@ -52,6 +52,7 @@ class LocalEnsembleSolver {
   typedef Geometry<MODEL>             Geometry_;
   typedef GeometryIterator<MODEL>     GeometryIterator_;
   typedef IncrementEnsemble4D<MODEL>  IncrementEnsemble4D_;
+  typedef IncrementSet<MODEL>         IncrementSet_;
   typedef ObsAuxControls<OBS>         ObsAux_;
   typedef ObsEnsemble<OBS>            ObsEnsemble_;
   typedef ObsErrors<OBS>              ObsErrors_;
@@ -59,9 +60,9 @@ class LocalEnsembleSolver {
   typedef ObsLocalizations<MODEL, OBS> ObsLocalizations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
-  typedef PseudoModelState4D<MODEL>   PseudoModel_;
+  typedef PseudoModelStateSet<MODEL>   PseudoModel_;
   typedef State<MODEL>                State_;
-  typedef State4D<MODEL>              State4D_;
+  typedef StateSet<MODEL>              StateSet_;
   typedef Model<MODEL>                Model_;
   typedef ModelAuxControl<MODEL>      ModelAux_;
   typedef ObsDataVector<OBS, int>     ObsData_;
@@ -74,14 +75,21 @@ class LocalEnsembleSolver {
   /// \p xbmean state is used if an implementation needs a reference state
   /// solver will use a list of analysis variables specified in \p incvars
   LocalEnsembleSolver(ObsSpaces_ & obspaces, const Geometry_ & geometry,
-                      const eckit::Configuration & config, size_t nens, const State4D_ & xbmean,
+                      const eckit::Configuration & config, size_t nens, const StateSet_ & xbmean,
                       const Variables & incvars);
   virtual ~LocalEnsembleSolver() = default;
 
   /// computes ensemble H(\p xx), returns mean H(\p xx), saves as hofx \p iteration
   virtual Observations_ computeHofX(const StateEnsemble4D_ & xx, size_t iteration,
                       bool readFromDisk);
+#if 0
+  /// update background ensemble \p bg to analysis ensemble \p for all points on this PE
+  void measurementUpdate(const IncrementSet_ & bg, IncrementSet_ & an);
 
+  /// update background ensemble \p bg to analysis ensemble \p an at a grid point location \p i
+  virtual void measurementUpdate(const IncrementSet_ & bg,
+                                 const GeometryIterator_ & i, IncrementSet_ & an);
+#endif
   /// update background ensemble \p bg to analysis ensemble \p for all points on this PE
   virtual void measurementUpdate(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
 
@@ -98,7 +106,7 @@ class LocalEnsembleSolver {
 
   /// compute H(x) based on 4D state \p xx and put the result into \p yy. Also sets up
   /// R_ based on the QC filters run during H(x)
-  void computeHofX4D(const eckit::Configuration &, const State4D_ &, Observations_ &);
+  void computeHofX4D(const eckit::Configuration &, const StateSet_ &, Observations_ &);
   /// accessor to obs localizations
   const ObsLocalizations_ & obsloc() const {return obsloc_;}
 
@@ -113,7 +121,7 @@ class LocalEnsembleSolver {
                                            ///  computeHofX method
   LocalEnsembleSolverParameters options_;
 
-  const State4D_ & xbmean_;     ///< ensemble mean or a control member that will be used to
+  const StateSet_ & xbmean_;     ///< ensemble mean or a control member that will be used to
                                 ///  center the prior ensemble
   const Variables incvars_;
 
@@ -129,7 +137,7 @@ template <typename MODEL, typename OBS>
 LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
                                         const Geometry_ & geometry,
                                         const eckit::Configuration & config, size_t nens,
-                                        const State4D_ & xbmean, const Variables & incvars)
+                                        const StateSet_ & xbmean, const Variables & incvars)
   : geometry_(geometry), obspaces_(obspaces), omb_(obspaces_), Yb_(obspaces_, nens),
     xbmean_(xbmean),
     incvars_(incvars),
@@ -158,7 +166,16 @@ LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
 }
 
 // -----------------------------------------------------------------------------
-
+#if 0
+template <typename MODEL, typename OBS>
+void LocalEnsembleSolver<MODEL, OBS>::measurementUpdate
+        (const IncrementSet_ & bg, IncrementSet_ & an) {
+    for (GeometryIterator_ i = geometry_.begin(); i != geometry_.end(); ++i) {
+      measurementUpdate(bg, i, an);
+    }
+}
+#endif
+// -----------------------------------------------------------------------------
 template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::measurementUpdate
         (const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an) {
@@ -170,18 +187,18 @@ void LocalEnsembleSolver<MODEL, OBS>::measurementUpdate
 
 template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration & config,
-                                                    const State4D_ & xx, Observations_ & yy) {
-  // compute forecast length from State4D times
+                                                    const StateSet_ & xx, Observations_ & yy) {
+  // compute forecast length from StateSet times
   const std::vector<util::DateTime> times = xx.validTimes();
   const util::Duration flength = times[times.size()-1] - times[0];
   // default_tstep = 2*observation window is passed to PseudoModel as the default
-  // pseudomodel time step. It is only used when State4D has a single state, to enable
+  // pseudomodel time step. It is only used when StateSet has a single state, to enable
   // processing of all observations in the specified window regardless of where in
   // the time window the state is. Observations in
   // ( max(winbgn, xx.time - tstep/2); min(winend, xx.time + tstep/2) ] are
   // processed in H(x).
   const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
-  // Setup PseudoModelState4D
+  // Setup PseudoModelStateSet
   std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
   const Model_ model(std::move(pseudomodel));
   // Setup model and obs biases; obs errors
@@ -340,11 +357,11 @@ template <typename MODEL, typename OBS>
 class LocalEnsembleSolverFactory {
   typedef Geometry<MODEL>           Geometry_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
-  typedef State4D<MODEL>            State4D_;
+  typedef StateSet<MODEL>            StateSet_;
  public:
   static std::unique_ptr<LocalEnsembleSolver<MODEL, OBS>> create(ObsSpaces_ &, const Geometry_ &,
                                                         const eckit::Configuration &,
-                                                        size_t, const State4D_ &,
+                                                        size_t, const StateSet_ &,
                                                         const Variables &);
   virtual ~LocalEnsembleSolverFactory() = default;
  protected:
@@ -352,7 +369,7 @@ class LocalEnsembleSolverFactory {
  private:
   virtual LocalEnsembleSolver<MODEL, OBS> * make(ObsSpaces_ &, const Geometry_ &,
                                         const eckit::Configuration &, size_t,
-                                        const State4D_ &, const Variables &) = 0;
+                                        const StateSet_ &, const Variables &) = 0;
   static std::map < std::string, LocalEnsembleSolverFactory<MODEL, OBS> * > & getMakers() {
     static std::map < std::string, LocalEnsembleSolverFactory<MODEL, OBS> * > makers_;
     return makers_;
@@ -365,11 +382,11 @@ template<class MODEL, class OBS, class T>
 class LocalEnsembleSolverMaker : public LocalEnsembleSolverFactory<MODEL, OBS> {
   typedef Geometry<MODEL>           Geometry_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
-  typedef State4D<MODEL>            State4D_;
+  typedef StateSet<MODEL>            StateSet_;
 
   virtual LocalEnsembleSolver<MODEL, OBS> * make(ObsSpaces_ & obspaces, const Geometry_ & geometry,
                                         const eckit::Configuration & conf, size_t nens,
-                                        const State4D_ & xbmean, const Variables & incvars)
+                                        const StateSet_ & xbmean, const Variables & incvars)
     { return new T(obspaces, geometry, conf, nens, xbmean, incvars); }
  public:
   explicit LocalEnsembleSolverMaker(const std::string & name)
@@ -392,7 +409,7 @@ template <typename MODEL, typename OBS>
 std::unique_ptr<LocalEnsembleSolver<MODEL, OBS>>
 LocalEnsembleSolverFactory<MODEL, OBS>::create(ObsSpaces_ & obspaces, const Geometry_ & geometry,
                                   const eckit::Configuration & conf, size_t nens,
-                                  const State4D_ & xbmean, const Variables & incvars) {
+                                  const StateSet_ & xbmean, const Variables & incvars) {
   Log::trace() << "LocalEnsembleSolver<MODEL, OBS>::create starting" << std::endl;
   const std::string id = conf.getString("local ensemble DA.solver");
   typename std::map<std::string, LocalEnsembleSolverFactory<MODEL, OBS>*>::iterator

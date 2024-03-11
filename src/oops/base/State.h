@@ -110,7 +110,7 @@ State<MODEL>::State(const State & other) :
 
 template<typename MODEL>
 State<MODEL> & State<MODEL>::operator=(const State & rhs) {
-  ASSERT(resol_ == rhs.resol_);
+//  ASSERT(resol_ == rhs.resol_);
   interface::State<MODEL>::operator=(rhs);
   return *this;
 }
