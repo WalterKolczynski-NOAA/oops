@@ -64,8 +64,8 @@ class LETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
                          const GeometryIterator_ &, IncrementEnsemble4D_ &) override;
 
   /// KF update + posterior inflation at a grid point location (GeometryIterator_)
-//  void measurementUpdate(const IncrementSet_ &,
-//                         const GeometryIterator_ &, IncrementSet_ &);
+  void measurementUpdateSet(const IncrementEnsemble4D_ &,
+                         const GeometryIterator_ &, IncrementEnsemble4D_ &);
 
  protected:
   /// Computes weights for ensemble update with local observations
@@ -116,12 +116,12 @@ LETKFSolver<MODEL, OBS>::LETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & ge
 }
 
 // -----------------------------------------------------------------------------
-#if 0
+#if 1
 template <typename MODEL, typename OBS>
-void LETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementSet_ & bkg_pert,
+void LETKFSolver<MODEL, OBS>::measurementUpdateSet(const IncrementEnsemble4D_ & bkg_pert,
                                                 const GeometryIterator_ & i,
-                                                IncrementSet_ & ana_pert) {
-  util::Timer timer(classname(), "measurementUpdate");
+                                                IncrementEnsemble4D_ & ana_pert) {
+  util::Timer timer(classname(), "measurementUpdateSet");
 
   // create the local subset of observations
   Departures_ locvector(this->obspaces_);
@@ -130,16 +130,25 @@ void LETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementSet_ & bkg_pert,
   locvector.mask(*(this->invVarR_));
   Eigen::VectorXd local_omb_vec = this->omb_.packEigen(locvector);
 
-  // if obs are present do normal KF update
-  // create local Yb
-  Eigen::MatrixXd local_Yb_mat = this->Yb_.packEigen(locvector);
-  // create local obs errors
-  Eigen::VectorXd local_invVarR_vec = this->invVarR_->packEigen(locvector);
-  // and apply localization
-  Eigen::VectorXd localization = locvector.packEigen(locvector);
-  local_invVarR_vec.array() *= localization.array();
-  computeWeights(local_omb_vec, local_Yb_mat, local_invVarR_vec);
-  applyWeights(bkg_pert, ana_pert, i);
+  if (local_omb_vec.size() == 0) {
+// FIX this-- not sure what this does--what is a local increment?
+    // no obs. so no need to update Wa_ and wa_
+    // ana_pert[i]=bkg_pert[i]
+    Log::trace() << "measurementUpdateSet local_omb_vec size is 0" << std::endl;
+    this->copyLocalIncrement(bkg_pert, i, ana_pert);
+  } else {
+    Log::trace() << "measurementUpdateSet local_omb_vec size NOT 0" << std::endl;
+    // if obs are present do normal KF update
+    // create local Yb
+    Eigen::MatrixXd local_Yb_mat = this->Yb_.packEigen(locvector);
+    // create local obs errors
+    Eigen::VectorXd local_invVarR_vec = this->invVarR_->packEigen(locvector);
+    // and apply localization
+    Eigen::VectorXd localization = locvector.packEigen(locvector);
+    local_invVarR_vec.array() *= localization.array();
+    computeWeights(local_omb_vec, local_Yb_mat, local_invVarR_vec);
+    applyWeights(bkg_pert, ana_pert, i);
+  }
 }
 #endif
 // -----------------------------------------------------------------------------
@@ -159,10 +168,12 @@ void LETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementEnsemble4D_ & bkg
   Eigen::VectorXd local_omb_vec = this->omb_.packEigen(locvector);
 
   if (local_omb_vec.size() == 0) {
+    Log::trace() << "measurementUpdate local_omb_vec size is 0" << std::endl;
     // no obs. so no need to update Wa_ and wa_
     // ana_pert[i]=bkg_pert[i]
     this->copyLocalIncrement(bkg_pert, i, ana_pert);
   } else {
+    Log::trace() << "measurementUpdate local_omb_vec size is NOT 0" << std::endl;
     // if obs are present do normal KF update
     // create local Yb
     Eigen::MatrixXd local_Yb_mat = this->Yb_.packEigen(locvector);

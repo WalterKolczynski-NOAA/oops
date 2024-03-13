@@ -31,7 +31,7 @@ template<typename MODEL>
 class IncrementSet : public DataSetBase< Increment<MODEL>, Geometry<MODEL> > {
   typedef Geometry<MODEL>     Geometry_;
   typedef Increment<MODEL>    Increment_;
-  typedef StateSet<MODEL>     States_;
+  typedef StateSet<MODEL>     StateSet_;
 
  public:
   IncrementSet(const Geometry_ &, const Variables &, const std::vector<util::DateTime> &,
@@ -44,8 +44,8 @@ class IncrementSet : public DataSetBase< Increment<MODEL>, Geometry<MODEL> > {
                const eckit::Configuration &,
                const eckit::mpi::Comm & commTime = oops::mpi::myself(),
                const eckit::mpi::Comm & commEns = oops::mpi::myself());
-  IncrementSet(const Geometry_ &, const Variables &, const States_ &);
-  IncrementSet(const Geometry_ &, const Variables &, States_ &, const bool clearStates = false);
+  IncrementSet(const Geometry_ &, const Variables &, const StateSet_ &);
+  IncrementSet(const Geometry_ &, const Variables &, StateSet_ &, const bool clearStates = false);
   virtual ~IncrementSet() = default;
 
   void zero();
@@ -57,7 +57,7 @@ class IncrementSet : public DataSetBase< Increment<MODEL>, Geometry<MODEL> > {
   double dot_product_with(const IncrementSet &) const;
   void schur_product_with(const IncrementSet &);
 
-  void diff(const States_ &, const States_ &);
+  void diff(const StateSet_ &, const StateSet_ &);
 
   IncrementSet ens_mean() const;
   IncrementSet ens_stddev() const;
@@ -157,7 +157,7 @@ IncrementSet<MODEL>::IncrementSet(const Geometry_ & resol, const Variables & var
 
 template<typename MODEL>
 IncrementSet<MODEL>::IncrementSet(const Geometry_ & resol, const Variables & vars,
-                                  const States_ & xx)
+                                  const StateSet_ & xx)
   : DataSetBase<Increment_, Geometry_>(xx.times(), xx.commTime(), xx.members(), xx.commEns())
 {
   Log::trace() << "IncrementSet::IncrementSet from States" << std::endl;
@@ -180,7 +180,7 @@ IncrementSet<MODEL>::IncrementSet(const Geometry_ & resol, const Variables & var
 
 template<typename MODEL>
 IncrementSet<MODEL>::IncrementSet(const Geometry_ & resol, const Variables & vars,
-                                  States_ & xx, const bool clearStates)
+                                  StateSet_ & xx, const bool clearStates)
   : DataSetBase<Increment_, Geometry_>(xx.times(), xx.commTime(), xx.members(), xx.commEns())
 {
   Log::trace() << "IncrementSet::IncrementSet from States" << std::endl;
@@ -204,7 +204,7 @@ IncrementSet<MODEL>::IncrementSet(const Geometry_ & resol, const Variables & var
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-void IncrementSet<MODEL>::diff(const States_ & xx1, const States_ & xx2) {
+void IncrementSet<MODEL>::diff(const StateSet_ & xx1, const StateSet_ & xx2) {
 //  this->check_consistency(xx1);
 //  this->check_consistency(xx2);
   for (size_t jj = 0; jj < this->size(); ++jj) {
@@ -330,20 +330,33 @@ template<typename MODEL>
 IncrementSet<MODEL> IncrementSet<MODEL>::ens_mean() const {
   Log::trace() << "IncrementSet::ens_mean start" << std::endl;
   IncrementSet<MODEL> mean(this->geometry(), this->variables(), this->times(), this->commTime());
+
   const double fact = 1.0 / static_cast<double>(this->ens_size());
+
   for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    size_t dataSize = (*this)(jt, 0).serialSize()-3;  // would be good to make this a method
+    // Put States from each local ensemble member in a vector
+    std::vector<std::vector<double> > zz(this->local_ens_size());
     for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
-      // get sum of values on local ensemble
-      mean[jt] += (*this)(jt, jm);
+      // serialize local ensembles
+      (*this)(jt, jm).serialize(zz[jm]);
+    }
+
+// add up all the state values on the local communicator and put them in zz[0][:]
+    for (size_t jm = 1; jm < this->local_ens_size(); ++jm) {
+      for ( int i = 0; i < dataSize; ++i) zz[0][i] += zz[jm][i];
     }
     if (this->commEns().size() > 1) {
-      // sum up values across ensemble communicator
-      oops::mpi::allReduceInPlace(this->commEns(), mean[jt]);
+      // if commEns > 1, then sum up across commEns communicators
+      this->commEns().allReduceInPlace(&(zz[0].front()), dataSize, eckit::mpi::Operation::SUM);
     }
     // Divide by total number of members to get average
-    mean[jt] *= fact;
-  }
+    for ( int i = 0; i < dataSize; ++i) zz[0][i] *= fact;
 
+// deserialize back to stateSet
+    size_t indx = 0;
+    mean[jt].deserialize(zz[0], indx);
+  }
   Log::trace() << "IncrementSet::ens_mean done" << std::endl;
   return mean;
 }

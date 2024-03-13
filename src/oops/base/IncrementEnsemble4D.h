@@ -51,8 +51,14 @@ template<typename MODEL> class IncrementEnsemble4D {
   IncrementEnsemble4D(const StateEnsemble4D_ & ens, const StateSet_ & mean,
                       const Variables & vars);
 
+  IncrementEnsemble4D(const StateSet_ & ensemble,
+                      const StateSet_ & mean, 
+                      const Geometry_ & resol,
+                      const Variables & vars);
   /// Accessors
   size_t size() const {return ensemblePerturbs_.size();}
+  IncrementSet_ incrementSet() const {return ensemblePerturbsSet_;}
+
   Increment4D_ & operator[](const size_t ii) {return ensemblePerturbs_[ii];}
   const Increment4D_ & operator[](const size_t ii) const {return ensemblePerturbs_[ii];}
 
@@ -81,21 +87,23 @@ IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const Geometry_ & resol, const V
 }
 
 // ====================================================================================
-#if 0
 template<typename MODEL>
 IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateSet_ & ensemble,
-                                                const StateSet_ & mean, const Variables & vars)
-  : ensemblePerturbs_()  // 
+                                                const StateSet_ & mean, 
+                                                const Geometry_ & resol,
+                                                const Variables & vars)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(resol, vars, ensemble)     
 {
   ensemblePerturbs_.reserve(ensemble.size());
-  for (size_t ii = 0; ii < ensemble.size(); ++ii) {
+//  FIX THIS--if this is created across communicators, it might work later
+  for (size_t ii = 0; ii < ensemble.local_ens_size(); ++ii) {
     ensemblePerturbs_.emplace_back(ensemble[ii].geometry(), vars,
-                                   ensemble[ii].validTimes());
-    ensemblePerturbs_[ii].diff(ensemble[ii], mean);
+                                   ensemble.times());
+    (ensemblePerturbs_[ii]).diff(ensemble, mean); // this will only work for local_ens_size=1
   }
+  ensemblePerturbsSet_.diff(ensemble,mean);
   Log::trace() << "IncrementEnsemble4D:contructor(StateEnsemble4D) done" << std::endl;
 }
-#endif
 // -----------------------------------------------------------------------------
 template<typename MODEL>
 IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateEnsemble4D_ & ensemble,

@@ -59,9 +59,9 @@ template<typename MODEL> class StateEnsemble4D {
   const State_ & operator()(const int ii) const { return (stateSet_)[ii]; }
   StateSet_ & operator[](const int ii) { return states_[ii]; }
   const StateSet_ & operator[](const int ii) const { return states_[ii]; }
-
   /// Information
   const Variables & variables() const {return states_[0].variables();}
+  const StateSet_ & stateSet() const {return stateSet_;}
 
  private:
   std::vector<StateSet_> states_;
@@ -137,15 +137,15 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
   }
 
   // Reserve memory to hold ensemble
-  states_.reserve(membersConfig.size());
+  states_.reserve(times.size());
 
-  // Loop over all ensemble members
-  for (size_t jj = 0; jj < membersConfig.size(); ++jj) {
-    states_.emplace_back(StateSet_(resol, membersConfig[jj]));
-  }
-  for( size_t jt = 0; jt < times.size(); ++jt) { // FIX THIS. 
-//    stateSet_[jt] = State(resol,membersConfig[mymember]);
-    stateSet_[jt] = (states_[mymember])[jt];
+  // read in ensemble members on appropriate communicator
+  states_.emplace_back(StateSet_(resol, membersConfig[mymember-1]));
+
+  for (size_t jj = 0; jj < stateSet_.local_ens_size(); ++jj) {
+    for( size_t jt = 0; jt < times.size(); ++jt) { // FIX THIS. 
+      stateSet_[jt] = (states_[jj])[jt];
+    }
   }
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
 }
