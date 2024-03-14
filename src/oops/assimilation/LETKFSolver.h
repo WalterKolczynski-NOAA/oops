@@ -23,6 +23,7 @@
 #include "oops/base/ObsErrors.h"
 #include "oops/base/ObsLocalizations.h"
 #include "oops/base/ObsSpaces.h"
+#include "oops/base/StateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/util/Logger.h"
 
@@ -51,12 +52,16 @@ class LETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   typedef ObsLocalizations<MODEL, OBS> ObsLocalizations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
   typedef State4D<MODEL>              State4D_;
+  typedef StateSet<MODEL>              StateSet_;
 
  public:
   static const std::string classname() {return "oops::LETKFSolver";}
 
   LETKFSolver(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
               const State4D_ &, const Variables &);
+
+  LETKFSolver(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
+              const StateSet_ &, const Variables &);
 
   /// KF update + posterior inflation at a grid point location (GeometryIterator_)
   void measurementUpdate(const IncrementEnsemble4D_ &,
@@ -84,6 +89,29 @@ class LETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   const size_t nens_;   // ensemble size
 };
 
+// -----------------------------------------------------------------------------
+
+template <typename MODEL, typename OBS>
+LETKFSolver<MODEL, OBS>::LETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & geometry,
+                                     const eckit::Configuration & config, size_t nens,
+                                     const StateSet_ & xbmean, const Variables & incvars)
+  : LocalEnsembleSolver<MODEL, OBS>(obspaces, geometry, config, nens, xbmean, incvars),
+    nens_(nens)
+{
+  Log::trace() << "LETKFSolver<MODEL, OBS>::create starting" << std::endl;
+  Log::info() << "Using EIGEN implementation of LETKF" << std::endl;
+
+  // pre-allocate transformation matrices
+  Wa_.resize(nens_, nens_);
+  wa_.resize(nens_);
+
+  // pre-allocate eigen sovler matrices
+  eival_.resize(nens_);
+  eivec_.resize(nens_, nens_);
+  Log::trace() << "LETKFSolver<MODEL, OBS>::create done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>

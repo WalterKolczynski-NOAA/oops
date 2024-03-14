@@ -49,6 +49,10 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   StateSet(const StateSet &) = default;
   // Calculate the ensemble mean and return a new StateSet variable
   StateSet ens_mean() const;
+  /// Zero
+  void zero();
+  /// Accumulator
+  void accumul(const double &, const StateSet &);
   virtual ~StateSet() = default;
 
  private:
@@ -152,4 +156,30 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
   Log::trace() << "StateSet::ens_mean done" << std::endl;
   return mean;
 }
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void StateSet<MODEL>::zero() {
+  Log::trace() << "StateSet<MODEL>::zero starting" << std::endl;
+  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+      (*this)(jt, jm).zero();
+    }
+  }
+  Log::trace() << "StateSet<MODEL>::zero done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void StateSet<MODEL>::accumul(const double & zz, const StateSet & xx) {
+  Log::trace() << "StateSet<MODEL>::accumul starting" << std::endl;
+  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+      (*this)(jt, jm).accumul(zz, xx(jt, jm));
+    }
+  }
+  Log::trace() << "StateSet<MODEL>::accumul done" << std::endl;
+}
+
 }  // namespace oops

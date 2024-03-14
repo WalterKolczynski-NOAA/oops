@@ -17,6 +17,7 @@
 #include "oops/base/Departures.h"
 #include "oops/base/DeparturesEnsemble.h"
 #include "oops/base/ObsErrors.h"
+#include "oops/base/StateSet.h"
 
 namespace oops {
   class Variables;
@@ -30,10 +31,13 @@ class LETKFSolverGSI : public LETKFSolver<MODEL, OBS> {
   typedef ObsErrors<OBS>            ObsErrors_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
   typedef State4D<MODEL>            State4D_;
+  typedef StateSet<MODEL>           StateSet_;
  public:
   LETKFSolverGSI(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
                  const State4D_ &, const Variables &);
 
+  LETKFSolverGSI(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
+                 const StateSet_ &, const Variables &);
   /// Computes weights for ensemble update with local observations
   /// \param[in] omb      Observation departures (nlocalobs)
   /// \param[in] Yb       Ensemble perturbations (nens, nlocalobs)
@@ -41,6 +45,16 @@ class LETKFSolverGSI : public LETKFSolver<MODEL, OBS> {
   virtual void computeWeights(const Eigen::VectorXd & omb, const Eigen::MatrixXd & Yb,
                               const Eigen::VectorXd & invvarR);
 };
+
+// -----------------------------------------------------------------------------
+
+template <typename MODEL, typename OBS>
+LETKFSolverGSI<MODEL, OBS>::LETKFSolverGSI(ObsSpaces_ & obspaces, const Geometry_ & geometry,
+                                           const eckit::Configuration & config, size_t nens,
+                                           const StateSet_ & xbmean, const Variables & incvars)
+  : LETKFSolver<MODEL, OBS>(obspaces, geometry, config, nens, xbmean, incvars)
+{
+}
 
 // -----------------------------------------------------------------------------
 

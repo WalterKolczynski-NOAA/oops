@@ -18,8 +18,9 @@
 
 #include "oops/base/Geometry.h"
 #include "oops/base/Increment4D.h"
+#include "oops/base/IncrementSet.h"
 #include "oops/base/LocalIncrement.h"
-#include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
 #include "oops/base/Variables.h"
 #include "oops/interface/GeometryIterator.h"
@@ -34,9 +35,10 @@ namespace oops {
 template<typename MODEL> class IncrementEnsemble4D {
   typedef Geometry<MODEL>            Geometry_;
   typedef GeometryIterator<MODEL>    GeometryIterator_;
-  typedef State4D<MODEL>             State4D_;
+  typedef StateSet<MODEL>             StateSet_;
   typedef StateEnsemble4D<MODEL>     StateEnsemble4D_;
   typedef Increment4D<MODEL>         Increment4D_;
+  typedef IncrementSet<MODEL>         IncrementSet_;
 
  public:
   /// Constructor
@@ -46,11 +48,17 @@ template<typename MODEL> class IncrementEnsemble4D {
                       const int rank);
   /// \brief construct ensemble of perturbations as \p ens - \p mean; holding
   //         \p vars variables
-  IncrementEnsemble4D(const StateEnsemble4D_ & ens, const State4D_ & mean,
+  IncrementEnsemble4D(const StateEnsemble4D_ & ens, const StateSet_ & mean,
                       const Variables & vars);
 
+  IncrementEnsemble4D(const StateSet_ & ensemble,
+                      const StateSet_ & mean, 
+                      const Geometry_ & resol,
+                      const Variables & vars);
   /// Accessors
   size_t size() const {return ensemblePerturbs_.size();}
+  IncrementSet_ incrementSet() const {return ensemblePerturbsSet_;}
+
   Increment4D_ & operator[](const size_t ii) {return ensemblePerturbs_[ii];}
   const Increment4D_ & operator[](const size_t ii) const {return ensemblePerturbs_[ii];}
 
@@ -60,6 +68,7 @@ template<typename MODEL> class IncrementEnsemble4D {
 
  private:
   std::vector<Increment4D_> ensemblePerturbs_;
+  IncrementSet_ ensemblePerturbsSet_;
 };
 
 // ====================================================================================
@@ -68,7 +77,7 @@ template<typename MODEL>
 IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const Geometry_ & resol, const Variables & vars,
                                                 const std::vector<util::DateTime> & timeslots,
                                                 const int rank)
-  : ensemblePerturbs_()
+  : ensemblePerturbs_(), ensemblePerturbsSet_(resol, vars, timeslots, oops::mpi::myself())
 {
   ensemblePerturbs_.reserve(rank);
   for (int m = 0; m < rank; ++m) {
@@ -78,11 +87,28 @@ IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const Geometry_ & resol, const V
 }
 
 // ====================================================================================
-
+template<typename MODEL>
+IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateSet_ & ensemble,
+                                                const StateSet_ & mean, 
+                                                const Geometry_ & resol,
+                                                const Variables & vars)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(resol, vars, ensemble)     
+{
+  ensemblePerturbs_.reserve(ensemble.size());
+//  FIX THIS--if this is created across communicators, it might work later
+  for (size_t ii = 0; ii < ensemble.local_ens_size(); ++ii) {
+    ensemblePerturbs_.emplace_back(ensemble[ii].geometry(), vars,
+                                   ensemble.times());
+    (ensemblePerturbs_[ii]).diff(ensemble, mean); // this will only work for local_ens_size=1
+  }
+  ensemblePerturbsSet_.diff(ensemble,mean);
+  Log::trace() << "IncrementEnsemble4D:contructor(StateEnsemble4D) done" << std::endl;
+}
+// -----------------------------------------------------------------------------
 template<typename MODEL>
 IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateEnsemble4D_ & ensemble,
-                                                const State4D_ & mean, const Variables & vars)
-  : ensemblePerturbs_()
+                                                const StateSet_ & mean, const Variables & vars)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(mean[0].geometry(), vars, mean.times(), oops::mpi::myself())
 {
   ensemblePerturbs_.reserve(ensemble.size());
   for (size_t ii = 0; ii < ensemble.size(); ++ii) {

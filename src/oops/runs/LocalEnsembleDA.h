@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
+#include "eckit/config/YAMLConfiguration.h"
 #include "oops/assimilation/instantiateLocalEnsembleSolverFactory.h"
 #include "oops/assimilation/LocalEnsembleSolver.h"
 #include "oops/base/Departures.h"
@@ -27,11 +28,14 @@
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/ParameterTraitsVariables.h"
 #include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
+#include "oops/base/StateSetSaver.h"
 #include "oops/base/StateEnsemble4D.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/mpi/mpi.h"
 #include "oops/runs/Application.h"
+#include "oops/runs/Forecast.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
@@ -114,6 +118,11 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
   Parameter<LocalEnsembleDADriverParameters> driver{"driver",
           "options controlling output and observer runs", {}, this};
 
+  RequiredParameter<bool> runForecast{"Run Forecast", this};
+  RequiredParameter<int> batch{"batch", this};
+  /// Parameters containing a list of YAML files for each ensemble member to be processed.
+  RequiredParameter<std::vector<std::string>> files{"files", this};
+
   RequiredParameter<eckit::LocalConfiguration> background{"background",
           "ensemble of backgrounds", this};
 
@@ -162,13 +171,19 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef IncrementEnsemble4D<MODEL>       IncrementEnsemble4D_;
   typedef Increment<MODEL>                 Increment_;
   typedef Increment4D<MODEL>               Increment4D_;
+  typedef IncrementSet<MODEL>              IncrementSet_;
   typedef LocalEnsembleSolver<MODEL, OBS>  LocalSolver_;
   typedef ObsSpaces<OBS>                   ObsSpaces_;
   typedef Observations<OBS>                Observations_;
   typedef State4D<MODEL>                   State4D_;
+  typedef Model<MODEL>                     Model_;
+  typedef ModelAuxControl<MODEL>           ModelAux_;
+  typedef StateSet<MODEL>                  StateSet_;
+  typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
+  typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
 
  public:
 // -----------------------------------------------------------------------------
@@ -195,6 +210,345 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
 
+    const bool runForecast = params.runForecast.value();
+    const std::vector<std::string> &files = params.files.value();
+    const int batchsize = params.batch.value();
+//  Get the MPI partition
+    const int nmembers = files.size();
+    const int ntasks = this->getComm().size();
+    const int mytask = this->getComm().rank();
+    const int tasks_per_member = ntasks / nmembers;
+    int mymember = mytask / tasks_per_member + 1;
+   
+    Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
+                << ntasks << " total MPI tasks and "
+                << tasks_per_member << " MPI tasks per member." << std::endl;
+
+    ASSERT(ntasks%nmembers == 0);
+
+//  Create the communicator for each ensemble member, named comm_member_{i}:
+    std::string commNameStr = "comm_member_" + std::to_string(mymember);
+    char const *commName = commNameStr.c_str();
+    eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
+    const int subrank = commMember.rank();
+
+//  Create the communicator for each face of cubed sphere, named face_member_{i}:
+    std::string faceNameStr = "face_member_" + std::to_string(subrank);
+    char const *faceName = faceNameStr.c_str();
+    eckit::mpi::Comm & faceMember = this->getComm().split(subrank, faceName);
+    const int subface = faceMember.rank();
+
+//  Each member uses a different configuration:
+    eckit::PathName confPath = files[mymember-1];
+    eckit::YAMLConfiguration memberConf(confPath);
+
+    ForecastAppParameters_ fcstparams;
+    fcstparams.validate(memberConf);
+    fcstparams.deserialize(memberConf);
+    const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
+
+//  Setup times
+    Log::info() << "setting up times" << std::endl;
+    eckit::LocalConfiguration model = fcstparams.fcstConf.model;
+    const util::Duration tstep(model.getString("tstep"));
+    eckit::LocalConfiguration ic = fcstparams.fcstConf.initialCondition;
+    const util::DateTime bgndate(ic.getString("datetime"));
+    const util::Duration fclength = fcstparams.fcstConf.forecastLength;
+    const util::DateTime enddate(bgndate + fclength);
+    std::vector<util::DateTime> times;
+    const Variables vars(ic, "state variables");
+// Don't save the initial state  
+    for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
+       Log::trace() << "pushing back time " << ii << std::endl;
+       times.push_back(ii);
+    }
+    std::vector<int> ens;  // vector of ensemble numbers
+    for (int m = 1; m <=nmembers; m++) { ens.push_back(m); }
+    Log::trace() << "ens is " << ens << std::endl;
+
+    std::unique_ptr<StateSet_> stateSet;
+
+    if(runForecast) {
+      eckit::LocalConfiguration initialCondition =
+            memberConf.getSubConfiguration("initial condition");
+      PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
+      StateSetSaver<MODEL> *saver_ =
+            new StateSetSaver<MODEL>(memberConf, geometry, times, oops::mpi::myself(), ens, faceMember);
+      post.enrollProcessor(saver_);
+  //  Each member uses a different configuration:
+      for (int m = 1; m <=nmembers; m++) {
+         if ( m == mymember ) {
+           Log::trace() << "running on mymember = " << mymember  << " " << mytask << std::endl;
+           executeForecast(geometry, memberConf, validate, post);
+           Log::trace() << "Done with ens execute\n";
+         }
+         if ( batchsize > 0 ) {  // don't divide by zero
+           if (m % batchsize == 0) oops::mpi::world().barrier();
+         }
+       }
+       oops::mpi::world().barrier();
+       stateSet = std::move(saver_->getStateSet());
+       Log::trace() << "HEYYYY ens_size of stateSet is " << stateSet->ens_size() << std::endl;
+       Log::trace() << "HEYYYY time_size of stateSet is " << stateSet->time_size() << std::endl;
+    } 
+    // Get observations configuration
+    const eckit::LocalConfiguration observationsConfig = params.observations;
+    eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
+
+    // if any of the obs. spaces uses Halo distribution it will need to know the geometry
+    // of the local grid on this PE
+    if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(geometry, obsConfig);
+
+    // Setup observations
+    const eckit::mpi::Comm & time = oops::mpi::myself();
+    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
+    Observations_ yobs(obsdb, "ObsValue");
+
+    // Read all ensemble members and compute the ensemble mean
+    // old version of SE4D stored all ens members on same communicator. Now making changes
+    // to save across communicators in a StateSet instead. 
+    StateEnsemble4D_* ens_xx;
+    if(runForecast) {
+      ens_xx = new StateEnsemble4D_(geometry, params.background, *stateSet);   
+    } else {
+      ens_xx = new StateEnsemble4D_(geometry, params.background, vars, times, oops::mpi::myself(), ens, faceMember, mymember);   
+    }
+    const size_t nens = ens_xx->size();
+    const Variables statevars = ens_xx->variables();
+    Variables incvars;
+    if (params.incvars.value() == boost::none) {
+      incvars += statevars;
+    } else {
+      incvars += *params.incvars.value();
+    }
+    StateSet_ bkg_mean = ens_xx->stateSet().ens_mean();
+    Log::trace() << "ens_xx stateset is " << ens_xx->stateSet() << std::endl;
+    Log::trace() << "Background mean is " << bkg_mean << std::endl;
+    // if control member is present use that instead of the ensemble mean
+    if (params.driver.value().useControlMember) {
+      StateSet_ controlMember(geometry, *params.controlMember.value());
+      bkg_mean = controlMember;
+    }
+
+    util::printRunStats("LocalEnsembleDA before solver ctor");
+
+    // set up solver
+    std::unique_ptr<LocalSolver_> solver =
+         LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, geometry, fullConfig,
+                                                        nens, bkg_mean, incvars);
+
+    // test prints for the prior ensemble
+    bool do_test_prints = params.driver.value().doTestPrints;
+    if (do_test_prints) {
+      for (size_t jj = 0; jj < (*ens_xx).stateSet().local_ens_size(); ++jj) {
+        Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)(jj) << std::endl;
+      }
+    }
+    std::cout << "HEYYY my rank and subrank are " << mytask << " " << subrank << std::endl;
+    util::printRunStats("LocalEnsembleDA before computeHofX");
+
+    // compute H(x)
+    Log::trace() << "calling computeHofX" << std::endl;
+    Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0, params.driver.value().readHofX);
+    if (do_test_prints) {
+       Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
+    }
+
+    Log::trace() << "done calling computeHofX" << std::endl;
+    Departures_ ombg(yobs - yb_mean);
+    Log::trace() << "done computing departures " << std::endl;
+    ombg.save("ombg");
+    Log::trace() << "done saving ombg" << std::endl;
+    if (do_test_prints) {
+       Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
+    }
+
+    // quit early if running in observer-only mode
+    if (params.driver.value().runObsOnly.value()) {
+      obsdb.save();
+      return 0;
+    }
+
+    // print background mean
+    if (do_test_prints) {
+      Log::test() << "Background mean :" << bkg_mean << std::endl;
+    }
+
+    // calculate background ensemble perturbations
+    Log::trace() << "create bkg_perts" << std::endl;
+    IncrementEnsemble4D_ bkg_pertSet(ens_xx->stateSet(), bkg_mean, geometry, incvars);
+
+    // initialize empty analysis perturbations
+    Log::trace() << "create ana_perts" << std::endl;
+    IncrementEnsemble4D_ ana_pertSet(bkg_mean, bkg_mean, geometry, incvars); // bkg_mean will be subtracted
+                                                                            // from itself to make ana_pert=0
+
+    // run the solver at each gridpoint
+    Log::info() << "Beginning core local solver..." << std::endl;
+    util::printRunStats("LocalEnsembleDA before solver", true);
+    solver->measurementUpdateSet(bkg_pertSet, ana_pertSet);
+
+    // wait all tasks to finish their solution, so the timing for functions below reports
+    // time which truly used (not from mpi_wait(), as all tasks need to sync before write).
+    oops::mpi::world().barrier();
+
+    Log::info() << "Local solver completed." << std::endl;
+    util::printRunStats("LocalEnsembleDA after solver", true);
+    // calculate final analysis states
+    IncrementSet_ new_ens_xx(geometry, incvars, (*ens_xx).stateSet());
+    if (incvars == statevars) {
+      new_ens_xx+=ana_pertSet.incrementSet(); 
+    } else {
+      IncrementSet_ ana_incrementSet(geometry, incvars, times, oops::mpi::myself(), ens, faceMember);
+      ana_incrementSet=ana_pertSet.incrementSet();
+      ana_incrementSet -= bkg_pertSet.incrementSet();
+      new_ens_xx += ana_incrementSet;
+    }
+
+    // save the posterior mean, ensemble, and ensemble of increments first
+    // (since they are needed for the next cycle)
+
+    // save the posterior ensemble increments
+    if (params.driver.value().savePostEnsInc.value()) {
+      if (params.outputPostEnsInc.value() == boost::none) {
+        throw eckit::BadValue(
+          "`save posterior ensemble increment` is set to true, but `output ensemble increments` "
+          "configuration not found.");
+      }
+      Log::trace() << "saving ana_increments." << std::endl;
+      IncrementWriteParameters_ output = *params.outputPostEnsInc.value();
+      
+      output.setMember(mymember);
+      for (size_t itime = 0; itime < times.size(); ++itime) {
+        Increment_ ana_increment(ana_pertSet.incrementSet()[itime], true);
+        ana_increment -= bkg_pertSet.incrementSet()[itime];
+        ana_increment.write(output);
+      }
+      Log::trace() << "done saving ana_increments." << std::endl;
+    }
+
+    // save the posterior mean
+    oops::mpi::world().barrier();
+    Log::trace() << "compute ana_mean" << std::endl;
+    IncrementSet_ ana_mean = new_ens_xx.ens_mean();   // calculate analysis mean
+    if (do_test_prints) {
+      Log::test() << "Analysis mean :" << ana_mean << std::endl;
+    }
+    oops::mpi::world().barrier();
+    Log::trace() << "at posterier mean" << std::endl;
+    if (params.driver.value().savePostMean.value()) {
+      if (params.output.value() == boost::none) {
+        throw eckit::BadValue("`save posterior mean` is set to true, but `output` "
+                              "configuration not found.");
+      }
+      Log::trace() << "saving ana_mean" << std::endl;
+      eckit::LocalConfiguration outConfig = *params.output.value();
+      outConfig.set("member", mymember);
+      ana_mean.write(outConfig);
+      Log::trace() << "done saving ana_mean" << std::endl;
+    }
+
+    oops::mpi::world().barrier();
+    // save the posterior ensemble
+    Log::trace() << "at posterier ensemble" << std::endl;
+    if (params.driver.value().savePostEns.value()) {
+      if (params.output.value() == boost::none) {
+        throw eckit::BadValue("`save posterior ensemble` is set to true, but `output` "
+                              "configuration not found.");
+      }
+      eckit::LocalConfiguration outConfig = *params.output.value();
+      outConfig.set("member", mymember);
+      new_ens_xx.write(outConfig);
+    }
+
+    // below is the diagnostic output -----------------------------
+    // save the background mean
+    oops::mpi::world().barrier();
+    Log::trace() << "at prior mean" << std::endl;
+    if (params.driver.value().savePriorMean.value()) {
+      if (params.outputPriorMean.value() == boost::none) {
+        throw eckit::BadValue("`save prior mean` is set to true, but `output mean prior` "
+                              "configuration not found.");
+      }
+      eckit::LocalConfiguration outConfig = *params.outputPriorMean.value();
+      outConfig.set("member", mymember);
+      bkg_mean.write(outConfig);
+    }
+
+    oops::mpi::world().barrier();
+    // save the analysis mean increment
+    Log::trace() << "at post mean inc" << std::endl;
+    if (params.driver.value().savePostMeanInc.value()) {
+      if (params.outputPostMeanInc.value() == boost::none) {
+        throw eckit::BadValue("`save posterior mean increment` is set to true, but "
+                              "`output increment` configuration not found.");
+      }
+      IncrementWriteParameters_ output = *params.outputPostMeanInc.value();
+      output.setMember(0);
+      IncrementSet_ bkg_mean_inc(geometry, incvars, bkg_mean);
+      for (size_t itime = 0; itime < times.size(); ++itime) {
+        Increment_ ana_increment(ana_mean[itime], true);
+        ana_increment-=bkg_mean_inc[itime];
+        ana_increment.write(output);
+        if (do_test_prints) {
+          Log::test() << "Analysis mean increment :" << ana_increment << std::endl;
+        }
+      }
+    }
+
+#if 0
+    // save the prior variance
+    if (params.driver.value().savePriorVar.value()) {
+      if (params.outputPriorVar.value() == boost::none) {
+        throw eckit::BadValue("`save prior variance` is set to true, but `output variance prior` "
+                              "configuration not found.");
+      }
+      IncrementWriteParameters_ output = *params.outputPriorVar.value();
+      output.setMember(0);
+      std::string strOut("Forecast variance :");
+      saveVariance(output, bkg_pert, do_test_prints, strOut);
+    }
+
+    // save the posterior variance
+    if (params.driver.value().savePostVar.value()) {
+      if (params.outputPostVar.value() == boost::none) {
+        throw eckit::BadValue("`save posterior variance` is set to true, but "
+                              "`output variance posterior` configuration not found.");
+      }
+      IncrementWriteParameters_ output = *params.outputPostVar.value();
+      output.setMember(0);
+      std::string strOut("Analysis variance :");
+      saveVariance(output, ana_pert, do_test_prints, strOut);
+    }
+
+    // posterior observer
+    // note: if H(X) is read from file, it might have used different time slots for observation
+    // than LETKF background/analysis perturbations.
+    // hence one might not expect that oman and omaf are comparable
+    if (params.driver.value().doPostObs.value()) {
+      Observations_ ya_mean = solver->computeHofX(*ens_xx, 1, false);
+      Log::test() << "H(x) ensemble analysis mean: " << std::endl << ya_mean << std::endl;
+
+      // calculate analysis obs departures
+      Departures_ oman(yobs - ya_mean);
+      oman.save("oman");
+      Log::test() << "analysis y - H(x): " << std::endl << oman << std::endl;
+
+      // display overall background/analysis RMS stats
+      Log::test() << "ombg RMS: " << ombg.rms() << std::endl
+                << "oman RMS: " << oman.rms() << std::endl;
+    }
+
+#endif
+    // Save the obsspace only if an hofx was calculated
+    // (either prior and/or posterior)
+    if ( !params.driver.value().readHofX.value() ||
+         params.driver.value().doPostObs.value()) {
+      obsdb.save();
+    }
+    Log::trace() << "done obsdb save" << std::endl;
+
+#if 0
     // Setup geometry
     const Geometry_ geometry(params.geometry, this->getComm());
 
@@ -431,6 +785,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       obsdb.save();
     }
 
+#endif
     return 0;
   }
 
@@ -540,6 +895,37 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         Log::test() << strOut << var << std::endl;
       }
     }
+  }
+
+// -----------------------------------------------------------------------------
+  void executeForecast(const Geometry_ & geometry,
+      const eckit::Configuration & fullConfig,
+      bool validate, PostProcessor<State_> & post) const {
+//  Deserialize parameters
+    ForecastAppParameters_ params;
+    if (validate) params.validate(fullConfig);
+    params.deserialize(fullConfig);
+
+//  Setup Model
+    Log::info() << "Forecast:setting up model" << std::endl;
+    const Model_ model(geometry, eckit::LocalConfiguration(fullConfig, "model"));
+
+//  Setup initial state
+    State_ xx(geometry, params.fcstConf.initialCondition);
+
+//  Setup augmented state
+    const ModelAux_ moderr(geometry, params.fcstConf.modelAuxControl);
+
+    const util::Duration fclength = params.fcstConf.forecastLength;
+    const util::DateTime bgndate(xx.validTime());
+    const util::DateTime enddate(bgndate + fclength);
+
+    Log::info() << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
+    post.initialize(xx, bgndate, fclength);
+//  Run forecast
+    Log::info() << "Forecast:running forecast" << std::endl;
+    model.forecast(xx, moderr, fclength, post);
+    Log::info() << "Forecast:done running forecast" << std::endl;
   }
 
 // -----------------------------------------------------------------------------
