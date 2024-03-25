@@ -229,6 +229,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 //  Create the communicator for each ensemble member, named comm_member_{i}:
     std::string commNameStr = "comm_member_" + std::to_string(mymember);
+    std::cout << "commNameStr is " << commNameStr << " and rank and mymember are " << mytask << " " << mymember << std::endl;
     char const *commName = commNameStr.c_str();
     eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
     const int subrank = commMember.rank();
@@ -294,8 +295,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     //   Log::trace() << "HEYYYY times of stateSet is " << stateSet->times() << std::endl;
     } 
     // Get observations configuration
-    const eckit::LocalConfiguration observationsConfig = params.observations;
-    eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
+    const eckit::LocalConfiguration observationsConfig = fcstparams.fcstConf.observConfig;
+//    eckit::LocalConfiguration observationsConfig = *fcstparams.observConfig.value();
+      eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
     // if any of the obs. spaces uses Halo distribution it will need to know the geometry
     // of the local grid on this PE
@@ -303,7 +305,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
-    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
+    ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
+//  ObsSpaces_ obsdb(obsConfig, faceMember, timeWindow, time);
+//  ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
     // Read all ensemble members and compute the ensemble mean
@@ -346,37 +350,32 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)(jj) << std::endl;
       }
     }
-/*
-    if(subrank == 0) {
-      std::cout << "Initial state for member " << mymember << ":" << (*ens_xx)(0) << std::endl;
-    } 
-*/
     std::cout << "HEYYY my rank and subrank are " << mytask << " " << subrank << std::endl;
     util::printRunStats("LocalEnsembleDA before computeHofX");
 
     // compute H(x)
     Log::trace() << "calling computeHofX" << std::endl;
 //    Observations_ yb_mean = solver->computeHofX(*ens_xx, 0, params.driver.value().readHofX);
-    Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0, params.driver.value().readHofX);
+    Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0, params.driver.value().readHofX,mymember);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
-
     Log::trace() << "done calling computeHofX" << std::endl;
     Departures_ ombg(yobs - yb_mean);
     Log::trace() << "done computing departures " << std::endl;
     ombg.save("ombg");
     Log::trace() << "done saving ombg" << std::endl;
+    Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
     if (do_test_prints) {
        Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
     }
-
     // quit early if running in observer-only mode
     if (params.driver.value().runObsOnly.value()) {
       obsdb.save();
       return 0;
     }
 
+#if 0
     // print background mean
     if (do_test_prints) {
       Log::test() << "Background mean :" << bkg_mean << std::endl;
@@ -399,6 +398,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     util::printRunStats("LocalEnsembleDA before solver", true);
 //    solver->measurementUpdate(bkg_pert, ana_pert);
     solver->measurementUpdateSet(bkg_pertSet, ana_pertSet);
+    Log::trace() << "writing out bkg_pertSet " << bkg_pertSet.incrementSet() << std::endl;
+    Log::trace() << "writing out ana_pertSet " << ana_pertSet.incrementSet() << std::endl;
 
     // wait all tasks to finish their solution, so the timing for functions below reports
     // time which truly used (not from mpi_wait(), as all tasks need to sync before write).
@@ -477,7 +478,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       outConfig.set("member", mymember);
       new_ens_xx.write(outConfig);
     }
-
+#endif
     // below is the diagnostic output -----------------------------
     // save the background mean
     oops::mpi::world().barrier();
@@ -491,7 +492,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       outConfig.set("member", mymember);
       bkg_mean.write(outConfig);
     }
-
+#if 0
     oops::mpi::world().barrier();
     // save the analysis mean increment
     Log::trace() << "at post mean inc" << std::endl;
@@ -513,7 +514,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
     }
 
-#if 0
     // save the prior variance
     if (params.driver.value().savePriorVar.value()) {
       if (params.outputPriorVar.value() == boost::none) {
@@ -538,25 +538,26 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       saveVariance(output, ana_pert, do_test_prints, strOut);
     }
 
+#endif
+#if 0
     // posterior observer
     // note: if H(X) is read from file, it might have used different time slots for observation
     // than LETKF background/analysis perturbations.
     // hence one might not expect that oman and omaf are comparable
     if (params.driver.value().doPostObs.value()) {
-      Observations_ ya_mean = solver->computeHofX(*ens_xx, 1, false);
+      Observations_ ya_mean = solver->computeHofXSet(*ens_xx, 1, false,mymember);
       Log::test() << "H(x) ensemble analysis mean: " << std::endl << ya_mean << std::endl;
 
       // calculate analysis obs departures
       Departures_ oman(yobs - ya_mean);
       oman.save("oman");
       Log::test() << "analysis y - H(x): " << std::endl << oman << std::endl;
-
       // display overall background/analysis RMS stats
       Log::test() << "ombg RMS: " << ombg.rms() << std::endl
                 << "oman RMS: " << oman.rms() << std::endl;
     }
-
 #endif
+
     // Save the obsspace only if an hofx was calculated
     // (either prior and/or posterior)
     if ( !params.driver.value().readHofX.value() ||
