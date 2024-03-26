@@ -355,13 +355,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // compute H(x)
     Log::trace() << "calling computeHofX" << std::endl;
-//    Observations_ yb_mean = solver->computeHofX(*ens_xx, 0, params.driver.value().readHofX);
     Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0, params.driver.value().readHofX,mymember);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
+    Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
+    Log::trace() << "yobs: " << std::endl << yobs << std::endl;
     Log::trace() << "done calling computeHofX" << std::endl;
     Departures_ ombg(yobs - yb_mean);
+    Log::trace() << "ombg: " << std::endl << ombg << std::endl;
     Log::trace() << "done computing departures " << std::endl;
     ombg.save("ombg");
     Log::trace() << "done saving ombg" << std::endl;

@@ -285,16 +285,12 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
     config.set("save qc", false);
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
-//    std::cout << "About to compute and save " << (obspaces_[0]).comm().name() << std::endl;
     // keep in mind we are doing this across MPI_COMM_WORLD 
     for (size_t jj = 0; jj < ens_xx.stateSet().local_ens_size(); ++jj) {
-//      std::cout << "HEYY about to compute H(x) on comm " << obsens[jj].comm().name() << std::endl;
       computeHofX4DSet(config, ens_xx.stateSet(), obsens[jj]);
       Log::trace() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
     }
-//    std::cout << "done computing and saving " << (obspaces_[0]).comm().name() << std::endl;
-    oops::mpi::world().barrier();
     // Compute H(mean(Xb))
     // set QC for the mean
     config.set("save qc", true);
@@ -303,7 +299,6 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
     computeHofX4DSet(config, xbmean_, y_mean_xb);
 
     y_mean_xb.save("hofx_y_mean_xb"+std::to_string(iteration));
-//    y_mean_xb.save("hofx_y_mean_xb"+std::to_string(mymember));
 
     // QC flags and Obs errors are set to that of the H(mean(Xb))
     R_->save("ObsError");
@@ -312,7 +307,8 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
   invVarR_.reset(new Departures_(R_->inverseVariance()));
 
   // calculate H(x) ensemble mean
-  Observations_ yb_mean(obsens.mean());
+  Log::trace() << "size of ensemble is " << obsens.size() << std::endl;
+  Observations_ yb_mean(obsens.ens_mean(ens_xx.stateSet().commEns()));
 
   // treat the special case of nens=1
   // default option: xbmean_=mean(xb) then yb_mean == y_mean_xb and action below is a tautology
