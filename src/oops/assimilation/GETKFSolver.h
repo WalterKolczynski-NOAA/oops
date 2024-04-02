@@ -22,11 +22,13 @@
 #include "oops/base/DeparturesEnsemble.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/IncrementEnsemble4D.h"
+#include "oops/base/IncrementEnsembleSet.h"
 #include "oops/base/ObsEnsemble.h"
 #include "oops/base/Observations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
+#include "oops/base/StateEnsembleSet.h"
 #include "oops/generic/VerticalLocEV.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/util/ConfigFunctions.h"
@@ -52,11 +54,13 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   typedef Geometry<MODEL>             Geometry_;
   typedef GeometryIterator<MODEL>     GeometryIterator_;
   typedef IncrementEnsemble4D<MODEL>  IncrementEnsemble4D_;
+  typedef IncrementEnsembleSet<MODEL>  IncrementEnsembleSet_;
   typedef ObsEnsemble<OBS>            ObsEnsemble_;
   typedef Observations<OBS>           Observations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
   typedef StateSet<MODEL>              StateSet_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
+  typedef StateEnsembleSet<MODEL>      StateEnsembleSet_;
   typedef VerticalLocEV<MODEL>        VerticalLocEV_;
 
  public:

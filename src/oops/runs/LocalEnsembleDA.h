@@ -32,7 +32,7 @@
 #include "oops/base/ParameterTraitsVariables.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateSetSaver.h"
-#include "oops/base/StateEnsemble4D.h"
+#include "oops/base/StateEnsembleSet.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/mpi/mpi.h"
@@ -181,7 +181,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef ModelAuxControl<MODEL>           ModelAux_;
   typedef StateSet<MODEL>                  StateSet_;
   typedef State<MODEL>                     State_;
-  typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
+  typedef StateEnsembleSet<MODEL>           StateEnsembleSet_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
   typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
@@ -313,11 +313,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // Read all ensemble members and compute the ensemble mean
     // old version of SE4D stored all ens members on same communicator. Now making changes
     // to save across communicators in a StateSet instead. 
-    StateEnsemble4D_* ens_xx;
+    StateEnsembleSet_* ens_xx;
     if(runForecast) {
-      ens_xx = new StateEnsemble4D_(geometry, params.background, *stateSet);   
+      ens_xx = new StateEnsembleSet_(geometry, params.background, *stateSet);   
     } else {
-      ens_xx = new StateEnsemble4D_(geometry, params.background, vars, times, oops::mpi::myself(), ens, faceMember, mymember);   
+      ens_xx = new StateEnsembleSet_(geometry, params.background, vars, times, oops::mpi::myself(), ens, faceMember, mymember);   
     }
     const size_t nens = ens_xx->size();
     const Variables statevars = ens_xx->variables();

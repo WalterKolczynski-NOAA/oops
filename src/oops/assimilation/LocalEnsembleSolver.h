@@ -23,6 +23,7 @@
 #include "oops/base/DeparturesEnsemble.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/IncrementEnsemble4D.h"
+#include "oops/base/IncrementEnsembleSet.h"
 #include "oops/base/Model.h"
 #include "oops/base/ObsAuxControls.h"
 #include "oops/base/ObsEnsemble.h"
@@ -34,6 +35,7 @@
 #include "oops/base/State.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
+#include "oops/base/StateEnsembleSet.h"
 #include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/interface/ModelAuxControl.h"
@@ -53,6 +55,7 @@ class LocalEnsembleSolver {
   typedef Geometry<MODEL>             Geometry_;
   typedef GeometryIterator<MODEL>     GeometryIterator_;
   typedef IncrementEnsemble4D<MODEL>  IncrementEnsemble4D_;
+  typedef IncrementEnsembleSet<MODEL>  IncrementEnsembleSet_;
   typedef IncrementSet<MODEL>         IncrementSet_;
   typedef ObsAuxControls<OBS>         ObsAux_;
   typedef ObsEnsemble<OBS>            ObsEnsemble_;
@@ -61,6 +64,7 @@ class LocalEnsembleSolver {
   typedef ObsLocalizations<MODEL, OBS> ObsLocalizations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
+  typedef StateEnsembleSet<MODEL>      StateEnsembleSet_;
   typedef PseudoModelStateSet<MODEL>   PseudoModel_;
   typedef State<MODEL>                State_;
   typedef StateSet<MODEL>              StateSet_;
@@ -83,17 +87,17 @@ class LocalEnsembleSolver {
   /// computes ensemble H(\p xx), returns mean H(\p xx), saves as hofx \p iteration
   virtual Observations_ computeHofX(const StateEnsemble4D_ & xx, size_t iteration,
                       bool readFromDisk);
-  virtual Observations_ computeHofXSet(const StateEnsemble4D_ & xx, size_t iteration,
+  virtual Observations_ computeHofXSet(const StateEnsembleSet_ & xx, size_t iteration,
                       bool readFromDisk, int mymember);
   /// update background ensemble \p bg to analysis ensemble \p for all points on this PE
-  void measurementUpdateSet(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
+//  void measurementUpdateSet(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
   virtual void measurementUpdate(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
 
   /// update background ensemble \p bg to analysis ensemble \p an at a grid point location \p i
   virtual void measurementUpdate(const IncrementEnsemble4D_ & bg,
                                  const GeometryIterator_ & i, IncrementEnsemble4D_ & an) = 0;
-  void measurementUpdateSet(const IncrementEnsemble4D_ & bg,
-                                 const GeometryIterator_ & i, IncrementEnsemble4D_ & an);
+//  void measurementUpdateSet(const IncrementEnsemble4D_ & bg,
+//                                 const GeometryIterator_ & i, IncrementEnsemble4D_ & an);
 
   /// copy \p an[\p i] = \p bg[\p i] (e.g. when there are no local observations to update state)
   virtual void copyLocalIncrement(const IncrementEnsemble4D_ & bg,
@@ -165,7 +169,7 @@ LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
 }
 
 // -----------------------------------------------------------------------------
-#if 1
+#if 0
 template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::measurementUpdateSet
         (const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an) {
@@ -252,7 +256,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEnsemble4D_ & ens_xx,
+Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEnsembleSet_ & ens_xx,
                                                    size_t iteration, bool readFromDisk, int mymember) {
   util::Timer timer(classname(), "computeHofXSet");
 

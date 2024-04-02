@@ -122,6 +122,7 @@ oops/base/Increment.h
 oops/base/Increment4D.h
 oops/base/IncrementEnsemble.h
 oops/base/IncrementEnsemble4D.h
+oops/base/IncrementEnsembleSet.h
 oops/base/IncrementSet.h
 oops/base/Inflation.h
 oops/base/InflationBase.h
@@ -179,6 +180,7 @@ oops/base/State.h
 oops/base/State4D.h
 oops/base/StateEnsemble.h
 oops/base/StateEnsemble4D.h
+oops/base/StateEnsembleSet.h
 oops/base/StateInfo.h
 oops/base/StateSaver.h
 oops/base/StateSet.h

@@ -1,0 +1,165 @@
+/*
+ * (C) Copyright 2009-2016 ECMWF.
+ * (C) Copyright 2020 UCAR
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+#ifndef OOPS_BASE_INCREMENTENSEMBLESET_H_
+#define OOPS_BASE_INCREMENTENSEMBLESET_H_
+
+#include <Eigen/Dense>
+#include <string>
+#include <vector>
+
+#include "oops/base/Geometry.h"
+#include "oops/base/Increment4D.h"
+#include "oops/base/IncrementSet.h"
+#include "oops/base/LocalIncrement.h"
+#include "oops/base/StateSet.h"
+#include "oops/base/StateEnsembleSet.h"
+#include "oops/base/Variables.h"
+#include "oops/interface/GeometryIterator.h"
+#include "oops/util/DateTime.h"
+#include "oops/util/Logger.h"
+
+namespace oops {
+
+// -----------------------------------------------------------------------------
+
+/// \brief Ensemble of 4D increments
+template<typename MODEL> class IncrementEnsembleSet {
+  typedef Geometry<MODEL>            Geometry_;
+  typedef GeometryIterator<MODEL>    GeometryIterator_;
+  typedef StateSet<MODEL>             StateSet_;
+  typedef StateEnsembleSet<MODEL>     StateEnsembleSet_;
+  typedef Increment4D<MODEL>         Increment4D_;
+  typedef IncrementSet<MODEL>         IncrementSet_;
+
+ public:
+  /// Constructor
+  IncrementEnsembleSet(const Geometry_ & resol,
+                      const Variables & vars,
+                      const std::vector<util::DateTime> &,
+                      const int rank);
+  /// \brief construct ensemble of perturbations as \p ens - \p mean; holding
+  //         \p vars variables
+  IncrementEnsembleSet(const StateEnsembleSet_ & ens, const StateSet_ & mean,
+                      const Variables & vars);
+
+  IncrementEnsembleSet(const StateSet_ & ensemble,
+                      const StateSet_ & mean, 
+                      const Geometry_ & resol,
+                      const Variables & vars);
+  /// Accessors
+  size_t size() const {return ensemblePerturbs_.size();}
+  IncrementSet_ incrementSet() const {return ensemblePerturbsSet_;}
+
+  Increment4D_ & operator[](const size_t ii) {return ensemblePerturbs_[ii];}
+  const Increment4D_ & operator[](const size_t ii) const {return ensemblePerturbs_[ii];}
+
+  /// Eigen interface
+  void packEigen(Eigen::MatrixXd &, const GeometryIterator_ &, const size_t &) const;
+  void setEigen(const Eigen::MatrixXd &, const GeometryIterator_ &, const size_t &);
+
+ private:
+  std::vector<Increment4D_> ensemblePerturbs_;
+  IncrementSet_ ensemblePerturbsSet_;
+};
+
+// ====================================================================================
+
+template<typename MODEL>
+IncrementEnsembleSet<MODEL>::IncrementEnsembleSet(const Geometry_ & resol, const Variables & vars,
+                                                const std::vector<util::DateTime> & timeslots,
+                                                const int rank)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(resol, vars, timeslots, oops::mpi::myself())
+{
+  ensemblePerturbs_.reserve(rank);
+  for (int m = 0; m < rank; ++m) {
+    ensemblePerturbs_.emplace_back(resol, vars, timeslots);
+  }
+  Log::trace() << "IncrementEnsembleSet:contructor done" << std::endl;
+}
+
+// ====================================================================================
+template<typename MODEL>
+IncrementEnsembleSet<MODEL>::IncrementEnsembleSet(const StateSet_ & ensemble,
+                                                const StateSet_ & mean, 
+                                                const Geometry_ & resol,
+                                                const Variables & vars)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(resol, vars, ensemble)     
+{
+  ensemblePerturbs_.reserve(ensemble.size());
+//  FIX THIS--if this is created across communicators, it might work later
+  for (size_t ii = 0; ii < ensemble.local_ens_size(); ++ii) {
+    ensemblePerturbs_.emplace_back(ensemble[ii].geometry(), vars,
+                                   ensemble.times());
+    (ensemblePerturbs_[ii]).diff(ensemble, mean); // this will only work for local_ens_size=1
+  }
+  ensemblePerturbsSet_.diff(ensemble,mean);
+  Log::trace() << "IncrementEnsembleSet:contructor(StateEnsembleSet) done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+template<typename MODEL>
+IncrementEnsembleSet<MODEL>::IncrementEnsembleSet(const StateEnsembleSet_ & ensemble,
+                                                const StateSet_ & mean, const Variables & vars)
+  : ensemblePerturbs_(), ensemblePerturbsSet_(mean[0].geometry(), vars, mean.times(), oops::mpi::myself())
+{
+  ensemblePerturbs_.reserve(ensemble.size());
+  for (size_t ii = 0; ii < ensemble.size(); ++ii) {
+    ensemblePerturbs_.emplace_back(ensemble[ii].geometry(), vars,
+                                   ensemble[ii].validTimes());
+    ensemblePerturbs_[ii].diff(ensemble[ii], mean);
+  }
+  Log::trace() << "IncrementEnsembleSet:contructor(StateEnsembleSet) done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void IncrementEnsembleSet<MODEL>::packEigen(Eigen::MatrixXd & X,
+                                         const GeometryIterator_ & gi,
+                                         const size_t & itime) const
+{
+  size_t ngp = ensemblePerturbs_[0][itime].getLocal(gi).getVals().size();
+  size_t nens = ensemblePerturbs_.size();
+  X.resize(ngp, nens);
+  for (size_t iens=0; iens < nens; ++iens) {
+    LocalIncrement gp = ensemblePerturbs_[iens][itime].getLocal(gi);
+    std::vector<double> tmp1 = gp.getVals();
+    for (size_t iv=0; iv < ngp; ++iv) {
+      X(iv, iens) = tmp1[iv];
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void IncrementEnsembleSet<MODEL>::setEigen(const Eigen::MatrixXd & X,
+                                        const GeometryIterator_ & gi,
+                                        const size_t & itime)
+{
+  size_t ngp = ensemblePerturbs_[0][itime].getLocal(gi).getVals().size();
+  size_t nens = ensemblePerturbs_.size();
+
+  LocalIncrement gptmp = ensemblePerturbs_[0][itime].getLocal(gi);
+  std::vector<double> tmp = gptmp.getVals();
+
+  for (size_t iens=0; iens < nens; ++iens) {
+    for (size_t iv=0; iv < ngp; ++iv) {
+      tmp[iv] = X(iv, iens);
+    }
+    gptmp.setVals(tmp);
+    ensemblePerturbs_[iens][itime].setLocal(gptmp, gi);
+  }
+}
+
+}  // namespace oops
+
+#endif  // OOPS_BASE_INCREMENTENSEMBLESET_H_
