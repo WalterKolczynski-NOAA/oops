@@ -64,8 +64,8 @@ class LETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
                          const GeometryIterator_ &, IncrementEnsemble4D_ &) override;
 
   /// KF update + posterior inflation at a grid point location (GeometryIterator_)
-  void measurementUpdateSet(const IncrementEnsemble4D_ &,
-                         const GeometryIterator_ &, IncrementEnsemble4D_ &);
+//  void measurementUpdateSet(const IncrementEnsemble4D_ &,
+//                         const GeometryIterator_ &, IncrementEnsemble4D_ &);
 
  protected:
   /// Computes weights for ensemble update with local observations
@@ -116,7 +116,7 @@ LETKFSolver<MODEL, OBS>::LETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & ge
 }
 
 // -----------------------------------------------------------------------------
-#if 1
+#if 0
 template <typename MODEL, typename OBS>
 void LETKFSolver<MODEL, OBS>::measurementUpdateSet(const IncrementEnsemble4D_ & bkg_pert,
                                                 const GeometryIterator_ & i,

@@ -55,24 +55,20 @@ template<typename MODEL> class StateEnsemble4D {
 
   /// Accessors
   unsigned int size() const { return states_.size(); }
-  State_ & operator()(const int ii) { return (stateSet_)[ii]; }
-  const State_ & operator()(const int ii) const { return (stateSet_)[ii]; }
   StateSet_ & operator[](const int ii) { return states_[ii]; }
   const StateSet_ & operator[](const int ii) const { return states_[ii]; }
   /// Information
   const Variables & variables() const {return states_[0].variables();}
-  const StateSet_ & stateSet() const {return stateSet_;}
 
  private:
   std::vector<StateSet_> states_;
-  StateSet_ stateSet_;
 };
 
 // ====================================================================================
 
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet ): states_(), stateSet_(stateSet) {
+                  StateSet_ & stateSet ): states_() {
 
   // copy stateSet into class
   states_.emplace_back(stateSet);
@@ -91,7 +87,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const std::vector<int> & ens,
                                         const eckit::mpi::Comm & commEns,
                                         const int mymember)
-  : states_(), stateSet_(resol,vars,times,commTime,ens,commEns) {
+  : states_() {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsemble4D:constructor: both members and members from template are specified");
@@ -142,11 +138,6 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
   // read in ensemble members on appropriate communicator
   states_.emplace_back(StateSet_(resol, membersConfig[mymember-1]));
 
-  for (size_t jj = 0; jj < stateSet_.local_ens_size(); ++jj) {
-    for( size_t jt = 0; jt < times.size(); ++jt) { // FIX THIS. 
-      stateSet_[jt] = (states_[jj])[jt];
-    }
-  }
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
 }
 
@@ -154,7 +145,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const eckit::Configuration & config)
-  : states_(), stateSet_(resol,config) {
+  : states_() {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsemble4D:constructor: both members and members from template are specified");
@@ -214,8 +205,6 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
 template<typename MODEL>
 StateSet<MODEL> StateEnsemble4D<MODEL>::mean() const {
 
-  return states_[0].ens_mean();
-/*
   // Compute ensemble mean
   Accumulator<MODEL, StateSet_, StateSet_> ensmean(states_[0]);
 
@@ -226,7 +215,6 @@ StateSet<MODEL> StateEnsemble4D<MODEL>::mean() const {
 
   Log::trace() << "StateEnsemble4D::mean done" << std::endl;
   return std::move(ensmean);
-*/
 }
 
 // -----------------------------------------------------------------------------
