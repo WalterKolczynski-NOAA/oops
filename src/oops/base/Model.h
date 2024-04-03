@@ -119,15 +119,11 @@ void Model<MODEL>::forecast(State_ & xx, const ModelAux_ & maux,
 
   const util::DateTime end(xx.validTime() + len);
   Log::info() << "Model:forecast: forecast starting: " << xx << std::endl;
-  Log::info() << "Model:forecast: forecast starting at time: " << xx.validTime() << std::endl;
   this->initialize(xx);
   post.initialize(xx, end, model_->timeResolution());
-  Log::info() << "Model:forecast: before pre-process time: " << xx.validTime() << std::endl;
   post.process(xx);
   while (xx.validTime() < end) {
-    Log::info() << "Model:forecast: before step time: " << xx.validTime() << std::endl;
     this->step(xx, maux);
-    Log::info() << "Model:forecast: after step time: " << xx.validTime() << std::endl;
     post.process(xx);
   }
   post.finalize(xx);

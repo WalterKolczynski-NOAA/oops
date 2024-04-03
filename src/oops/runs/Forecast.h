@@ -99,7 +99,6 @@ template <typename MODEL> class Forecast : public Application {
     post.enrollProcessor(new StateInfo<State_>("fc", prtConfig));
 
     eckit::LocalConfiguration outConfig(fullConfig, "output");
-    eckit::LocalConfiguration observConfig(fullConfig, "observations");
     outConfig.set("date", bgndate.toString());
     post.enrollProcessor(new StateWriter<State_>(outConfig));
 

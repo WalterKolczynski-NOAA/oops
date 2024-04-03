@@ -312,6 +312,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
 
   // calculate H(x) ensemble mean
   Log::trace() << "size of ensemble is " << obsens.size() << std::endl;
+  // There is no method to calculate the mean of Observations spread across communicators
   Observations_ yb_mean(obsens.ens_mean(ens_xx.stateSet().commEns()));
 
   // treat the special case of nens=1
