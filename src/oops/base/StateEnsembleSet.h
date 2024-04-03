@@ -48,7 +48,7 @@ template<typename MODEL> class StateEnsembleSet {
 
   /// Create ensemble of stateSets
   StateEnsembleSet(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet );
+                  StateSet_ & stateSet);
 
   /// calculate ensemble mean
   StateSet_ mean() const;
@@ -71,8 +71,7 @@ template<typename MODEL> class StateEnsembleSet {
 
 template<typename MODEL>
 StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet ): stateSet_(stateSet) {
-
+                  StateSet_ & stateSet): stateSet_(stateSet) {
   Log::trace() << "StateEnsembleSet:contructor done" << std::endl;
 }
 
@@ -87,7 +86,7 @@ StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ & resol,
                                         const std::vector<int> & ens,
                                         const eckit::mpi::Comm & commEns,
                                         const int mymember)
-  : stateSet_(resol,vars,times,commTime,ens,commEns) {
+  : stateSet_(resol, vars, times, commTime, ens, commEns) {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsembleSet:constructor: both members and members from template are specified");
@@ -140,7 +139,7 @@ StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ & resol,
   states_.emplace_back(StateSet_(resol, membersConfig[mymember-1]));
 
   for (size_t jj = 0; jj < stateSet_.local_ens_size(); ++jj) {
-    for( size_t jt = 0; jt < times.size(); ++jt) { // FIX THIS. 
+    for (size_t jt = 0; jt < times.size(); ++jt) {  // FIX THIS.
       stateSet_[jt] = (states_[jj])[jt];
     }
   }
@@ -151,7 +150,7 @@ StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ & resol,
 template<typename MODEL>
 StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ & resol,
                                         const eckit::Configuration & config)
-  : stateSet_(resol,config) {
+  : stateSet_(resol, config) {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsembleSet:constructor: both members and members from template are specified");
@@ -210,7 +209,6 @@ StateEnsembleSet<MODEL>::StateEnsembleSet(const Geometry_ & resol,
 
 template<typename MODEL>
 StateSet<MODEL> StateEnsembleSet<MODEL>::mean() const {
-
   return stateSet_.ens_mean();
 }
 

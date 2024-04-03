@@ -12,6 +12,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
@@ -23,16 +24,16 @@
 #include "oops/base/Geometry.h"
 #include "oops/base/Increment.h"
 #include "oops/base/Increment4D.h"
-#include "oops/base/IncrementSet.h"
 #include "oops/base/IncrementEnsemble4D.h"
+#include "oops/base/IncrementSet.h"
 #include "oops/base/instantiateObsFilterFactory.h"
 #include "oops/base/Model.h"
 #include "oops/base/Observations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/ParameterTraitsVariables.h"
+#include "oops/base/StateEnsembleSet.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateSetSaver.h"
-#include "oops/base/StateEnsembleSet.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/mpi/mpi.h"
@@ -220,7 +221,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const int mytask = this->getComm().rank();
     const int tasks_per_member = ntasks / nmembers;
     int mymember = mytask / tasks_per_member + 1;
-   
+
     Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
                 << tasks_per_member << " MPI tasks per member." << std::endl;
@@ -229,7 +230,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 //  Create the communicator for each ensemble member, named comm_member_{i}:
     std::string commNameStr = "comm_member_" + std::to_string(mymember);
-    std::cout << "commNameStr is " << commNameStr << " and rank and mymember are " << mytask << " " << mymember << std::endl;
+    std::cout << "commNameStr is " << commNameStr << " and rank and mymember are " <<
+        mytask << " " << mymember << std::endl;
     char const *commName = commNameStr.c_str();
     eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
     const int subrank = commMember.rank();
@@ -259,7 +261,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::DateTime enddate(bgndate + fclength);
     std::vector<util::DateTime> times;
     const Variables vars(ic, "state variables");
-// Don't save the initial state  
+// Don't save the initial state
     for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
        Log::trace() << "pushing back time " << ii << std::endl;
        times.push_back(ii);
@@ -270,12 +272,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     std::unique_ptr<StateSet_> stateSet;
 
-    if(runForecast) {
+    if ( runForecast ) {
       eckit::LocalConfiguration initialCondition =
             memberConf.getSubConfiguration("initial condition");
       PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
       StateSetSaver<MODEL> *saver_ =
-            new StateSetSaver<MODEL>(memberConf, geometry, times, oops::mpi::myself(), ens, faceMember);
+        new StateSetSaver<MODEL>(memberConf, geometry, times, oops::mpi::myself(), ens, faceMember);
       post.enrollProcessor(saver_);
   //  Each member uses a different configuration:
       for (int m = 1; m <=nmembers; m++) {
@@ -293,7 +295,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
        Log::trace() << "HEYYYY ens_size of stateSet is " << stateSet->ens_size() << std::endl;
        Log::trace() << "HEYYYY time_size of stateSet is " << stateSet->time_size() << std::endl;
     //   Log::trace() << "HEYYYY times of stateSet is " << stateSet->times() << std::endl;
-    } 
+    }
     // Get observations configuration
     const eckit::LocalConfiguration observationsConfig = fcstparams.fcstConf.observConfig;
 //    eckit::LocalConfiguration observationsConfig = *fcstparams.observConfig.value();
@@ -312,12 +314,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // Read all ensemble members and compute the ensemble mean
     // old version of SE4D stored all ens members on same communicator. Now making changes
-    // to save across communicators in a StateSet instead. 
+    // to save across communicators in a StateSet instead.
     StateEnsembleSet_* ens_xx;
-    if(runForecast) {
-      ens_xx = new StateEnsembleSet_(geometry, params.background, *stateSet);   
+    if ( runForecast ) {
+      ens_xx = new StateEnsembleSet_(geometry, params.background, *stateSet);
     } else {
-      ens_xx = new StateEnsembleSet_(geometry, params.background, vars, times, oops::mpi::myself(), ens, faceMember, mymember);   
+      ens_xx = new StateEnsembleSet_(geometry, params.background, vars, times, oops::mpi::myself(),
+               ens, faceMember, mymember);
     }
     const size_t nens = ens_xx->size();
     const Variables statevars = ens_xx->variables();
@@ -355,7 +358,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // compute H(x)
     Log::trace() << "calling computeHofX" << std::endl;
-    Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0, params.driver.value().readHofX,mymember);
+    Observations_ yb_mean = solver->computeHofXSet(*ens_xx, 0,
+        params.driver.value().readHofX, mymember);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
@@ -390,9 +394,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // initialize empty analysis perturbations
     Log::trace() << "create ana_perts" << std::endl;
-//    IncrementEnsemble4D_ ana_pert(geometry, incvars, (*ens_xx)[mymember].validTimes(), bkg_pert.size());
-    IncrementEnsemble4D_ ana_pertSet(bkg_mean, bkg_mean, geometry, incvars); // bkg_mean will be subtracted
-                                                                            // from itself to make ana_pert=0
+    // bkg_mean will be subtracted from itself to make ana_pert=0
+    IncrementEnsemble4D_ ana_pertSet(bkg_mean, bkg_mean, geometry, incvars);
 //    IncrementEnsemble4D_ ana_pertSet(geometry, incvars, bkg_mean, bkg_pert.size());
 
     // run the solver at each gridpoint
@@ -412,15 +415,16 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // calculate final analysis states
     IncrementSet_ new_ens_xx(geometry, incvars, (*ens_xx).stateSet());
     if (incvars == statevars) {
-      new_ens_xx+=ana_pertSet.incrementSet(); 
+      new_ens_xx+=ana_pertSet.incrementSet();
 /*
         (*ens_xx)[jj] = bkg_mean;
         (*ens_xx)[jj] += ana_pert[jj];
 */
     } else {
 //      Increment4D_ ana_increment(geometry, incvars, (*ens_xx)[0].validTimes());
-      IncrementSet_ ana_incrementSet(geometry, incvars, times, oops::mpi::myself(), ens, faceMember);
-      ana_incrementSet=ana_pertSet.incrementSet();
+      IncrementSet_ ana_incrementSet(geometry, incvars, times, oops::mpi::myself(), ens,
+           faceMember);
+      ana_incrementSet = ana_pertSet.incrementSet();
       ana_incrementSet -= bkg_pertSet.incrementSet();
       new_ens_xx += ana_incrementSet;
     }
@@ -437,7 +441,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
       Log::trace() << "saving ana_increments." << std::endl;
       IncrementWriteParameters_ output = *params.outputPostEnsInc.value();
-      
+
       output.setMember(mymember);
       for (size_t itime = 0; itime < times.size(); ++itime) {
         Increment_ ana_increment(ana_pertSet.incrementSet()[itime], true);
@@ -508,7 +512,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       IncrementSet_ bkg_mean_inc(geometry, incvars, bkg_mean);
       for (size_t itime = 0; itime < times.size(); ++itime) {
         Increment_ ana_increment(ana_mean[itime], true);
-        ana_increment-=bkg_mean_inc[itime];
+        ana_increment -= bkg_mean_inc[itime];
         ana_increment.write(output);
         if (do_test_prints) {
           Log::test() << "Analysis mean increment :" << ana_increment << std::endl;
@@ -547,7 +551,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // than LETKF background/analysis perturbations.
     // hence one might not expect that oman and omaf are comparable
     if (params.driver.value().doPostObs.value()) {
-      Observations_ ya_mean = solver->computeHofXSet(*ens_xx, 1, false,mymember);
+      Observations_ ya_mean = solver->computeHofXSet(*ens_xx, 1, false, mymember);
       Log::test() << "H(x) ensemble analysis mean: " << std::endl << ya_mean << std::endl;
 
       // calculate analysis obs departures

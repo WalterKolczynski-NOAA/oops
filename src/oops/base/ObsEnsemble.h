@@ -33,7 +33,7 @@ template<typename OBS> class ObsEnsemble {
 
   /// Compute ensemble mean
   Observations_ mean() const;
-  Observations_ ens_mean(const eckit::mpi::Comm & ) const;
+  Observations_ ens_mean(const eckit::mpi::Comm &) const;
 
  private:
   const ObsSpaces_ & obsdb_;             // ObsSpaces used for creating ensemble members
@@ -82,7 +82,6 @@ Observations<OBS> ObsEnsemble<OBS>::ens_mean(const eckit::mpi::Comm & commEns) c
 // Now sum across communicator -- how do we do this?
 //  commEns.allReduceInPlace(&(mean_obs[0]),mean_obs.size(),eckit::mpi::Operation::SUM);
   Log::trace() << "ObsEnsemble::mean done" << std::endl;
-  
   return mean_obs;
 }
 

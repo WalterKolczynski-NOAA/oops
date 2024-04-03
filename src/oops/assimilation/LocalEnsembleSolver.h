@@ -33,9 +33,9 @@
 #include "oops/base/ObsLocalizations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/State.h"
-#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
 #include "oops/base/StateEnsembleSet.h"
+#include "oops/base/StateSet.h"
 #include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/interface/ModelAuxControl.h"
@@ -257,7 +257,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
 
 template <typename MODEL, typename OBS>
 Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEnsembleSet_ & ens_xx,
-                                                   size_t iteration, bool readFromDisk, int mymember) {
+                                       size_t iteration, bool readFromDisk, int mymember) {
   util::Timer timer(classname(), "computeHofXSet");
 
   ASSERT(ens_xx.size() == Yb_.size());
@@ -289,7 +289,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
     config.set("save qc", false);
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
-    // keep in mind we are doing this across MPI_COMM_WORLD 
+    // keep in mind we are doing this across MPI_COMM_WORLD
     for (size_t jj = 0; jj < ens_xx.stateSet().local_ens_size(); ++jj) {
       computeHofX4DSet(config, ens_xx.stateSet(), obsens[jj]);
       Log::trace() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;

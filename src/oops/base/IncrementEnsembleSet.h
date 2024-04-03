@@ -19,8 +19,8 @@
 #include "oops/base/Geometry.h"
 #include "oops/base/IncrementSet.h"
 #include "oops/base/LocalIncrement.h"
-#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsembleSet.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/Variables.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/util/DateTime.h"
@@ -50,7 +50,7 @@ template<typename MODEL> class IncrementEnsembleSet {
                       const Variables & vars);
 
   IncrementEnsembleSet(const StateSet_ & ensemble,
-                      const StateSet_ & mean, 
+                      const StateSet_ & mean,
                       const Geometry_ & resol,
                       const Variables & vars);
   /// Accessors
@@ -75,12 +75,12 @@ IncrementEnsembleSet<MODEL>::IncrementEnsembleSet(const Geometry_ & resol, const
 // ====================================================================================
 template<typename MODEL>
 IncrementEnsembleSet<MODEL>::IncrementEnsembleSet(const StateSet_ & ensemble,
-                                                const StateSet_ & mean, 
+                                                const StateSet_ & mean,
                                                 const Geometry_ & resol,
                                                 const Variables & vars)
-  : ensemblePerturbsSet_(resol, vars, ensemble)     
+  : ensemblePerturbsSet_(resol, vars, ensemble)
 {
-  ensemblePerturbsSet_.diff(ensemble,mean);
+  ensemblePerturbsSet_.diff(ensemble, mean);
   Log::trace() << "IncrementEnsembleSet:contructor(StateEnsembleSet) done" << std::endl;
 }
 // -----------------------------------------------------------------------------

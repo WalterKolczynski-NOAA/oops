@@ -48,7 +48,7 @@ template<typename MODEL> class StateEnsemble4D {
 
   /// Create ensemble of 4D states
   StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet );
+                  StateSet_ & stateSet);
 
   /// calculate ensemble mean
   StateSet_ mean() const;
@@ -68,8 +68,7 @@ template<typename MODEL> class StateEnsemble4D {
 
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet ): states_() {
-
+                  StateSet_ & stateSet): states_() {
   // copy stateSet into class
   states_.emplace_back(stateSet);
 
@@ -204,7 +203,6 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
 
 template<typename MODEL>
 StateSet<MODEL> StateEnsemble4D<MODEL>::mean() const {
-
   // Compute ensemble mean
   Accumulator<MODEL, StateSet_, StateSet_> ensmean(states_[0]);
 

@@ -76,8 +76,7 @@ template<typename MODEL>
 void PseudoModelStateSet<MODEL>::initialize(State_ & xx) const {
   currentstate_ = 0;
   xx = stateset_[currentstate_];
-  Log::trace() << "PseudoModelStateSet<MODEL>::initialize done currentstate is " << currentstate_ << std::endl;
-  Log::trace() << "PseudoModelStateSet<MODEL>::initialize done size is " << stateset_[currentstate_] << std::endl;
+  Log::trace() << "PseudoModelStateSet<MODEL>::initialize done " << std::endl;
 }
 
 // -----------------------------------------------------------------------------
