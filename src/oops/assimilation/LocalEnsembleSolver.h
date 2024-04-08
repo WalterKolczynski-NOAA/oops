@@ -23,7 +23,6 @@
 #include "oops/base/DeparturesEnsemble.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/IncrementEnsemble4D.h"
-#include "oops/base/IncrementEnsembleSet.h"
 #include "oops/base/Model.h"
 #include "oops/base/ObsAuxControls.h"
 #include "oops/base/ObsEnsemble.h"
@@ -34,7 +33,6 @@
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/State.h"
 #include "oops/base/StateEnsemble4D.h"
-#include "oops/base/StateEnsembleSet.h"
 #include "oops/base/StateSet.h"
 #include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
@@ -55,8 +53,6 @@ class LocalEnsembleSolver {
   typedef Geometry<MODEL>             Geometry_;
   typedef GeometryIterator<MODEL>     GeometryIterator_;
   typedef IncrementEnsemble4D<MODEL>  IncrementEnsemble4D_;
-  typedef IncrementEnsembleSet<MODEL>  IncrementEnsembleSet_;
-  typedef IncrementSet<MODEL>         IncrementSet_;
   typedef ObsAuxControls<OBS>         ObsAux_;
   typedef ObsEnsemble<OBS>            ObsEnsemble_;
   typedef ObsErrors<OBS>              ObsErrors_;
@@ -64,7 +60,6 @@ class LocalEnsembleSolver {
   typedef ObsLocalizations<MODEL, OBS> ObsLocalizations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
-  typedef StateEnsembleSet<MODEL>      StateEnsembleSet_;
   typedef PseudoModelStateSet<MODEL>   PseudoModel_;
   typedef State<MODEL>                State_;
   typedef StateSet<MODEL>              StateSet_;
@@ -87,10 +82,9 @@ class LocalEnsembleSolver {
   /// computes ensemble H(\p xx), returns mean H(\p xx), saves as hofx \p iteration
   virtual Observations_ computeHofX(const StateEnsemble4D_ & xx, size_t iteration,
                       bool readFromDisk);
-  virtual Observations_ computeHofXSet(const StateEnsembleSet_ & xx, size_t iteration,
+  virtual Observations_ computeHofXSet(const StateSet_ & xx, size_t iteration,
                       bool readFromDisk, int mymember);
   /// update background ensemble \p bg to analysis ensemble \p for all points on this PE
-//  void measurementUpdateSet(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
   virtual void measurementUpdate(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
 
   /// update background ensemble \p bg to analysis ensemble \p an at a grid point location \p i
@@ -169,15 +163,6 @@ LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
 }
 
 // -----------------------------------------------------------------------------
-#if 0
-template <typename MODEL, typename OBS>
-void LocalEnsembleSolver<MODEL, OBS>::measurementUpdateSet
-        (const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an) {
-    for (GeometryIterator_ i = geometry_.begin(); i != geometry_.end(); ++i) {
-      measurementUpdate(bg, i, an);
-    }
-}
-#endif
 // -----------------------------------------------------------------------------
 template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::measurementUpdate
@@ -256,7 +241,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEnsembleSet_ & ens_xx,
+Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateSet_ & ens_xx,
                                        size_t iteration, bool readFromDisk, int mymember) {
   util::Timer timer(classname(), "computeHofXSet");
 
@@ -290,8 +275,8 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
     // keep in mind we are doing this across MPI_COMM_WORLD
-    for (size_t jj = 0; jj < ens_xx.stateSet().local_ens_size(); ++jj) {
-      computeHofX4DSet(config, ens_xx.stateSet(), obsens[jj]);
+    for (size_t jj = 0; jj < ens_xx.local_ens_size(); ++jj) {
+      computeHofX4DSet(config, ens_xx, obsens[jj]);
       Log::trace() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
     }
@@ -313,7 +298,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateEns
   // calculate H(x) ensemble mean
   Log::trace() << "size of ensemble is " << obsens.size() << std::endl;
   // There is no method to calculate the mean of Observations spread across communicators
-  Observations_ yb_mean(obsens.ens_mean(ens_xx.stateSet().commEns()));
+  Observations_ yb_mean(obsens.ens_mean(ens_xx.commEns()));
 
   // treat the special case of nens=1
   // default option: xbmean_=mean(xb) then yb_mean == y_mean_xb and action below is a tautology

@@ -32,7 +32,6 @@
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/ParameterTraitsVariables.h"
 #include "oops/base/StateEnsemble4D.h"
-#include "oops/base/StateEnsembleSet.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateSetSaver.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
@@ -187,7 +186,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef StateSet<MODEL>                  StateSet_;
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
-  typedef StateEnsembleSet<MODEL>          StateEnsembleSet_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
   typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
@@ -267,6 +265,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       if (do_test_prints) {
         for (size_t jj = 0; jj < nens; ++jj) {
           Log::test() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
+          Log::trace() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
         }
       }
 
@@ -276,12 +275,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       Observations_ yb_mean = solver->computeHofX(ens_xx, 0, params.driver.value().readHofX);
       if (do_test_prints) {
          Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
+         Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
       }
 
       Departures_ ombg(yobs - yb_mean);
       ombg.save("ombg");
       if (do_test_prints) {
-         Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
+         Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
       }
 
       // quit early if running in observer-only mode
@@ -494,6 +494,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::mpi::Comm & faceMember = this->getComm().split(subrank, faceName);
     const int subface = faceMember.rank();
 
+    Log::info() << "size of faceMember/ENS comm is " << faceMember.size() << std::endl;
     //  Each member uses a different configuration:
     eckit::PathName confPath = files[mymember-1];
     eckit::YAMLConfiguration memberConf(confPath);
@@ -502,6 +503,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     fcstparams.validate(memberConf);
     fcstparams.deserialize(memberConf);
     const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
+    Log::info() << "done with geometry" << std::endl;
 
     //  Setup times
     Log::info() << "setting up times" << std::endl;
@@ -514,16 +516,22 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     std::vector<util::DateTime> times;
     const Variables vars(ic, "state variables");
     // Don't save the initial state
+   
+    Log::info() << "bgndate is " << bgndate << std::endl;
+    Log::info() << "enddate is " << enddate << std::endl;
+    oops::mpi::world().barrier();
     for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
-       Log::trace() << "pushing back time " << ii << std::endl;
+       Log::info() << "pushing back time " << ii << std::endl;
        times.push_back(ii);
     }
+    oops::mpi::world().barrier();
     std::vector<int> ens;  // vector of ensemble numbers
     for (int m = 1; m <=nmembers; m++) { ens.push_back(m); }
-    Log::trace() << "ens is " << ens << std::endl;
+    Log::info() << "ens is " << ens << std::endl;
+//  std::cout << "ens is " << ens << std::endl;
+    oops::mpi::world().barrier();
 
-    std::unique_ptr<StateSet_> stateSet;
-
+    std::unique_ptr<StateSet_> ens_xx;
     if ( runForecast ) {
       eckit::LocalConfiguration initialCondition =
             memberConf.getSubConfiguration("initial condition");
@@ -543,10 +551,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
          }
        }
        oops::mpi::world().barrier();
-       stateSet = std::move(saver_->getStateSet());
-       Log::trace() << "HEYYYY ens_size of stateSet is " << stateSet->ens_size() << std::endl;
-       Log::trace() << "HEYYYY time_size of stateSet is " << stateSet->time_size() << std::endl;
-    //   Log::trace() << "HEYYYY times of stateSet is " << stateSet->times() << std::endl;
+       ens_xx = std::move(saver_->getStateSet());
+    } else {  // read in the states
+      Log::info() << "creating new stateset " << std::endl;
+      std::vector<eckit::LocalConfiguration> membersConfig;
+      eckit::LocalConfiguration background = params.background;
+      ens_xx = std::unique_ptr<StateSet_>(new StateSet_(geometry, background, oops::mpi::myself(), faceMember));
     }
     // Get observations configuration
     const eckit::LocalConfiguration observationsConfig = fcstparams.fcstConf.observConfig;
@@ -561,16 +571,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
-    // Read all ensemble members and compute the ensemble mean
+    // compute the ensemble mean
     // old version of SE4D stored all ens members on same communicator. Now making changes
     // to save across communicators in a StateSet instead.
-    StateEnsembleSet_* ens_xx;
-    if ( runForecast ) {
-      ens_xx = new StateEnsembleSet_(geometry, params.background, *stateSet);
-    } else {
-      ens_xx = new StateEnsembleSet_(geometry, params.background, vars, times, oops::mpi::myself(),
-               ens, faceMember, mymember);
-    }
     const size_t nens = ens_xx->size();
     const Variables statevars = ens_xx->variables();
     Variables incvars;
@@ -579,9 +582,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     } else {
       incvars += *params.incvars.value();
     }
-    StateSet_ bkg_mean = ens_xx->stateSet().ens_mean();
-    Log::trace() << "ens_xx stateset is " << ens_xx->stateSet() << std::endl;
-    Log::trace() << "Background mean is " << bkg_mean << std::endl;
+    StateSet_ bkg_mean = ens_xx->ens_mean();
+    Log::info() << "Background mean is " << bkg_mean << std::endl;
     // if control member is present use that instead of the ensemble mean
     if (params.driver.value().useControlMember) {
       StateSet_ controlMember(geometry, *params.controlMember.value());
@@ -597,9 +599,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // test prints for the prior ensemble
     bool do_test_prints = params.driver.value().doTestPrints;
+    do_test_prints = true;
     if (do_test_prints) {
-      for (size_t jj = 0; jj < (*ens_xx).stateSet().local_ens_size(); ++jj) {
-        Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)(jj) << std::endl;
+      for (size_t jj = 0; jj < ens_xx->local_ens_size(); ++jj) {
+        Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)[jj] << std::endl;
       }
     }
     util::printRunStats("LocalEnsembleDA before computeHofX");
@@ -622,6 +625,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
     if (do_test_prints) {
        Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
+       Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
     }
     // quit early if running in observer-only mode
     if (params.driver.value().runObsOnly.value()) {

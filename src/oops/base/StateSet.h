@@ -78,6 +78,7 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
   }
   this->check_consistency();
   Log::trace() << "StateSet::StateSet" << std::endl;
+  Log::info() << "StateSet::StateSet done" << std::endl;
 }
 
 
@@ -88,6 +89,7 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
   : DataSetBase<State_, Geometry_>(commTime, commEns)
 {
   Log::trace() << "StateSet::StateSet read start " << config << std::endl;
+  Log::info() << "StateSet::StateSet read start " << config << std::endl;
 
 // get vector of local configurations
   std::vector<eckit::LocalConfiguration> locals = this->configure(config);
@@ -104,6 +106,7 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
   this->check_consistency();
 
   Log::trace() << "StateSet::StateSet read done" << std::endl;
+  Log::info() << "StateSet::StateSet read done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
