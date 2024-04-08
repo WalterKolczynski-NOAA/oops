@@ -60,7 +60,7 @@ template <typename MODEL>
 StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf, const Geometry_ & resol):
   PostBase<State_>(conf), resol_(resol)
 {
-  Log::info() << "StateSetSaver::constructor1" << std::endl;
+  Log::info() << "StateSetSaver::constructor" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -78,8 +78,6 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
   times_(times),
   ens_(ens)
 {
-  Log::trace() << "StateSetSaver::size of stateset is " << ens_.size() << std::endl;
-  Log::trace() << "StateSetSaver::time[0] of stateset is " << times_[0] << std::endl;
   Log::info() << "StateSetSaver::constructor" << std::endl;
 }
 // -----------------------------------------------------------------------------
@@ -97,11 +95,9 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
                            const util::DateTime & bgndate,
                            const util::Duration & fcstlen ) {
   if (!initialized_) {
-    Log::info() << "StateSetSaver::doInitialize start for times_ " << times_[0] << std::endl;
     States_.reset( new StateSet(resol_, x0.variables(), times_, commTime_, ens_, commEns_) );
     stateIndex_ = 0;
     Log::info() << "StateSetSaver::doInitialize done " << std::endl;
-//    initialized_ = true; // skip the first state, which is the IC
   }
 }
 
@@ -110,8 +106,6 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
 template <typename MODEL>
 void StateSetSaver<MODEL>::doProcessing(const State_ & xx) {
   if ( initialized_ ) {
-    Log::trace() << "StateSetSaver::doProcessing on stateIndex_ " << stateIndex_ << std::endl;
-    Log::trace() << "StateSetSaver::doProcessing on xx times is " << xx.validTime() << std::endl;
     (*States_)[stateIndex_] = xx;
     stateIndex_++;
     Log::info() << "StateSetSaver::doProcessing done" << std::endl;

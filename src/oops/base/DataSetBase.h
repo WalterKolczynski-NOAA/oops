@@ -321,7 +321,7 @@ template<typename DATA, typename GEOM>
 std::vector<eckit::LocalConfiguration>
   DataSetBase<DATA, GEOM>::configure(const eckit::Configuration & config)
 {
-  Log::info() << "DataSetBase::configure start " << config << std::endl;
+  Log::trace() << "DataSetBase::configure start " << config << std::endl;
 
   std::vector<eckit::LocalConfiguration> locals;
 
@@ -329,7 +329,6 @@ std::vector<eckit::LocalConfiguration>
   if (config.has("members from template")) {
     eckit::LocalConfiguration tmpl(config, "members from template");
     nmembers_ = tmpl.getInt("nmembers");
-    Log::info() << "HEY nmembers is " << nmembers_ << std::endl;
     const std::string pattern = tmpl.getString("pattern");
     const int zpad = tmpl.getInt("zero padding", 0);
     const std::vector<size_t> except = tmpl.getUnsignedVector("except", {});

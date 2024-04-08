@@ -515,10 +515,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::DateTime enddate(bgndate + fclength);
     std::vector<util::DateTime> times;
     const Variables vars(ic, "state variables");
+
     // Don't save the initial state
-   
-    Log::info() << "bgndate is " << bgndate << std::endl;
-    Log::info() << "enddate is " << enddate << std::endl;
     oops::mpi::world().barrier();
     for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
        Log::info() << "pushing back time " << ii << std::endl;
@@ -556,7 +554,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       Log::info() << "creating new stateset " << std::endl;
       std::vector<eckit::LocalConfiguration> membersConfig;
       eckit::LocalConfiguration background = params.background;
-      ens_xx = std::unique_ptr<StateSet_>(new StateSet_(geometry, background, oops::mpi::myself(), faceMember));
+      ens_xx = std::unique_ptr<StateSet_>(new StateSet_(geometry, background,
+                  oops::mpi::myself(), faceMember));
     }
     // Get observations configuration
     const eckit::LocalConfiguration observationsConfig = fcstparams.fcstConf.observConfig;
