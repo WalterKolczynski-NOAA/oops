@@ -46,7 +46,6 @@ template <typename MODEL> class ForecastParameters : public Parameters {
   /// Where to write the output.
   RequiredParameter<eckit::LocalConfiguration> output{"output", this};
   OptionalParameter<eckit::LocalConfiguration> latlonGridOutput{"forecast to latlon", this};
-  RequiredParameter<eckit::LocalConfiguration> observConfig{"observations", this};
 
   /// Options passed to the object writing out forecast fields.
   Parameter<eckit::LocalConfiguration> prints{"prints", eckit::LocalConfiguration(), this};

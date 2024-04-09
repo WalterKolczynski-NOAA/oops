@@ -93,7 +93,26 @@ class LocalEnsembleDADriverParameters : public Parameters {
                   "use control member to center prior ensemble instead of the prior ensemble mean",
                   false, this};
 };
-
+// -----------------------------------------------------------------------------
+/// \brief Options controlling output and observer for LocalEnsembleDA application.
+class LocalEnsembleInlineParameters : public Parameters {
+  OOPS_CONCRETE_PARAMETERS(LocalEnsembleInlineParameters, Parameters)
+ public:
+  Parameter<bool> runForecast{"Run Forecast",
+                  "controls whether or not a forecast is run before computing H(x)", false, this};
+  Parameter<int> batch{"forecast batch size",
+                  "the number of ensemble members to run at a given time", 1, this};
+  Parameter<std::string> pattern{"output file pattern",
+                  "pattern in obsdataout.engine.obsfile to be replaced", "%ensmem%", this};
+  Parameter<int> zpad{"zero padding",
+                  "number of zeros to add in front of member number", 1, this};
+  Parameter<bool> hofXOnly{"Compute HofX Only",
+                  "stop after computing HofX and write out files", false, this};
+  /// Parameters containing a list of YAML files for each ensemble member to be processed.
+  std::vector<std::string> defaultFiles = {"empty"};
+  Parameter<std::vector<std::string>> files{"Forecast configuration",
+                 "list of yaml files with forecast configurations", defaultFiles, this};
+};
 // -----------------------------------------------------------------------------
 /// \brief Top-level options taken by the LocalEnsembleDA application.
 template <typename MODEL>
@@ -121,13 +140,8 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
   Parameter<LocalEnsembleDADriverParameters> driver{"driver",
           "options controlling output and observer runs", {}, this};
 
-  Parameter<bool> runForecast{"Run Forecast", false, this};
-  Parameter<int> batch{"batch", 1, this};
-  Parameter<bool> hofXOnly{"Compute HofX Only", false, this};
+  Parameter<LocalEnsembleInlineParameters> inlineParams{"inline parameters", {}, this};
 
-  /// Parameters containing a list of YAML files for each ensemble member to be processed.
-  std::vector<std::string> defaultFiles = {"empty"};
-  Parameter<std::vector<std::string>> files{"files", defaultFiles, this};
 
   RequiredParameter<eckit::LocalConfiguration> background{"background",
           "ensemble of backgrounds", this};
@@ -211,7 +225,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
-    const bool HofXOnly = params.hofXOnly.value();
+    LocalEnsembleInlineParameters inlineParams = params.inlineParams;
+    const bool HofXOnly = inlineParams.hofXOnly.value();
 
     if ( HofXOnly ) {
       executeHofX(fullConfig, validate, params);
@@ -467,9 +482,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
     //  Get the MPI partition
-    const bool runForecast = params.runForecast.value();
-    const std::vector<std::string> &files = params.files.value();
-    const int batchsize = params.batch.value();
+
+    LocalEnsembleInlineParameters inlineParams = params.inlineParams;
+    const bool HofXOnly = inlineParams.hofXOnly.value();
+    const bool runForecast = inlineParams.runForecast.value();
+    const std::vector<std::string> &files = inlineParams.files.value();
+    const int batchsize = inlineParams.batch.value();
+    const int zpad = inlineParams.zpad.value();
+    const std::string pattern = inlineParams.pattern.value();
+
     const int nmembers = files.size();
     const int ntasks = this->getComm().size();
     const int mytask = this->getComm().rank();
@@ -525,8 +546,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     oops::mpi::world().barrier();
     std::vector<int> ens;  // vector of ensemble numbers
     for (int m = 1; m <=nmembers; m++) { ens.push_back(m); }
-    Log::info() << "ens is " << ens << std::endl;
-//  std::cout << "ens is " << ens << std::endl;
     oops::mpi::world().barrier();
 
     std::unique_ptr<StateSet_> ens_xx;
@@ -558,7 +577,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
                   oops::mpi::myself(), faceMember));
     }
     // Get observations configuration
-    const eckit::LocalConfiguration observationsConfig = fcstparams.fcstConf.observConfig;
+    eckit::LocalConfiguration observationsConfig = params.observations;
+    util::seekAndReplace(observationsConfig, pattern, (mymember - 1), zpad);
     eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
     // if any of the obs. spaces uses Halo distribution it will need to know the geometry
@@ -567,6 +587,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
+    Log::info() << "creating obsdb\n";
     ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
