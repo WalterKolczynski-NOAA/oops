@@ -252,6 +252,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateSet
   Observations_ y_mean_xb(obspaces_);
 
   if (readFromDisk) {
+    Log::trace() << "reading from disk now" << std::endl;
     // read hofx from disk
     for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
@@ -278,7 +279,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXSet(const StateSet
     for (size_t jj = 0; jj < ens_xx.local_ens_size(); ++jj) {
       computeHofX4DSet(config, ens_xx, obsens[jj]);
       Log::trace() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-      obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
+      obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(mymember));
     }
     // Compute H(mean(Xb))
     // set QC for the mean
@@ -336,11 +337,14 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofX(const StateEnsemb
   ObsEnsemble_ obsens(obspaces_, nens);
   Observations_ y_mean_xb(obspaces_);
 
+  Log::info() << "reading from disk now on iteration " << iteration << std::endl;
   if (readFromDisk) {
     // read hofx from disk
+    Log::info() << "reading from disk now" << std::endl;
     for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
+      Log::info() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
     }
     R_.reset(new ObsErrors_(observersconf_, obspaces_));
     y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));

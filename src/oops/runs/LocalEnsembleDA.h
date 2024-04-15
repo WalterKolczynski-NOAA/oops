@@ -252,6 +252,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       Observations_ yobs(obsdb, "ObsValue");
 
       // Read all ensemble members and compute the ensemble mean
+      Log::info() << "reading in ensemble members" << std::endl;
       StateEnsemble4D_ ens_xx(geometry, params.background);
       const size_t nens = ens_xx.size();
       const Variables statevars = ens_xx.variables();
@@ -287,7 +288,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       util::printRunStats("LocalEnsembleDA before computeHofX");
 
       // compute H(x)
-      Observations_ yb_mean = solver->computeHofX(ens_xx, 0, params.driver.value().readHofX);
+      Log::info() << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
+      std::cout << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
+      size_t iter = 0;
+      Observations_ yb_mean = solver->computeHofX(ens_xx, iter, params.driver.value().readHofX);
       if (do_test_prints) {
          Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
          Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
@@ -300,8 +304,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
 
       // quit early if running in observer-only mode
+      Log::info() << "HEY, runobsonly is " << params.driver.value().runObsOnly.value() << std::endl;
       if (params.driver.value().runObsOnly.value()) {
         obsdb.save();
+        Log::info() << "HEY, quiting " << std::endl;
         return 0;
       }
 
