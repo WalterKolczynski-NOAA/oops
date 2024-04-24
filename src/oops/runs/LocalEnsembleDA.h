@@ -200,6 +200,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef StateSet<MODEL>                  StateSet_;
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
+  typedef typename Geometry_::Parameters_       GeometryParameters_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
   typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
@@ -228,13 +229,20 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     LocalEnsembleInlineParameters inlineParams = params.inlineParams;
     const bool HofXOnly = inlineParams.hofXOnly.value();
 
+#if 1
+    Log::info() << "setting up sub geometry" << std::endl;
+    Log::info() << "comm size is " << this->getComm().size() << std::endl;
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    Geometry_ subgeometry(subconfig , this->getComm() );
+#endif
     if ( HofXOnly ) {
       executeHofX(fullConfig, validate, params);
     } else {
       //  Setup observation window
       const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
       Log::info() << "Observation window: " << timeWindow << std::endl;
-
       // Setup geometry
       const Geometry_ geometry(params.geometry, this->getComm());
 
@@ -515,6 +523,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
     const int subrank = commMember.rank();
 
+    int *pelist = new int[commMember.size()];
+    for( int i = 0; i < commMember.size(); ++i) {
+      pelist[i] = (mymember - 1) * tasks_per_member + i;
+    }
     //  Create the communicator for each face of cubed sphere, named face_member_{i}:
     std::string faceNameStr = "face_member_" + std::to_string(subrank);
     char const *faceName = faceNameStr.c_str();
@@ -525,11 +537,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     //  Each member uses a different configuration:
     eckit::PathName confPath = files[mymember-1];
     eckit::YAMLConfiguration memberConf(confPath);
-
     ForecastAppParameters_ fcstparams;
     fcstparams.validate(memberConf);
     fcstparams.deserialize(memberConf);
+    
     const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
+    std::cout << "DONE with geometry ctr " << std::endl;
+
     Log::info() << "done with geometry" << std::endl;
 
     //  Setup times

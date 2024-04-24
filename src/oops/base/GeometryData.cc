@@ -206,6 +206,9 @@ void GeometryData::setGlobalTree(const std::vector<double> & lats,
   util::Timer timer("oops::GeometryData", "setGlobalTree");
   const size_t ntasks = comm_.size();
 
+  Log::info() << "oops::GeometryData ntasks is " << ntasks << std::endl;
+//  std::cout << "HEY my comm is " << comm_.rank() << " lons" << lons << std::endl;
+//  std::cout << "HEY my comm is " << comm_.rank() << " lats " << lats << std::endl;
 // Local latitudes and longitudes
   const size_t sizel = lats.size();
   std::vector<double> latlon(2*sizel);
