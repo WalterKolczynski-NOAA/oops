@@ -607,8 +607,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
-    Log::info() << "creating obsdb\n";
+    Log::info() << "creating obsspaces with comm size " << commMember.size() << std::endl;
+//    ObsSpaces_ obsdb(obsConfig, faceMember, timeWindow, time);
     ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
+//    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
     // compute the ensemble mean
