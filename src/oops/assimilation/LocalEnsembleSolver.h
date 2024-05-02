@@ -352,7 +352,6 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
     for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-      Log::info() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
     }
     R_.reset(new ObsErrors_(observersconf_, obspaces_));
     y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));
@@ -372,9 +371,10 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
 
+
     for (size_t jj = 0; jj < nens; ++jj) {
       computeHofX4D(config, ens_xx[jj], obsens[jj]);
-      Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
+//    Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
     }
 
@@ -402,7 +402,6 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeYbMean(const StateEnse
   for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-      Log::info() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
   }
   R_.reset(new ObsErrors_(observersconf_, obspaces_));
   y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));
@@ -455,7 +454,6 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofX(const StateEnsemb
     for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-      Log::info() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
     }
     R_.reset(new ObsErrors_(observersconf_, obspaces_));
     y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));

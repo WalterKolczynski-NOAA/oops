@@ -291,41 +291,32 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       if (do_test_prints) {
         for (size_t jj = 0; jj < nens; ++jj) {
           Log::test() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
-          Log::trace() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
         }
       }
 
       util::printRunStats("LocalEnsembleDA before computeHofX");
 
       // compute H(x)
-      Log::info() << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
-      std::cout << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
       size_t iter = 0;
       solver->computeHofXAlone(ens_xx, iter, params.driver.value().readHofX);
 
       // quit early if running in observer-only mode
-      Log::info() << "HEY, runobsonly is " << params.driver.value().runObsOnly.value() << std::endl;
       if (params.driver.value().runObsOnly.value()) {
         obsdb.save();
-        Log::info() << "HEY, quiting " << std::endl;
         return 0;
       }
 
-      std::cout << "HEYY calling computeYbMean " << params.driver.value().readHofX << std::endl;
       iter = 0;
       Observations_ yb_mean = solver->computeYbMean(ens_xx, iter, params.driver.value().readHofX);
       if (do_test_prints) {
          Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
-         Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
       }
 
-      std::cout << "HEYY DONE with computeYbMean " << std::endl;
       iter = 0;
       Departures_ ombg(yobs - yb_mean);
       ombg.save("ombg");
-      std::cout << "HEYY saved ombg" <<  std::endl;
       if (do_test_prints) {
-         Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
+         Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
       }
 
 
@@ -334,18 +325,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         Log::test() << "Background mean :" << bkg_mean << std::endl;
       }
 
-      std::cout << "HEYY bkg_pert" <<  std::endl;
       // calculate background ensemble perturbations
       IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
-      std::cout << "HEYY ana_pert" << std::endl;
       // initialize empty analysis perturbations
       IncrementEnsemble4D_ ana_pert(geometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
       // run the solver at each gridpoint
       Log::info() << "Beginning core local solver..." << std::endl;
       util::printRunStats("LocalEnsembleDA before solver", true);
-      std::cout << "HEYY measurement updated" << std::endl;
       solver->measurementUpdate(bkg_pert, ana_pert);
 
       // wait all tasks to finish their solution, so the timing for functions below reports
@@ -356,21 +344,16 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       util::printRunStats("LocalEnsembleDA after solver", true);
 
       // calculate final analysis states
-      std::cout << "HEYY calc final analysis" << std::endl;
       if (incvars == statevars) {
-        std::cout << "HEYY incvars == statevars" << std::endl;
         for (size_t jj = 0; jj < nens; ++jj) {
           ens_xx[jj] = bkg_mean;
           ens_xx[jj] += ana_pert[jj];
         }
       } else {
-        std::cout << "HEYY incvars != statevars" << std::endl;
-        std::cout << "HEYY ana_inc" << std::endl;
         Increment4D_ ana_increment(geometry, incvars, ens_xx[0].validTimes());
         for (size_t jj = 0; jj < nens; ++jj) {
           ana_increment = ana_pert[jj];
           for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
-            std::cout << "HEYY iterate in time " << itime << std::endl;
             ana_increment[itime] -= bkg_pert[jj][itime];
           }
           ens_xx[jj] += ana_increment;
@@ -387,7 +370,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
             "`save posterior ensemble increment` is set to true, but `output ensemble increments` "
             "configuration not found.");
         }
-      std::cout << "HEYY writeParams " << std::endl;
         IncrementWriteParameters_ output = *params.outputPostEnsInc.value();
         for (size_t jj = 0; jj < nens; ++jj) {
           output.setMember(jj+1);
@@ -400,7 +382,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
 
       // save the posterior mean
-      std::cout << "HEYY save post mean" << std::endl;
       StateSet_ ana_mean = ens_xx.mean();   // calculate analysis mean
       if (do_test_prints) {
         Log::test() << "Analysis mean :" << ana_mean << std::endl;
@@ -430,7 +411,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // below is the diagnostic output -----------------------------
       // save the background mean
-      std::cout << "HEYY doing diag output" << std::endl;
       if (params.driver.value().savePriorMean.value()) {
         if (params.outputPriorMean.value() == boost::none) {
           throw eckit::BadValue("`save prior mean` is set to true, but `output mean prior` "
@@ -508,7 +488,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         obsdb.save();
       }
     }
-    std::cout << "LEAVING execute of LocalEnsembleDA" << std::endl; 
     return 0;
   }
 
