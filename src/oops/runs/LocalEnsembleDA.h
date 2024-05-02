@@ -229,15 +229,17 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     LocalEnsembleInlineParameters inlineParams = params.inlineParams;
     const bool HofXOnly = inlineParams.hofXOnly.value();
 
-#if 1
-    Log::info() << "setting up sub geometry" << std::endl;
-    Log::info() << "comm size is " << this->getComm().size() << std::endl;
-    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-    std::vector<int> layout{2,1};
-    subconfig.set("layout",layout);
-    Geometry_ subgeometry(subconfig , this->getComm() );
-#endif
     if ( HofXOnly ) {
+
+      // This geometry will be decomposed over the entire comm world
+      Log::info() << "setting up sub geometry" << std::endl;
+      Log::info() << "comm size is " << this->getComm().size() << std::endl;
+      eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+      // hard coded for now, but will need a new layout in yaml file 
+      std::vector<int> layout{2,1};
+      subconfig.set("layout",layout);
+      Geometry_ subgeometry(subconfig , this->getComm() );
+
       executeHofX(fullConfig, validate, params);
     } else {
       //  Setup observation window
@@ -299,17 +301,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       Log::info() << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
       std::cout << "HEYY readHofx is " << params.driver.value().readHofX << std::endl;
       size_t iter = 0;
-      Observations_ yb_mean = solver->computeHofX(ens_xx, iter, params.driver.value().readHofX);
-      if (do_test_prints) {
-         Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
-         Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
-      }
-
-      Departures_ ombg(yobs - yb_mean);
-      ombg.save("ombg");
-      if (do_test_prints) {
-         Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
-      }
+      solver->computeHofXAlone(ens_xx, iter, params.driver.value().readHofX);
 
       // quit early if running in observer-only mode
       Log::info() << "HEY, runobsonly is " << params.driver.value().runObsOnly.value() << std::endl;
@@ -319,20 +311,41 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         return 0;
       }
 
+      std::cout << "HEYY calling computeYbMean " << params.driver.value().readHofX << std::endl;
+      iter = 0;
+      Observations_ yb_mean = solver->computeYbMean(ens_xx, iter, params.driver.value().readHofX);
+      if (do_test_prints) {
+         Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
+         Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
+      }
+
+      std::cout << "HEYY DONE with computeYbMean " << std::endl;
+      iter = 0;
+      Departures_ ombg(yobs - yb_mean);
+      ombg.save("ombg");
+      std::cout << "HEYY saved ombg" <<  std::endl;
+      if (do_test_prints) {
+         Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
+      }
+
+
       // print background mean
       if (do_test_prints) {
         Log::test() << "Background mean :" << bkg_mean << std::endl;
       }
 
+      std::cout << "HEYY bkg_pert" <<  std::endl;
       // calculate background ensemble perturbations
       IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
+      std::cout << "HEYY ana_pert" << std::endl;
       // initialize empty analysis perturbations
       IncrementEnsemble4D_ ana_pert(geometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
       // run the solver at each gridpoint
       Log::info() << "Beginning core local solver..." << std::endl;
       util::printRunStats("LocalEnsembleDA before solver", true);
+      std::cout << "HEYY measurement updated" << std::endl;
       solver->measurementUpdate(bkg_pert, ana_pert);
 
       // wait all tasks to finish their solution, so the timing for functions below reports
@@ -343,16 +356,21 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       util::printRunStats("LocalEnsembleDA after solver", true);
 
       // calculate final analysis states
+      std::cout << "HEYY calc final analysis" << std::endl;
       if (incvars == statevars) {
+        std::cout << "HEYY incvars == statevars" << std::endl;
         for (size_t jj = 0; jj < nens; ++jj) {
           ens_xx[jj] = bkg_mean;
           ens_xx[jj] += ana_pert[jj];
         }
       } else {
+        std::cout << "HEYY incvars != statevars" << std::endl;
+        std::cout << "HEYY ana_inc" << std::endl;
         Increment4D_ ana_increment(geometry, incvars, ens_xx[0].validTimes());
         for (size_t jj = 0; jj < nens; ++jj) {
           ana_increment = ana_pert[jj];
           for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
+            std::cout << "HEYY iterate in time " << itime << std::endl;
             ana_increment[itime] -= bkg_pert[jj][itime];
           }
           ens_xx[jj] += ana_increment;
@@ -369,6 +387,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
             "`save posterior ensemble increment` is set to true, but `output ensemble increments` "
             "configuration not found.");
         }
+      std::cout << "HEYY writeParams " << std::endl;
         IncrementWriteParameters_ output = *params.outputPostEnsInc.value();
         for (size_t jj = 0; jj < nens; ++jj) {
           output.setMember(jj+1);
@@ -381,6 +400,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
 
       // save the posterior mean
+      std::cout << "HEYY save post mean" << std::endl;
       StateSet_ ana_mean = ens_xx.mean();   // calculate analysis mean
       if (do_test_prints) {
         Log::test() << "Analysis mean :" << ana_mean << std::endl;
@@ -410,6 +430,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // below is the diagnostic output -----------------------------
       // save the background mean
+      std::cout << "HEYY doing diag output" << std::endl;
       if (params.driver.value().savePriorMean.value()) {
         if (params.outputPriorMean.value() == boost::none) {
           throw eckit::BadValue("`save prior mean` is set to true, but `output mean prior` "
@@ -487,6 +508,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         obsdb.save();
       }
     }
+    std::cout << "LEAVING execute of LocalEnsembleDA" << std::endl; 
     return 0;
   }
 
@@ -607,9 +629,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
+// maybe we need to set up a different obs space for MPI_COMM_WORLD?
+// when done this way, we can save individual files for each ensemble member
     Log::info() << "creating obsspaces with comm size " << commMember.size() << std::endl;
-//    ObsSpaces_ obsdb(obsConfig, faceMember, timeWindow, time);
     ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
+//    ObsSpaces_ obsdb(obsConfig, faceMember, timeWindow, time);
 //    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
@@ -656,6 +680,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
+/*
     Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     Log::trace() << "yobs: " << std::endl << yobs << std::endl;
     Log::trace() << "done calling computeHofX" << std::endl;
@@ -669,6 +694,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
        Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
        Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
     }
+*/
     // quit early if running in observer-only mode
     if (params.driver.value().runObsOnly.value()) {
       obsdb.save();
