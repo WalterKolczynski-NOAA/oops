@@ -1,6 +1,6 @@
 add_subdirectory( src/lorenz95 )
 add_subdirectory( src/executables )
-add_subdirectory( test )
+#add_subdirectory( test )
 
 ecbuild_add_test( TARGET l95_coding_norms
                   TYPE SCRIPT

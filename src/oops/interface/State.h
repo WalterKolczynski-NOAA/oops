@@ -103,6 +103,7 @@ class State : public util::Printable,
   /// Serialize and deserialize (used in 4DEnVar, weak-constraint 4DVar and Block-Lanczos minimizer)
   size_t serialSize() const override;
   void serialize(std::vector<double> &) const override;
+  void serializeSect(std::vector<double> &, const int &, const int &, const int &, const int &) const;
   void deserialize(const std::vector<double> &, size_t &) override;
 
  private:
@@ -251,6 +252,19 @@ size_t State<MODEL>::serialSize() const {
   Log::trace() << "State<MODEL>::serialSize" << std::endl;
   util::Timer timer(classname(), "serialSize");
   return state_->serialSize();
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+  void State<MODEL>::serializeSect(std::vector<double> & vect, const int & isc, const int & iec, 
+      const int & jsc, const int & jec) const {
+  std::cout << "in oops interface\n";
+  Log::trace() << "State<MODEL>::serializeSect starting" << std::endl;
+  util::Timer timer(classname(), "serialize");
+  state_->serializeSect(vect,isc,iec,jsc,jec);
+  std::cout << "coming out of oops interface\n";
+  Log::trace() << "State<MODEL>::serialize done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

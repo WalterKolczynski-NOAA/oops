@@ -103,6 +103,8 @@ class Geometry : public util::Printable,
 
   /// Accessor to the latitude/longitude vectors
   void latlon(std::vector<double> &, std::vector<double> &, const bool) const;
+  int tileNum() const {return geom_->tileNum();}
+  void get_indices(std::vector<int> & indices) const {geom_->get_indices(indices);}
 
   /// Accessor to MODEL::Geometry, used in the other interface classes in oops.
   /// Does not need to be implemented.

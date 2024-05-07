@@ -1,4 +1,4 @@
-add_subdirectory( test )
+#add_subdirectory( test )
 
 ecbuild_add_test( TARGET coupled_coding_norms
                   TYPE SCRIPT

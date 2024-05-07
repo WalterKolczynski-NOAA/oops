@@ -229,32 +229,33 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     LocalEnsembleInlineParameters inlineParams = params.inlineParams;
     const bool HofXOnly = inlineParams.hofXOnly.value();
 
+    std::unique_ptr<StateSet_> dist_xx;
     if ( HofXOnly ) {
 
-      // This geometry will be decomposed over the entire comm world
-      Log::info() << "setting up sub geometry" << std::endl;
-      Log::info() << "comm size is " << this->getComm().size() << std::endl;
-      eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-      // hard coded for now, but will need a new layout in yaml file 
-      std::vector<int> layout{2,1};
-      subconfig.set("layout",layout);
-      Geometry_ subgeometry(subconfig , this->getComm() );
-
-      executeHofX(fullConfig, validate, params);
-    } else {
+      dist_xx = executeHofX(fullConfig, validate, params);
+/*
+      StateSet_ ens_xx(subgeometry, *dist_xx, 2);
+      std::vector<double> lats;
+      std::vector<double> lons;
+      subgeometry.latlon(lats,lons,false);
+      std::cout << "new lats are from " << *min_element(lats.begin(),lats.end()) << " to " << *max_element(lats.begin(), lats.end()) << std::endl;
+      std::cout << "new lons are from " << *min_element(lons.begin(),lons.end()) << " to " << *max_element(lons.begin(), lons.end()) << std::endl;
+*/
+    } 
+//else {
       //  Setup observation window
       const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
       Log::info() << "Observation window: " << timeWindow << std::endl;
-      // Setup geometry
-      const Geometry_ geometry(params.geometry, this->getComm());
-
+    
+//      const Geometry_ geometry(params.geometry, this->getComm());
+      StateEnsemble4D_ ens_xx(dist_xx->geometry(), fullConfig, (*dist_xx));
       // Get observations configuration
       const eckit::LocalConfiguration observationsConfig = params.observations;
       eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
       // if any of the obs. spaces uses Halo distribution it will need to know the geometry
       // of the local grid on this PE
-      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(geometry, obsConfig);
+      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(dist_xx->geometry(), obsConfig);
 
       // Setup observations
       const eckit::mpi::Comm & time = oops::mpi::myself();
@@ -263,7 +264,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // Read all ensemble members and compute the ensemble mean
       Log::info() << "reading in ensemble members" << std::endl;
-      StateEnsemble4D_ ens_xx(geometry, params.background);
+//      StateEnsemble4D_ ens_xx(geometry, params.background);
       const size_t nens = ens_xx.size();
       const Variables statevars = ens_xx.variables();
       Variables incvars;
@@ -275,7 +276,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       StateSet_ bkg_mean = ens_xx.mean();
       // if control member is present use that instead of the ensemble mean
       if (params.driver.value().useControlMember) {
-        StateSet_ controlMember(geometry, *params.controlMember.value());
+        StateSet_ controlMember(dist_xx->geometry(), *params.controlMember.value());
         bkg_mean = controlMember;
       }
 
@@ -283,7 +284,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // set up solver
       std::unique_ptr<LocalSolver_> solver =
-           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, geometry, fullConfig,
+           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, dist_xx->geometry(), fullConfig,
                                                           nens, bkg_mean, incvars);
 
       // test prints for the prior ensemble
@@ -329,7 +330,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
       // initialize empty analysis perturbations
-      IncrementEnsemble4D_ ana_pert(geometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
+      IncrementEnsemble4D_ ana_pert(dist_xx->geometry(), incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
       // run the solver at each gridpoint
       Log::info() << "Beginning core local solver..." << std::endl;
@@ -350,7 +351,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
           ens_xx[jj] += ana_pert[jj];
         }
       } else {
-        Increment4D_ ana_increment(geometry, incvars, ens_xx[0].validTimes());
+        Increment4D_ ana_increment(dist_xx->geometry(), incvars, ens_xx[0].validTimes());
         for (size_t jj = 0; jj < nens; ++jj) {
           ana_increment = ana_pert[jj];
           for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
@@ -487,15 +488,25 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
            params.driver.value().doPostObs.value()) {
         obsdb.save();
       }
-    }
+//    }
     return 0;
   }
 
-  void executeHofX(const eckit::Configuration & fullConfig, bool validate,
+  std::unique_ptr<StateSet_> executeHofX(const eckit::Configuration & fullConfig, bool validate,
           LocalEnsembleDAParameters_ & params) const {
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
+
+    // This geometry will be decomposed over the entire comm world
+    Log::info() << "setting up sub geometry" << std::endl;
+    Log::info() << "comm size is " << this->getComm().size() << std::endl;
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // hard coded for now, but will need a new layout in yaml file 
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    Geometry_ subgeometry(subconfig , this->getComm() );
+
     //  Get the MPI partition
 
     LocalEnsembleInlineParameters inlineParams = params.inlineParams;
@@ -510,7 +521,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const int ntasks = this->getComm().size();
     const int mytask = this->getComm().rank();
     const int tasks_per_member = ntasks / nmembers;
-    int mymember = mytask / tasks_per_member + 1;
+    // divide by blocks of tasks_per_member
+     int mymember = mytask / tasks_per_member + 1;
+    // alternate with modulo
+    //int mymember = mytask % nmembers + 1;
+
 
     Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
@@ -544,7 +559,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     
     const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
     std::cout << "DONE with geometry ctr " << std::endl;
-
+    std::cout << "HEY, subgeom is on tile " << subgeometry.tileNum() << std::endl;
+    std::cout << "HEY, geom is on tile " << geometry.tileNum() << std::endl;
+/*
+    std::vector<double> lats;
+    std::vector<double> lons;
+    geometry.latlon(lats,lons,false);
+    std::cout << "orig lats are from " << *min_element(lats.begin(),lats.end()) << " to " << *max_element(lats.begin(), lats.end()) << std::endl;
+    std::cout << "orig lons are from " << *min_element(lons.begin(),lons.end()) << " to " << *max_element(lons.begin(), lons.end()) << std::endl;
+*/
     Log::info() << "done with geometry" << std::endl;
 
     //  Setup times
@@ -597,6 +620,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       ens_xx = std::unique_ptr<StateSet_>(new StateSet_(geometry, background,
                   oops::mpi::myself(), faceMember));
     }
+
+    std::unique_ptr<StateSet_> loc_ens_xx = ens_xx->get_local(this->getComm(), subgeometry, mytask, mymember);
+    std::cout << "HEY, local_ens_xx size is " << loc_ens_xx->local_ens_size() << std::endl;
+    return(loc_ens_xx);
     // Get observations configuration
     eckit::LocalConfiguration observationsConfig = params.observations;
     util::seekAndReplace(observationsConfig, pattern, (mymember - 1), zpad);
@@ -612,8 +639,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 // when done this way, we can save individual files for each ensemble member
     Log::info() << "creating obsspaces with comm size " << commMember.size() << std::endl;
     ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
-//    ObsSpaces_ obsdb(obsConfig, faceMember, timeWindow, time);
-//    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
     // compute the ensemble mean
@@ -659,25 +684,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
-/*
-    Log::trace() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
-    Log::trace() << "yobs: " << std::endl << yobs << std::endl;
-    Log::trace() << "done calling computeHofX" << std::endl;
-    Departures_ ombg(yobs - yb_mean);
-    Log::trace() << "ombg: " << std::endl << ombg << std::endl;
-    Log::trace() << "done computing departures " << std::endl;
-    ombg.save("ombg");
-    Log::trace() << "done saving ombg" << std::endl;
-    Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
-    if (do_test_prints) {
-       Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
-       Log::trace() << "background y - H(x): " << std::endl << ombg << std::endl;
-    }
-*/
     // quit early if running in observer-only mode
     if (params.driver.value().runObsOnly.value()) {
       obsdb.save();
     }
+    return(ens_xx);
   }
 
 // -----------------------------------------------------------------------------
