@@ -229,10 +229,18 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     LocalEnsembleInlineParameters inlineParams = params.inlineParams;
     const bool HofXOnly = inlineParams.hofXOnly.value();
 
+    // This geometry will be decomposed over the entire comm world
+    Log::info() << "setting up sub geometry" << std::endl;
+    Log::info() << "comm size is " << this->getComm().size() << std::endl;
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // hard coded for now, but will need a new layout in yaml file 
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    Geometry_ subgeometry(subconfig , this->getComm() );
     std::unique_ptr<StateSet_> dist_xx;
     if ( HofXOnly ) {
 
-      dist_xx = executeHofX(fullConfig, validate, params);
+      dist_xx = executeHofX(fullConfig, validate, params, subgeometry);
 /*
       StateSet_ ens_xx(subgeometry, *dist_xx, 2);
       std::vector<double> lats;
@@ -246,16 +254,18 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       //  Setup observation window
       const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
       Log::info() << "Observation window: " << timeWindow << std::endl;
-    
+     
+      Log::info() << "dist_xx size is: " << dist_xx->size() << std::endl;
 //      const Geometry_ geometry(params.geometry, this->getComm());
-      StateEnsemble4D_ ens_xx(dist_xx->geometry(), fullConfig, (*dist_xx));
+      StateEnsemble4D_ ens_xx(subgeometry, fullConfig, (*dist_xx));
+      Log::info() << "ens_xx size is: " << ens_xx.size() << " " << ens_xx[0].local_ens_size() << std::endl;
       // Get observations configuration
       const eckit::LocalConfiguration observationsConfig = params.observations;
       eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
       // if any of the obs. spaces uses Halo distribution it will need to know the geometry
       // of the local grid on this PE
-      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(dist_xx->geometry(), obsConfig);
+      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(subgeometry, obsConfig);
 
       // Setup observations
       const eckit::mpi::Comm & time = oops::mpi::myself();
@@ -265,8 +275,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       // Read all ensemble members and compute the ensemble mean
       Log::info() << "reading in ensemble members" << std::endl;
 //      StateEnsemble4D_ ens_xx(geometry, params.background);
-      const size_t nens = ens_xx.size();
+      const size_t nens = ens_xx[0].local_ens_size();
+      std::cout << "ensemble size is " << nens << std::endl;
       const Variables statevars = ens_xx.variables();
+      Log::info() << "variables are " << ens_xx.variables() << std::endl;
       Variables incvars;
       if (params.incvars.value() == boost::none) {
         incvars += statevars;
@@ -274,9 +286,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         incvars += *params.incvars.value();
       }
       StateSet_ bkg_mean = ens_xx.mean();
+      std::cout << "bkg_mean is " << bkg_mean << std::endl;
       // if control member is present use that instead of the ensemble mean
       if (params.driver.value().useControlMember) {
-        StateSet_ controlMember(dist_xx->geometry(), *params.controlMember.value());
+        StateSet_ controlMember(subgeometry, *params.controlMember.value());
         bkg_mean = controlMember;
       }
 
@@ -284,14 +297,16 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // set up solver
       std::unique_ptr<LocalSolver_> solver =
-           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, dist_xx->geometry(), fullConfig,
+           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, subgeometry, fullConfig,
                                                           nens, bkg_mean, incvars);
-
+      Log::info() << "after ctor 1" << std::endl;
       // test prints for the prior ensemble
       bool do_test_prints = params.driver.value().doTestPrints;
       if (do_test_prints) {
+      Log::info() << "after ctor 2 nens = " << nens << std::endl;
         for (size_t jj = 0; jj < nens; ++jj) {
-          Log::test() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
+          Log::info() << "Initial state for member " << jj+1 << std::endl;
+          Log::info() << "Initial state for member " << ens_xx[jj] << std::endl;
         }
       }
 
@@ -299,6 +314,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // compute H(x)
       size_t iter = 0;
+      Log::info() << "after ctor 3" << std::endl;
       solver->computeHofXAlone(ens_xx, iter, params.driver.value().readHofX);
 
       // quit early if running in observer-only mode
@@ -330,7 +346,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
       // initialize empty analysis perturbations
-      IncrementEnsemble4D_ ana_pert(dist_xx->geometry(), incvars, ens_xx[0].validTimes(), bkg_pert.size());
+      IncrementEnsemble4D_ ana_pert(subgeometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
       // run the solver at each gridpoint
       Log::info() << "Beginning core local solver..." << std::endl;
@@ -351,7 +367,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
           ens_xx[jj] += ana_pert[jj];
         }
       } else {
-        Increment4D_ ana_increment(dist_xx->geometry(), incvars, ens_xx[0].validTimes());
+        Increment4D_ ana_increment(subgeometry, incvars, ens_xx[0].validTimes());
         for (size_t jj = 0; jj < nens; ++jj) {
           ana_increment = ana_pert[jj];
           for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
@@ -493,19 +509,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   }
 
   std::unique_ptr<StateSet_> executeHofX(const eckit::Configuration & fullConfig, bool validate,
-          LocalEnsembleDAParameters_ & params) const {
+          LocalEnsembleDAParameters_ & params, Geometry_ & subgeometry) const {
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
 
-    // This geometry will be decomposed over the entire comm world
-    Log::info() << "setting up sub geometry" << std::endl;
-    Log::info() << "comm size is " << this->getComm().size() << std::endl;
-    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-    // hard coded for now, but will need a new layout in yaml file 
-    std::vector<int> layout{2,1};
-    subconfig.set("layout",layout);
-    Geometry_ subgeometry(subconfig , this->getComm() );
 
     //  Get the MPI partition
 
@@ -623,7 +631,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     std::unique_ptr<StateSet_> loc_ens_xx = ens_xx->get_local(this->getComm(), subgeometry, mytask, mymember);
     std::cout << "HEY, local_ens_xx size is " << loc_ens_xx->local_ens_size() << std::endl;
+    Log::info() << (*loc_ens_xx)[0] << std::endl;
+    Log::info() << (*loc_ens_xx)[1] << std::endl;
+    Log::info() << (*ens_xx)[0] << std::endl;
     return(loc_ens_xx);
+#if 0
     // Get observations configuration
     eckit::LocalConfiguration observationsConfig = params.observations;
     util::seekAndReplace(observationsConfig, pattern, (mymember - 1), zpad);
@@ -689,6 +701,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       obsdb.save();
     }
     return(ens_xx);
+#endif
   }
 
 // -----------------------------------------------------------------------------

@@ -151,23 +151,29 @@ LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
     obsloc_(observersconf_, obspaces_) {
   // initialize and print options
   options_.deserialize(config);
+  std::cout << "create 1 " << std::endl;
   const LocalEnsembleSolverInflationParameters & inflopt = this->options_.infl;
   Log::info() << "Multiplicative inflation will be applied with multCoeff=" <<
                  inflopt.mult << std::endl;
+  std::cout << "create 2 " << std::endl;
   if (inflopt.doRtpp()) {
       Log::info() << "RTPP inflation will be applied with rtppCoeff=" <<
                     inflopt.rtpp << std::endl;
   } else {
+  std::cout << "create 3 " << std::endl;
       Log::info() << "RTPP inflation is not applied rtppCoeff is out of bounds (0,1], rtppCoeff="
                   << inflopt.rtpp << std::endl;
   }
   if (inflopt.doRtps()) {
+  std::cout << "create 4 " << std::endl;
     Log::info() << "RTPS inflation will be applied with rtpsCoeff=" <<
                     inflopt.rtps << std::endl;
   } else {
+  std::cout << "create 5 " << std::endl;
     Log::info() << "RTPS inflation is not applied rtpsCoeff is out of bounds (0,1], rtpsCoeff="
                 << inflopt.rtps << std::endl;
   }
+  std::cout << "create 6 " << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -230,7 +236,9 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
   // processed in H(x).
   const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
   // Setup PseudoModelStateSet
+  std::cout << "Hey, setting up pseudomodel\n";
   std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
+  std::cout << "Hey, constructing model\n";
   const Model_ model(std::move(pseudomodel));
   // Setup model and obs biases; obs errors
   ModelAux_ moderr(geometry_, eckit::LocalConfiguration());
@@ -242,8 +250,11 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
   Observers_ hofx(obspaces_, obsconf_);
 
   hofx.initialize(geometry_, obsaux, *R_, post, config);
+  std::cout << "Hey, starting forecast, xx length is " << xx.size() << std::endl;
   model.forecast(init_xx, moderr, flength, post);
+  std::cout << "Hey, finalizing yy" << std::endl;
   hofx.finalize(yy);
+  std::cout << "Hey, done finalizing yy" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -339,13 +350,18 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
                                                    size_t iteration, bool readFromDisk) {
   util::Timer timer(classname(), "computeHofX");
 
+  Log::info() << "hofxAlone 1" << std::endl;
   ASSERT(ens_xx.size() == Yb_.size());
 
+  Log::info() << "hofxAlone 2" << std::endl;
   const size_t nens = ens_xx.size();
+  Log::info() << "hofxAlone 3" << std::endl;
   ObsEnsemble_ obsens(obspaces_, nens);
+  Log::info() << "hofxAlone 4" << std::endl;
   Observations_ y_mean_xb(obspaces_);
+  Log::info() << "hofxAlone 1" << std::endl;
 
-  Log::info() << "computeHofXAlone reading from disk now on iteration " << iteration << std::endl;
+  Log::info() << "computeHofXAlone reading from disk now on iteration " << iteration << " of " << nens << std::endl;
   if (readFromDisk) {
     // read hofx from disk
     Log::info() << "reading from disk now" << std::endl;
@@ -447,7 +463,7 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofX(const StateEnsemb
   ObsEnsemble_ obsens(obspaces_, nens);
   Observations_ y_mean_xb(obspaces_);
 
-  Log::info() << "reading from disk now on iteration " << iteration << std::endl;
+  Log::info() << "computeHofX now on iteration " << iteration << " of " << nens << std::endl;
   if (readFromDisk) {
     // read hofx from disk
     Log::info() << "reading from disk now" << std::endl;
@@ -472,11 +488,13 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofX(const StateEnsemb
     config.set("save qc", false);
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
-
+    std::cout << "starting jj loop \n"; 
     for (size_t jj = 0; jj < nens; ++jj) {
       computeHofX4D(config, ens_xx[jj], obsens[jj]);
+      Log::info() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
+      Log::info() << "Done H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
     }
 
     // Compute H(mean(Xb))

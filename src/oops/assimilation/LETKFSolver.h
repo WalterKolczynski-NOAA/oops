@@ -103,10 +103,10 @@ LETKFSolver<MODEL, OBS>::LETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & ge
     nens_(nens)
 {
   Log::trace() << "LETKFSolver<MODEL, OBS>::create starting" << std::endl;
-  Log::info() << "Using EIGEN implementation of LETKF" << std::endl;
 
   // pre-allocate transformation matrices
   Wa_.resize(nens_, nens_);
+  
   wa_.resize(nens_);
 
   // pre-allocate eigen sovler matrices

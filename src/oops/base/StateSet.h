@@ -176,9 +176,14 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::get_local(const eckit::mpi::C
     //broadcast the state
     (*this)(0,0).serialize(zz); //serialize so that we don't overwrite local state
     global.broadcast(zz, i);
+    StateSet<MODEL> tmpState = StateSet<MODEL>(*this);
+    size_t indx = 0;
+    tmpState[0].deserialize(zz,indx);
+    Log::info() << "Start of zz is " << zz[0] << " " << zz[10] << std::endl;
     std::cout << "HEY, broadcasts are done on task " << mytask << std::endl;
     //If the incoming tile number matches what this task needs, copy it into local ens
     if(subgeom.tileNum() == buf[0]) { // we need part of the zz buffer
+      int size_fld = (*local)(0,0).serialSize() - 3;
       std::vector<double> yy;
       int ist, iend, jst, jend, npz;
       std::vector<int> indices;
@@ -188,52 +193,17 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::get_local(const eckit::mpi::C
       jst = indices[2];
       jend = indices[3];
       std::cout << "calling ssect from " << mytask << " " << ist << "," << iend << "," << jst << "," << jend << std::endl;
-      (*local)(0,ensNum-1).serializeSect(yy,ist,iend,jst,jend);
+//      (*local)(0,ensNum-1).serializeSect(yy,ist,iend,jst,jend);
+      tmpState[0].serializeSect(yy,ist,iend,jst,jend,size_fld);
+      Log::info() << "Start of yy is " << yy[0] << " " << yy[10] << std::endl;
       std::cout << "returned fromssect from " << mytask << " " << yy.size() << std::endl;
       std::cout << "serializing subgeom tileNum " << subgeom.tileNum() << std::endl;
-      size_t indx = 0;
+      indx = 0;
       (*local)(0,ensNum-1).deserialize(yy,indx);
       std::cout << "DONE serializing subgeom tileNum " << subgeom.tileNum() << std::endl;
     } else {  
       std::cout << "dont have this tile on " << mytask << " " << std::endl;
     }
-#if 0
-/*
-      (*local)(0,i).serialize(yy);
-      int ist, iend, jst, jend, npz;
-      std::vector<int> indices;
-      subgeom.get_indices(indices);
-      ist = indices[0];
-      iend = indices[1];
-      jst = indices[2];
-      jend = indices[3];
-      npz = indices[6];
-      std::cout << "HEY, ist-- is " << ist <<","<<iend<<","<<jst<<","<<jend<<","<<npz << std::endl;
-      std::cout << "HEY, size of yy is " << yy.size() << " zz is " << zz.size() << std::endl;
-      // yy is the vector for the subgeom, so we will copy values from zz into it       
-      // zz is serialized by variable, zlevels, j, i
-      // we will take strides of nvars*zlevels*ny for i values from ist to iend and ny = jend - jst
-      int nx = iend - ist + 1;
-      int ny = jend - jst + 1;
-      int stride = nvars*npz*ny; 
-      int index;
-      int local_ind = 0;
-      for( int v = 0; v < nvars; ++v) {
-        for( int kk = 0; kk < npz; ++kk) {
-          for( int jj = (jst -1); jj < jend; ++jj) {
-            for( int ii = (ist - 1); ii < iend; ++ii) {
-              index = v*npz*nyg*nxg + kk * nyg * nxg + jj * nxg + ii; 
-              std::cout << mytask << " pushing back index " << local_ind << " " << index <<" "<< ii << " " << jj << " " << kk << " " << v << std::endl;
-              yy[local_ind]=zz[index];
-              local_ind++;
-            }
-          }
-        }
-      }
-*/
-    }
-#endif
-//    oops::mpi::world()::barrier();
   }
   return(std::move(local));
 }

@@ -70,6 +70,7 @@ template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
                   StateSet_ & stateSet): states_() {
   // copy stateSet into class
+  Log::info() << "in SE4d ctr, states_ size is " << stateSet.size() << stateSet.local_ens_size() << std::endl;
   states_.emplace_back(stateSet);
 
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
