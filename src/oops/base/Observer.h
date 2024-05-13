@@ -185,22 +185,27 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
 template <typename MODEL, typename OBS>
 void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
+  oops::Log::info() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   ASSERT(initialized_);
 
   // Fill GeoVaLs
+  std::cout << "final 1" << std::endl;
   GeoVaLs_ geovals(*locations_, allVars_, allVarSizes_);
   for (size_t m = 0; m < getvals_.size(); ++m) {
     getvals_[m]->fillGeoVaLs(geovals);
   }
 
+  std::cout << "final 2" << std::endl;
   // Compute the reduced representation of the GeoVaLs for which it's been requested
   oops::Variables reducedVars = biascoeff_->requiredVars();
   reducedVars += filters_->requiredVars();
   obsop_->computeReducedVars(reducedVars, geovals);
 
+  std::cout << "final 3" << std::endl;
   /// Call prior filters
   filters_->priorFilter(geovals);
 
+  std::cout << "final 4" << std::endl;
   /// Setup diagnostics
   Variables vars;
   vars += filters_->requiredHdiagnostics();
@@ -208,41 +213,57 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   // The current interface makes it possible to assign different location sampling methods not only
   // to GeoVaLs, but also to ObsDiagnostics. We could simplify things and assume there'll always
   // be a 1-to-1 mapping between obs locations and columns of ObsDiagnostics.
+  std::cout << "final 5" << std::endl;
   ObsDiags_ ydiags(obspace_, *locations_, vars);
 
   // Setup bias vector
+  std::cout << "final 6" << std::endl;
   ObsVector_ ybias(obspace_);
   ybias.zero();
 
+  std::cout << "final 7" << std::endl;
   /// Compute H(x)
   obsop_->simulateObs(geovals, yobsim, *biascoeff_, *qcflags_, ybias, ydiags);
 
+  std::cout << "final 8" << std::endl;
   /// Call posterior filters
   filters_->postFilter(geovals, yobsim, ybias, ydiags);
 
   // Update R with obs errors that filters might have updated
+  std::cout << "final 9" << std::endl;
   ObsVector_ obserr(Rmat_->obserrors());
+  std::cout << "final 10" << std::endl;
   obserr = *obserrfilter_;
+  std::cout << "final 11" << std::endl;
   Rmat_->update(obserr);
+  std::cout << "final 12" << std::endl;
 
   // Save current obs, obs error estimates and QC flags (for diagnostics use only)
   std::string siter = "";
   if (iterconf_->has("iteration")) siter = iterconf_->getString("iteration");
 
+  std::cout << "final 13" << std::endl;
   if (iterconf_->getBool("save qc", true)) {
+  std::cout << "final 14" << std::endl;
     const std::string qcname = "EffectiveQC" + siter;
     qcflags_->save(qcname);
   }
+  std::cout << "final 15" << std::endl;
   if (iterconf_->getBool("save hofx", true)) {
+  std::cout << "final 16" << std::endl;
     const std::string obsname = "hofx" + siter;
     yobsim.save(obsname);
   }
+  std::cout << "final 17" << std::endl;
   if (iterconf_->getBool("save obs errors", true)) {
+  std::cout << "final 18" << std::endl;
     const std::string errname = "EffectiveError" + siter;
     obserrfilter_->save(errname);
   }
+  std::cout << "final 19" << std::endl;
   if (iterconf_->getBool("save obs bias", true)) {
     const std::string biasname  = "ObsBias" + siter;
+  std::cout << "final 20" << std::endl;
     ybias.save(biasname);
   }
 

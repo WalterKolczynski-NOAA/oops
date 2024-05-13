@@ -153,8 +153,9 @@ void Observers<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrls
 template <typename MODEL, typename OBS>
 void Observers<MODEL, OBS>::finalize(Observations_ & yobs) {
   oops::Log::trace() << "Observers<MODEL, OBS>::finalize start" << std::endl;
-
+  std::cout << "starting finalize with observers size " << observers_.size() << std::endl;
   for (size_t jj = 0; jj < observers_.size(); ++jj) {
+    std::cout << "working on jj " << jj << "," << yobs[jj] << std::endl;
     observers_[jj]->finalize(yobs[jj]);
   }
 

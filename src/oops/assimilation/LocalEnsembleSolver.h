@@ -236,7 +236,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
   // processed in H(x).
   const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
   // Setup PseudoModelStateSet
-  std::cout << "Hey, setting up pseudomodel\n";
+  std::cout << "Hey, setting up pseudomodel step is" << default_tstep << std::endl;
   std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
   std::cout << "Hey, constructing model\n";
   const Model_ model(std::move(pseudomodel));
@@ -250,9 +250,12 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
   Observers_ hofx(obspaces_, obsconf_);
 
   hofx.initialize(geometry_, obsaux, *R_, post, config);
-  std::cout << "Hey, starting forecast, xx length is " << xx.size() << std::endl;
+  std::cout << "Hey, starting forecast, xx length is " << xx.local_time_size() << std::endl;
+  std::cout << "Hey, starting forecast, flength is " << flength << std::endl;
+  std::cout << "Hey, starting forecast, times " << times[0] <<" " << times.size() << std::endl;
   model.forecast(init_xx, moderr, flength, post);
   std::cout << "Hey, finalizing yy" << std::endl;
+  std::cout << "yy is " << yy << std::endl;
   hofx.finalize(yy);
   std::cout << "Hey, done finalizing yy" << std::endl;
 }
@@ -361,7 +364,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
   Observations_ y_mean_xb(obspaces_);
   Log::info() << "hofxAlone 1" << std::endl;
 
-  Log::info() << "computeHofXAlone reading from disk now on iteration " << iteration << " of " << nens << std::endl;
+  Log::info() << "computeHofXAlone now on iteration " << iteration << " of " << nens << std::endl;
   if (readFromDisk) {
     // read hofx from disk
     Log::info() << "reading from disk now" << std::endl;
@@ -389,9 +392,12 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
 
 
     for (size_t jj = 0; jj < nens; ++jj) {
+      std::cout << "working on ens number " << jj << std::endl;
       computeHofX4D(config, ens_xx[jj], obsens[jj]);
+      std::cout << "done working on ens number " << jj << std::endl;
 //    Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
+      std::cout << "done saving hofx ens number " << jj << std::endl;
     }
 
     // Compute H(mean(Xb))
@@ -399,7 +405,9 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & 
     config.set("save qc", true);
     config.set("save obs errors", true);
 
+    std::cout << "calling computeHofX4D again" << std::endl;
     computeHofX4D(config, xbmean_, y_mean_xb);
+    std::cout << "done calling computeHofX4D again" << std::endl;
 
     y_mean_xb.save("hofx_y_mean_xb"+std::to_string(iteration));
 

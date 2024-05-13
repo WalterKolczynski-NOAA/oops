@@ -50,6 +50,8 @@ template<typename MODEL> class StateEnsemble4D {
   StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
                   StateSet_ & stateSet);
 
+  StateEnsemble4D( StateSet_ & stateSet);
+
   /// calculate ensemble mean
   StateSet_ mean() const;
 
@@ -63,6 +65,28 @@ template<typename MODEL> class StateEnsemble4D {
  private:
   std::vector<StateSet_> states_;
 };
+
+// ====================================================================================
+
+template<typename MODEL>
+StateEnsemble4D<MODEL>::StateEnsemble4D( StateSet_ & stateSet) {
+  // copy each of local ens states from stateSet into its own stateset
+  Log::info() << "in SE4d dist ctr, states_ size is " << stateSet.local_time_size() << "," << stateSet.size() << std::endl;
+//  states_.reserve(stateSet.size());
+  for(int i = 0; i < stateSet.size(); ++i ){
+     std::cout << "creating stateset from ensemble " << i << std::endl;
+     StateSet_ *newSS = new StateSet(stateSet.geometry(), stateSet.variables(), stateSet.times(), stateSet.commTime(), stateSet.members(), stateSet.commEns());
+     std::cout << "created stateset from ensemble " << i << std::endl;
+     (*newSS)(0,0) = stateSet(0,i);
+     std::cout << "copied state for " << i << "," << states_.size() << std::endl;
+     states_.push_back(*newSS);
+//     states_[i] = *newSS;
+//     StateSet_ *newSS = new StateSet_(stateSet, i);
+//     states_.emplace_back( *newSS );
+     std::cout << "done creating stateset from ensemble " << i << std::endl;
+  }
+  Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
+}
 
 // ====================================================================================
 

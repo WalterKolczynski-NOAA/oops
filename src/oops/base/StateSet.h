@@ -50,6 +50,7 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   StateSet(const Geometry_ &, const StateSet &, const int);
   StateSet(const Geometry_ &, const StateSet &);
   StateSet(const StateSet &) = default;
+  StateSet(const StateSet &, const int );
   // Calculate the ensemble mean and return a new StateSet variable
   StateSet ens_mean() const;
   // Collect distributed states and return a local subset
@@ -144,6 +145,30 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const StateSet & other,
   Log::trace() << "StateSet::StateSet redist done" << std::endl;
 }
 
+template<typename MODEL>
+StateSet<MODEL>::StateSet(const StateSet & other, const int ensNum)
+  : DataSetBase<State_, Geometry_>(other.times(), other.commTime(),
+                                   other.members(), other.commEns())
+{
+
+  std::vector<double> zz;  
+  size_t indx = 0;
+  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    std::cout << "pushing back ens number" << ensNum << std::endl;
+//    std::cout << "other(jt,ensNum)" << other(jt,ensNum) << std::endl;
+    this->dataset().emplace_back(new State_(other.geometry(), other(jt,ensNum)));
+    std::cout << "done pushing back ens number" << ensNum << std::endl;
+/*
+    other(jt,ensNum).serialize(zz); //serialize 
+    std::cout << "zz is " << zz[0] << "," << zz[1] << "," << zz[2] << std::endl;
+    (*this)[jt].deserialize(zz,indx);
+    std::cout << "done deserializing" << ensNum << std::endl;
+*/
+/*
+*/
+  } 
+    
+}
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
@@ -160,30 +185,33 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::get_local(const eckit::mpi::C
                   this->commTime(), local_ens, oops::mpi::myself()));
   std::vector<int> buf(2);
   std::vector<int> global_indices;
-  this->geometry().get_indices(global_indices);
+  this->geometry().get_indices(global_indices); // returns ist, iend, jst, jend, kst, kend, npz
   int nxg = global_indices[1] - global_indices[0] + 1;
   int nyg = global_indices[3] - global_indices[2] + 1;
-  int nvars = this->variables().size();
+  int nvars = this->variables().size(); //number of variable state
   std::cout << "HEY, rank size is " << global.size() << " and mytask is " << mytask << std::endl;
   std::cout << "HEY, nxg is " << nxg << " and nyg " << nyg << std::endl;
+  std::cout << "before bcast state looks like this " << (*this)(0,0) << std::endl;
+  StateSet<MODEL> tmpState = StateSet<MODEL>(*this);  //ths tmpState is full size
   for(int i = 0; i < global.size(); ++i){
-    if(i == mytask ) {
+    if(i == mytask ) { //mytask is global rank
       buf[0] = this->geometry().tileNum();  // The tile number about to be sent
       buf[1] = ensNum;
     }
     std::cout << "HEY, starting broadcasts " << i << " on task " << mytask << std::endl;
     global.broadcast(buf, i);
     //broadcast the state
-    (*this)(0,0).serialize(zz); //serialize so that we don't overwrite local state
-    global.broadcast(zz, i);
-    StateSet<MODEL> tmpState = StateSet<MODEL>(*this);
-    size_t indx = 0;
-    tmpState[0].deserialize(zz,indx);
-    Log::info() << "Start of zz is " << zz[0] << " " << zz[10] << std::endl;
-    std::cout << "HEY, broadcasts are done on task " << mytask << std::endl;
+    const std::vector<util::DateTime> times = (*this).validTimes(); 
+    std::cout << "before serialize, times are " << times[0] << " and " << times.size() << std::endl;
+    (*this)(0,0).serialize(zz);  //serialize the state in time 0 and local_ens_number 0
+    global.broadcast(zz, i);  //broadcast from root of rank i
     //If the incoming tile number matches what this task needs, copy it into local ens
     if(subgeom.tileNum() == buf[0]) { // we need part of the zz buffer
-      int size_fld = (*local)(0,0).serialSize() - 3;
+      size_t indx = 0;
+      tmpState[0].deserialize(zz,indx);  
+      Log::info() << "Start of zz is " << zz[0] << " " << zz[10] << std::endl;
+      std::cout << "HEY, broadcasts are done on task " << mytask << std::endl;
+      int size_fld = (*local)(0,0).serialSize() - 3;  // get the serialsize of the smaller tile (local)
       std::vector<double> yy;
       int ist, iend, jst, jend, npz;
       std::vector<int> indices;
@@ -193,18 +221,22 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::get_local(const eckit::mpi::C
       jst = indices[2];
       jend = indices[3];
       std::cout << "calling ssect from " << mytask << " " << ist << "," << iend << "," << jst << "," << jend << std::endl;
-//      (*local)(0,ensNum-1).serializeSect(yy,ist,iend,jst,jend);
       tmpState[0].serializeSect(yy,ist,iend,jst,jend,size_fld);
       Log::info() << "Start of yy is " << yy[0] << " " << yy[10] << std::endl;
       std::cout << "returned fromssect from " << mytask << " " << yy.size() << std::endl;
-      std::cout << "serializing subgeom tileNum " << subgeom.tileNum() << std::endl;
+      std::cout << "serializing subgeom tileNum " << subgeom.tileNum() << "," << ensNum << std::endl;
+      std::cout << "Start of yy is " << yy[0] << "," << yy[10] << std::endl;
       indx = 0;
       (*local)(0,ensNum-1).deserialize(yy,indx);
-      std::cout << "DONE serializing subgeom tileNum " << subgeom.tileNum() << std::endl;
+      std::cout << "DONE deserializing subgeom tileNum " << subgeom.tileNum() << std::endl;
     } else {  
       std::cout << "dont have this tile on " << mytask << " " << std::endl;
     }
+  std::cout << "writing out tmpState[0]" << tmpState[0] << std::endl;
   }
+  std::cout << "DONE deserializing subgeom state 0 is " << (*local)(0,0) << std::endl;
+  std::cout << "DONE deserializing subgeom state 1 is " << (*local)(0,1) << std::endl;
+  const std::vector<util::DateTime> times = (*local).validTimes(); 
   return(std::move(local));
 }
 // -----------------------------------------------------------------------------
