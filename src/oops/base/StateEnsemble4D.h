@@ -72,17 +72,16 @@ template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D( StateSet_ & stateSet) {
   // copy each of local ens states from stateSet into its own stateset
   Log::info() << "in SE4d dist ctr, states_ size is " << stateSet.local_time_size() << "," << stateSet.size() << std::endl;
+  std::vector<int> members;
+  members.push_back(0);
 //  states_.reserve(stateSet.size());
   for(int i = 0; i < stateSet.size(); ++i ){
      std::cout << "creating stateset from ensemble " << i << std::endl;
-     StateSet_ *newSS = new StateSet(stateSet.geometry(), stateSet.variables(), stateSet.times(), stateSet.commTime(), stateSet.members(), stateSet.commEns());
+     StateSet_ *newSS = new StateSet(stateSet.geometry(), stateSet.variables(), stateSet.times(), stateSet.commTime(), members, oops::mpi::myself());
      std::cout << "created stateset from ensemble " << i << std::endl;
      (*newSS)(0,0) = stateSet(0,i);
      std::cout << "copied state for " << i << "," << states_.size() << std::endl;
      states_.push_back(*newSS);
-//     states_[i] = *newSS;
-//     StateSet_ *newSS = new StateSet_(stateSet, i);
-//     states_.emplace_back( *newSS );
      std::cout << "done creating stateset from ensemble " << i << std::endl;
   }
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
@@ -232,6 +231,7 @@ StateSet<MODEL> StateEnsemble4D<MODEL>::mean() const {
   Accumulator<MODEL, StateSet_, StateSet_> ensmean(states_[0]);
 
   const double rr = 1.0/static_cast<double>(states_.size());
+  Log::info() << "calculating mean with states_.size() of " << states_.size() << std::endl;
   for (size_t iens = 0; iens < states_.size(); ++iens) {
     ensmean.accumul(rr, states_[iens]);
   }

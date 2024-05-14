@@ -333,8 +333,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::get_local(const eckit::mpi::C
       std::cout << "DONE deserializing subgeom tileNum " << subgeom.tileNum() << std::endl;
 
   }
-//  std::cout << "DONE deserializing subgeom state 0 is " << (*local)(0,0) << std::endl;
-//  std::cout << "DONE deserializing subgeom state 1 is " << (*local)(0,1) << std::endl;
+  std::cout << "DONE deserializing subgeom state 0 is " << (*local)(0,0) << std::endl;
+  std::cout << "DONE deserializing subgeom state 1 is " << (*local)(0,1) << std::endl;
   const std::vector<util::DateTime> times = (*local).validTimes(); 
   return(std::move(local));
 }
@@ -346,6 +346,7 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
 
   const double fact = 1.0 / static_cast<double>(this->ens_size());
 
+  Log::info() << "in ens_mean, ens_size, local_ens_size, local_time_size are " << this->ens_size() << " " << this->local_ens_size() << " " << this->local_time_size() << std::endl;
   for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
     size_t dataSize = (*this)(jt, 0).serialSize()-3;  // would be good to make this a method
     // Put States from each local ensemble member in a vector
@@ -357,9 +358,12 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
 
 // add up all the state values on the local communicator and put them in zz[0][:]
     for (size_t jm = 1; jm < this->local_ens_size(); ++jm) {
-      for ( int i = 0; i < dataSize; ++i) zz[0][i] += zz[jm][i];
+//      Log::info() << "in ens_mean, summing local ensmebles 0 and " << jm << " fact is " << fact << std::endl;
+      for ( int i = 0; i < dataSize; ++i) { 
+//          Log::info() << zz[0][i] << " " << zz[jm][i] << std::endl;
+          zz[0][i] += zz[jm][i]; }
     }
-    if (this->commEns().size() > 1) {
+    if (this->local_ens_size() != this->ens_size()) {
       // if commEns > 1, then sum up across commEns communicators
       this->commEns().allReduceInPlace(&(zz[0].front()), dataSize, eckit::mpi::Operation::SUM);
     }

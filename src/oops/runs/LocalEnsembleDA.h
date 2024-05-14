@@ -274,11 +274,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 //      StateEnsemble4D_ ens_xx(geometry, params.background);
       StateEnsemble4D_ ens_xx(*dist_xx);
       std::cout << "ens_xx size is " << ens_xx.size() << std::endl;
+/*
       for(int ii=0; ii < ens_xx.size(); ++ii) {
         std::cout << "ens_xx[ii] size is " << ens_xx[ii].size() << std::endl;
         std::cout << "ens_xx[ii] is " << ens_xx[ii] << std::endl;
         std::cout << "ens_xx[ii] local_ens_size is " << ens_xx[ii].local_ens_size() << std::endl;
       }
+*/
       Log::info() << "done creating ens_xx " << std::endl; 
       const size_t nens = ens_xx.size();
       Log::info() << "nens is now " << nens << std::endl; 
@@ -292,6 +294,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
       Log::info() << "calculating mean " << statevars << std::endl; 
       StateSet_ bkg_mean = ens_xx.mean();
+//    StateSet_ bkg_mean = dist_xx->ens_mean();
       Log::info() << "done calculating mean " << statevars << std::endl; 
       // if control member is present use that instead of the ensemble mean
       if (params.driver.value().useControlMember) {
@@ -327,17 +330,21 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
 
       iter = 0;
+      Log::info() << "calling computYbMean" << std::endl;
       Observations_ yb_mean = solver->computeYbMean(ens_xx, iter, params.driver.value().readHofX);
       if (do_test_prints) {
          Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
       }
+      Log::info() << "Done calling computYbMean" << std::endl;
 
       iter = 0;
+      Log::info() << "computing ombg" << std::endl;
       Departures_ ombg(yobs - yb_mean);
       ombg.save("ombg");
       if (do_test_prints) {
          Log::test() << "background y - H(x): " << std::endl << ombg << std::endl;
       }
+      Log::info() << "Done computing ombg" << std::endl;
 
 
       // print background mean
@@ -361,11 +368,28 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       oops::mpi::world().barrier();
 
       Log::info() << "Local solver completed." << std::endl;
+//    std::cout << "printing enx_xx state 0 " << (ens_xx[0])[0] << std::endl;
+//    std::cout << "printing enx_xx state 0 " << (ens_xx[1])[0] << std::endl;
+/*
+      Log::info() << "printing enx_xx state 0 " << (ens_xx[0])[0] << std::endl;
+      Log::info() << "printing enx_xx state 1 " << (ens_xx[1])[0] << std::endl;
+      Log::info() << "printing bkg_mean " << bkg_mean[0] << std::endl;
+      Log::info() << "printing mean " << ens_xx.mean() << std::endl;
+*/
       util::printRunStats("LocalEnsembleDA after solver", true);
-
+    
+      Log::info() << "ens_xx[0] local_ens_size is " << ens_xx[0].local_ens_size() << std::endl;
+      oops::mpi::world().barrier(); 
+//      IncrementSet_ bkg_mean_inc(bkg_mean.geometry(), bkg_mean.variables(), bkg_mean); 
+      oops::mpi::world().barrier(); 
       // calculate final analysis states
       if (incvars == statevars) {
         for (size_t jj = 0; jj < nens; ++jj) {
+          Log::info() << "ens_xx["<<jj<<"] is " << ens_xx[jj] << std::endl;
+//          ens_xx[jj].zero();
+//          Log::info() << "ens_xx["<<jj<<"] is now " << ens_xx[jj] << std::endl;
+//          Log::info() << "bkg_mean_inc is " << bkg_mean_inc << std::endl;
+//        ens_xx[jj] += bkg_mean_inc;
           ens_xx[jj] = bkg_mean;
           ens_xx[jj] += ana_pert[jj];
         }

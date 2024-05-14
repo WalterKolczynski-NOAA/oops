@@ -237,6 +237,8 @@ void IncrementSet<MODEL>::random() {
 template <typename MODEL>
 StateSet<MODEL> & operator+=(StateSet<MODEL> & xx, const IncrementSet<MODEL> & dx) {
   Log::trace() << "operator+=(StateSet, IncrementSet) starting" << std::endl;
+  Log::info() << "operator+=(StateSet, IncrementSet) starting" << std::endl;
+  Log::info() << "operator+= sizes are " << xx.size() << " " << dx.size() << std::endl;
 //  xx.check_consistency(dx);
   for (size_t ii = 0; ii < xx.size(); ++ii) {
     xx[ii] += dx[ii];
