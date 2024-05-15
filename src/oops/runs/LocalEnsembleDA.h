@@ -232,6 +232,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // This geometry will be decomposed over the entire comm world
     Log::info() << "setting up sub geometry" << std::endl;
     Log::info() << "comm size is " << this->getComm().size() << std::endl;
+    std::unique_ptr<Geometry_ > subgeometry;
 /*
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // hard coded for now, but will need a new layout in yaml file 
@@ -241,23 +242,17 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 */
     std::unique_ptr<StateSet_> dist_xx;
     if ( HofXOnly ) {
+      dist_xx = executeHofX(fullConfig, validate, params, subgeometry);
+    } else {
+      eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+      // hard coded for now, but will need a new layout in yaml file 
+      std::vector<int> layout{2,1};
+      subconfig.set("layout",layout);
+      subgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
-      dist_xx = executeHofX(fullConfig, validate, params );
-/*
-      StateSet_ ens_xx(subgeometry, *dist_xx, 2);
-      std::vector<double> lats;
-      std::vector<double> lons;
-      subgeometry.latlon(lats,lons,false);
-      std::cout << "new lats are from " << *min_element(lats.begin(),lats.end()) << " to " << *max_element(lats.begin(), lats.end()) << std::endl;
-      std::cout << "new lons are from " << *min_element(lons.begin(),lons.end()) << " to " << *max_element(lons.begin(), lons.end()) << std::endl;
-*/
-    } 
+    }
+
 //else {
-    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-    // hard coded for now, but will need a new layout in yaml file 
-    std::vector<int> layout{2,1};
-    subconfig.set("layout",layout);
-    Geometry_ subgeometry(subconfig , this->getComm() );
       //  Setup observation window
       const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
       Log::info() << "Observation window: " << timeWindow << std::endl;
@@ -270,7 +265,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // if any of the obs. spaces uses Halo distribution it will need to know the geometry
       // of the local grid on this PE
-      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(subgeometry, obsConfig);
+      if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(*subgeometry, obsConfig);
       // Setup observations
       const eckit::mpi::Comm & time = oops::mpi::myself();
       ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
@@ -305,7 +300,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       Log::info() << "done calculating mean " << statevars << std::endl; 
       // if control member is present use that instead of the ensemble mean
       if (params.driver.value().useControlMember) {
-        StateSet_ controlMember(subgeometry, *params.controlMember.value());
+        StateSet_ controlMember(*subgeometry, *params.controlMember.value());
         bkg_mean = controlMember;
       }
 
@@ -313,7 +308,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
       // set up solver
       std::unique_ptr<LocalSolver_> solver =
-           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, subgeometry, fullConfig,
+           LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, *subgeometry, fullConfig,
                                                           nens, bkg_mean, incvars);
 
       // test prints for the prior ensemble
@@ -363,7 +358,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
       // initialize empty analysis perturbations
-      IncrementEnsemble4D_ ana_pert(subgeometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
+      IncrementEnsemble4D_ ana_pert(*subgeometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
       // run the solver at each gridpoint
       Log::info() << "Beginning core local solver..." << std::endl;
@@ -401,7 +396,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
           ens_xx[jj] += ana_pert[jj];
         }
       } else {
-        Increment4D_ ana_increment(subgeometry, incvars, ens_xx[0].validTimes());
+        Increment4D_ ana_increment(*subgeometry, incvars, ens_xx[0].validTimes());
         for (size_t jj = 0; jj < nens; ++jj) {
           ana_increment = ana_pert[jj];
           for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
@@ -542,8 +537,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   }
 
   std::unique_ptr<StateSet_> executeHofX(const eckit::Configuration & fullConfig, bool validate,
-          LocalEnsembleDAParameters_ & params ) const {
-//          LocalEnsembleDAParameters_ & params, Geometry_ & subgeometry) const {
+          LocalEnsembleDAParameters_ & params, std::unique_ptr<Geometry_> & subgeometry) const {
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
@@ -568,6 +562,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // alternate with modulo
     //int mymember = mytask % nmembers + 1;
 
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // hard coded for now, but will need a new layout in yaml file 
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    subgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
     Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
@@ -591,6 +590,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::mpi::Comm & faceMember = this->getComm().split(subrank, faceName);
     const int subface = faceMember.rank();
 
+    std::cout << "HEYY, my rank, subrank, and facerank are " << mytask << " " << subrank << " " << subface << std::endl;
+    std::cout << "HEYY, my rank, commMember size are " << mytask << " " << commMember.size() << std::endl;
     Log::info() << "size of faceMember/ENS comm is " << faceMember.size() << std::endl;
     //  Each member uses a different configuration:
     eckit::PathName confPath = files[mymember-1];
@@ -601,15 +602,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     
     const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
     std::cout << "DONE with geometry ctr " << std::endl;
-//  std::cout << "HEY, subgeom is on tile " << subgeometry.tileNum() << std::endl;
     std::cout << "HEY, geom is on tile " << geometry.tileNum() << std::endl;
-/*
-    std::vector<double> lats;
-    std::vector<double> lons;
-    geometry.latlon(lats,lons,false);
-    std::cout << "orig lats are from " << *min_element(lats.begin(),lats.end()) << " to " << *max_element(lats.begin(), lats.end()) << std::endl;
-    std::cout << "orig lons are from " << *min_element(lons.begin(),lons.end()) << " to " << *max_element(lons.begin(), lons.end()) << std::endl;
-*/
     Log::info() << "done with geometry" << std::endl;
 
     //  Setup times
@@ -645,11 +638,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   //  Each member uses a different configuration:
       for (int m = 1; m <=nmembers; m++) {
          if ( m == mymember ) {
-           Log::trace() << "running on mymember = " << mymember  << " " << mytask << std::endl;
+//           Log::info() << "running on mymember = " << mymember  << " " << mytask << std::endl;
            std::cout << "running on mymember = " << mymember  << " " << mytask << std::endl;
            executeForecast(geometry, memberConf, validate, post);
+//           Log::info() << "Done with ens execute\n";
            std::cout << "Done with ens execute\n";
-           Log::trace() << "Done with ens execute\n";
          }
          if ( batchsize > 0 ) {  // don't divide by zero
            if (m % batchsize == 0) oops::mpi::world().barrier();
@@ -666,13 +659,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       std::cout << "after reading statesets, enx_xx(0) is " << (*ens_xx)[0] << std::endl;
     }
 
-    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-    // hard coded for now, but will need a new layout in yaml file 
-    std::vector<int> layout{2,1};
-    subconfig.set("layout",layout);
-    Geometry_ subgeometry(subconfig , this->getComm() );
 
-    std::unique_ptr<StateSet_> loc_ens_xx = ens_xx->get_local(this->getComm(), subgeometry, mytask, mymember);
+    std::unique_ptr<StateSet_> loc_ens_xx = ens_xx->get_local(this->getComm(), *subgeometry, mytask, mymember);
     std::cout << "HEY, local_ens_xx size is " << loc_ens_xx->local_ens_size() << std::endl;
     Log::info() << (*loc_ens_xx)[0] << std::endl;
     Log::info() << (*loc_ens_xx)[1] << std::endl;
@@ -865,7 +853,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     params.deserialize(fullConfig);
 
 //  Setup Model
-    std::cout   << "Forecast:setting up model" << std::endl;
+    std::cout << "Forecast:setting up model" << std::endl;
+//    Log::info() << "Forecast:setting up model" << std::endl;
     const Model_ model(geometry, eckit::LocalConfiguration(fullConfig, "model"));
 
 //  Setup initial state
@@ -878,12 +867,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::DateTime bgndate(xx.validTime());
     const util::DateTime enddate(bgndate + fclength);
 
-    std::cout   << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
+//  Log::info() << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
+    std::cout << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
     post.initialize(xx, bgndate, fclength);
 //  Run forecast
-    std::cout   << "Forecast:running forecast" << std::endl;
+//  Log::info() << "Forecast:running forecast" << std::endl;
+    std::cout << "Forecast:running forecast" << std::endl;
     model.forecast(xx, moderr, fclength, post);
-    std::cout   << "Forecast:done running forecast" << std::endl;
+//    Log::info() << "Forecast:done running forecast" << std::endl;
+    std::cout << "Forecast:done running forecast" << std::endl;
   }
 
 // -----------------------------------------------------------------------------
