@@ -232,15 +232,17 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // This geometry will be decomposed over the entire comm world
     Log::info() << "setting up sub geometry" << std::endl;
     Log::info() << "comm size is " << this->getComm().size() << std::endl;
+/*
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // hard coded for now, but will need a new layout in yaml file 
     std::vector<int> layout{2,1};
     subconfig.set("layout",layout);
     Geometry_ subgeometry(subconfig , this->getComm() );
+*/
     std::unique_ptr<StateSet_> dist_xx;
     if ( HofXOnly ) {
 
-      dist_xx = executeHofX(fullConfig, validate, params, subgeometry);
+      dist_xx = executeHofX(fullConfig, validate, params );
 /*
       StateSet_ ens_xx(subgeometry, *dist_xx, 2);
       std::vector<double> lats;
@@ -251,6 +253,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 */
     } 
 //else {
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // hard coded for now, but will need a new layout in yaml file 
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    Geometry_ subgeometry(subconfig , this->getComm() );
       //  Setup observation window
       const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
       Log::info() << "Observation window: " << timeWindow << std::endl;
@@ -535,7 +542,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   }
 
   std::unique_ptr<StateSet_> executeHofX(const eckit::Configuration & fullConfig, bool validate,
-          LocalEnsembleDAParameters_ & params, Geometry_ & subgeometry) const {
+          LocalEnsembleDAParameters_ & params ) const {
+//          LocalEnsembleDAParameters_ & params, Geometry_ & subgeometry) const {
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
@@ -593,7 +601,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     
     const Geometry_ geometry(fcstparams.fcstConf.geometry, commMember);
     std::cout << "DONE with geometry ctr " << std::endl;
-    std::cout << "HEY, subgeom is on tile " << subgeometry.tileNum() << std::endl;
+//  std::cout << "HEY, subgeom is on tile " << subgeometry.tileNum() << std::endl;
     std::cout << "HEY, geom is on tile " << geometry.tileNum() << std::endl;
 /*
     std::vector<double> lats;
@@ -638,7 +646,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       for (int m = 1; m <=nmembers; m++) {
          if ( m == mymember ) {
            Log::trace() << "running on mymember = " << mymember  << " " << mytask << std::endl;
+           std::cout << "running on mymember = " << mymember  << " " << mytask << std::endl;
            executeForecast(geometry, memberConf, validate, post);
+           std::cout << "Done with ens execute\n";
            Log::trace() << "Done with ens execute\n";
          }
          if ( batchsize > 0 ) {  // don't divide by zero
@@ -655,6 +665,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
                   oops::mpi::myself(), faceMember));
       std::cout << "after reading statesets, enx_xx(0) is " << (*ens_xx)[0] << std::endl;
     }
+
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // hard coded for now, but will need a new layout in yaml file 
+    std::vector<int> layout{2,1};
+    subconfig.set("layout",layout);
+    Geometry_ subgeometry(subconfig , this->getComm() );
 
     std::unique_ptr<StateSet_> loc_ens_xx = ens_xx->get_local(this->getComm(), subgeometry, mytask, mymember);
     std::cout << "HEY, local_ens_xx size is " << loc_ens_xx->local_ens_size() << std::endl;
@@ -849,7 +865,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     params.deserialize(fullConfig);
 
 //  Setup Model
-    Log::info() << "Forecast:setting up model" << std::endl;
+    std::cout   << "Forecast:setting up model" << std::endl;
     const Model_ model(geometry, eckit::LocalConfiguration(fullConfig, "model"));
 
 //  Setup initial state
@@ -862,12 +878,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::DateTime bgndate(xx.validTime());
     const util::DateTime enddate(bgndate + fclength);
 
-    Log::info() << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
+    std::cout   << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
     post.initialize(xx, bgndate, fclength);
 //  Run forecast
-    Log::info() << "Forecast:running forecast" << std::endl;
+    std::cout   << "Forecast:running forecast" << std::endl;
     model.forecast(xx, moderr, fclength, post);
-    Log::info() << "Forecast:done running forecast" << std::endl;
+    std::cout   << "Forecast:done running forecast" << std::endl;
   }
 
 // -----------------------------------------------------------------------------
