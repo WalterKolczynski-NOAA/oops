@@ -25,7 +25,7 @@
 #include "oops/base/ObsEnsemble.h"
 #include "oops/base/Observations.h"
 #include "oops/base/ObsSpaces.h"
-#include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
 #include "oops/generic/VerticalLocEV.h"
 #include "oops/interface/GeometryIterator.h"
@@ -68,7 +68,7 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   typedef PseudoModelState4D<MODEL>   PseudoModel_;
   typedef PseudoLinearModelIncrement4D<MODEL> PseudoLinearModel_;
   typedef State<MODEL>                State_;
-  typedef State4D<MODEL>              State4D_;
+  typedef StateSet<MODEL>              StateSet_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
   typedef VerticalLocEV<MODEL>        VerticalLocEV_;
 
@@ -78,7 +78,7 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   /// Constructor (allocates Wa, wa, HZb_,
   /// saves options from the config, computes VerticalLocEV_)
   GETKFSolver(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
-              const State4D_ &, const Variables &);
+              const StateSet_ &, const Variables &);
 
   Observations_ computeHofX(const StateEnsemble4D_ &, size_t, bool) override;
 
@@ -119,7 +119,7 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
 template <typename MODEL, typename OBS>
 GETKFSolver<MODEL, OBS>::GETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & geometry,
                                 const eckit::Configuration & config, size_t nens,
-                                const State4D_ & xbmean, const Variables & incvars)
+                                const StateSet_ & xbmean, const Variables & incvars)
   : LocalEnsembleSolver<MODEL, OBS>(obspaces, geometry, config, nens, xbmean, incvars),
     nens_(nens), geometry_(geometry),
     vertloc_(config.getSubConfiguration("local ensemble DA.vertical localization"), xbmean[0],
@@ -236,7 +236,7 @@ Observations<OBS> GETKFSolver<MODEL, OBS>::computeHofX(const StateEnsemble4D_ & 
         dx.diff(ens_xx[iens], this->xbmean_);
         vertloc_.modulateIncrement(dx, Ztmp);
         for (size_t ieig = 0; ieig < neig_; ++ieig) {
-          State4D_ tmpState = this->xbmean_;
+          StateSet_ tmpState = this->xbmean_;
           tmpState += Ztmp[ieig];
           Observations_ tmpObs(this->obspaces_);
           this->computeHofX4DNonLinear(config, tmpState, tmpObs);

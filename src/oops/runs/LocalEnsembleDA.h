@@ -26,7 +26,7 @@
 #include "oops/base/Observations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/ParameterTraitsVariables.h"
-#include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/GeometryIterator.h"
@@ -165,7 +165,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef LocalEnsembleSolver<MODEL, OBS>  LocalSolver_;
   typedef ObsSpaces<OBS>                   ObsSpaces_;
   typedef Observations<OBS>                Observations_;
-  typedef State4D<MODEL>                   State4D_;
+  typedef StateSet<MODEL>                   StateSet_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
@@ -221,10 +221,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     } else {
       incvars += *params.incvars.value();
     }
-    State4D_ bkg_mean = ens_xx.mean();
+    StateSet_ bkg_mean = ens_xx.mean();
     // if control member is present use that instead of the ensemble mean
     if (params.driver.value().useControlMember) {
-      State4D_ controlMember(geometry, *params.controlMember.value());
+      StateSet_ controlMember(geometry, *params.controlMember.value());
       bkg_mean = controlMember;
     }
 
@@ -325,7 +325,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     }
 
     // save the posterior mean
-    State4D_ ana_mean = ens_xx.mean();   // calculate analysis mean
+    StateSet_ ana_mean = ens_xx.mean();   // calculate analysis mean
     if (do_test_prints) {
       Log::test() << "Analysis mean :" << ana_mean << std::endl;
     }
