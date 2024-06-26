@@ -194,7 +194,6 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
 template <typename MODEL, typename OBS>
 void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
-  oops::Log::info() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   ASSERT(initialized_);
 
   // Fill GeoVaLs

@@ -12,7 +12,6 @@
 #include <cmath>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
@@ -20,22 +19,17 @@
 #include "oops/assimilation/instantiateLocalEnsembleSolverFactory.h"
 #include "oops/assimilation/LocalEnsembleSolver.h"
 #include "oops/base/Departures.h"
-#include "oops/base/ForecastParameters.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/Increment.h"
 #include "oops/base/Increment4D.h"
 #include "oops/base/IncrementEnsemble4D.h"
-#include "oops/base/IncrementSet.h"
 #include "oops/base/instantiateObsFilterFactory.h"
-#include "oops/base/Model.h"
 #include "oops/base/Observations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/ParameterTraitsVariables.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/StateSetSaver.h"
 #include "oops/base/StateEnsemble4D.h"
-#include "oops/base/StateSet.h"
-#include "oops/base/StateSetSaver.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/mpi/mpi.h"
@@ -203,7 +197,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef StateSet<MODEL>                  StateSet_;
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
-  typedef typename Geometry_::Parameters_       GeometryParameters_;
   typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
   typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
@@ -247,8 +240,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     Log::info() << "Observation window: " << timeWindow << std::endl;
 
     // Get observations configuration
-    eckit::LocalConfiguration observationsConfig = params.observations;
-    util::seekAndReplace(observationsConfig, pattern, (mymember - 1), zpad);
+    const eckit::LocalConfiguration observationsConfig = params.observations;
     eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
     // if any of the obs. spaces uses Halo distribution it will need to know the geometry
@@ -256,10 +248,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(*subgeometry, obsConfig);
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
-// maybe we need to set up a different obs space for MPI_COMM_WORLD?
-// when done this way, we can save individual files for each ensemble member
-    Log::info() << "creating obsspaces with comm size " << commMember.size() << std::endl;
-    ObsSpaces_ obsdb(obsConfig, commMember, timeWindow, time);
+    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
 
     // convert dist_xx from StateSet to StateEnsemble4D
@@ -293,12 +282,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // test prints for the prior ensemble
     bool do_test_prints = params.driver.value().doTestPrints;
-    do_test_prints = true;
     if (do_test_prints) {
-      for (size_t jj = 0; jj < ens_xx->local_ens_size(); ++jj) {
-        Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)[jj] << std::endl;
+      for (size_t jj = 0; jj < nens; ++jj) {
+        Log::test() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
       }
     }
+
     util::printRunStats("LocalEnsembleDA before computeHofX");
 
     // compute H(x)

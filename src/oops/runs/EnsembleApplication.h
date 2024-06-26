@@ -58,6 +58,7 @@ class EnsembleApplication : public Application {
     const std::vector<std::string> &files = params.files.value();
 
     Log::info() << "EnsembleApplication YAML files:" << files << std::endl;
+
 //  Get the MPI partition
     const int nmembers = files.size();
     const int ntasks = this->getComm().size();
@@ -80,7 +81,7 @@ class EnsembleApplication : public Application {
     eckit::PathName confPath = files[mymember-1];
     eckit::YAMLConfiguration memberConf(confPath);
 
-    APP ensapp(this->getComm());
+    APP ensapp(commMember);
     return ensapp.execute(memberConf, validate);
   }
 // -----------------------------------------------------------------------------

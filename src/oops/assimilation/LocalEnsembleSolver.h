@@ -42,7 +42,6 @@
 #include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/interface/ModelAuxControl.h"
-#include "oops/mpi/mpi.h"
 #include "oops/util/abor1_cpp.h"
 #include "oops/util/Logger.h"
 
@@ -176,29 +175,24 @@ LocalEnsembleSolver<MODEL, OBS>::LocalEnsembleSolver(ObsSpaces_ & obspaces,
   const LocalEnsembleSolverInflationParameters & inflopt = this->options_.infl;
   Log::info() << "Multiplicative inflation will be applied with multCoeff=" <<
                  inflopt.mult << std::endl;
-  std::cout << "create 2 " << std::endl;
   if (inflopt.doRtpp()) {
       Log::info() << "RTPP inflation will be applied with rtppCoeff=" <<
                     inflopt.rtpp << std::endl;
   } else {
-  std::cout << "create 3 " << std::endl;
       Log::info() << "RTPP inflation is not applied rtppCoeff is out of bounds (0,1], rtppCoeff="
                   << inflopt.rtpp << std::endl;
   }
   if (inflopt.doRtps()) {
-  std::cout << "create 4 " << std::endl;
     Log::info() << "RTPS inflation will be applied with rtpsCoeff=" <<
                     inflopt.rtps << std::endl;
   } else {
-  std::cout << "create 5 " << std::endl;
     Log::info() << "RTPS inflation is not applied rtpsCoeff is out of bounds (0,1], rtpsCoeff="
                 << inflopt.rtps << std::endl;
   }
-  std::cout << "create 6 " << std::endl;
 }
 
 // -----------------------------------------------------------------------------
-// -----------------------------------------------------------------------------
+
 template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::measurementUpdateSet
         (const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an) {
@@ -319,45 +313,6 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DLinear(const eckit::Configura
 }
 
 // -----------------------------------------------------------------------------
-template <typename MODEL, typename OBS>
-void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration & config,
-                                                    const StateSet_ & xx, Observations_ & yy) {
-  // compute forecast length from StateSet times
-  const std::vector<util::DateTime> times = xx.validTimes();
-  const util::Duration flength = times[times.size()-1] - times[0];
-  // default_tstep = 2*observation window is passed to PseudoModel as the default
-  // pseudomodel time step. It is only used when StateSet has a single state, to enable
-  // processing of all observations in the specified window regardless of where in
-  // the time window the state is. Observations in
-  // ( max(winbgn, xx.time - tstep/2); min(winend, xx.time + tstep/2) ] are
-  // processed in H(x).
-  const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
-  // Setup PseudoModelStateSet
-  std::cout << "Hey, setting up pseudomodel step is" << default_tstep << std::endl;
-  std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
-  std::cout << "Hey, constructing model\n";
-  const Model_ model(std::move(pseudomodel));
-  // Setup model and obs biases; obs errors
-  ModelAux_ moderr(geometry_, eckit::LocalConfiguration());
-  ObsAux_ obsaux(obspaces_, observersconf_);
-  R_.reset(new ObsErrors_(observersconf_, obspaces_));
-  // Setup and run the model forecast with observers
-  State_ init_xx = xx[0];
-  PostProcessor<State_> post;
-  Observers_ hofx(obspaces_, obsconf_);
-
-  hofx.initialize(geometry_, obsaux, *R_, post, config);
-  std::cout << "Hey, starting forecast, xx length is " << xx.local_time_size() << std::endl;
-  std::cout << "Hey, starting forecast, flength is " << flength << std::endl;
-  std::cout << "Hey, starting forecast, times " << times[0] <<" " << times.size() << std::endl;
-  model.forecast(init_xx, moderr, flength, post);
-  std::cout << "Hey, finalizing yy" << std::endl;
-  std::cout << "yy is " << yy << std::endl;
-  hofx.finalize(yy);
-  std::cout << "Hey, done finalizing yy" << std::endl;
-}
-
-// -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
 Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXLinear(
@@ -373,7 +328,6 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXLinear(
   Observations_ y_mean_xb(obspaces_);
 
   if (readFromDisk) {
-    Log::trace() << "computeHofXSet reading from disk now" << std::endl;
     // read hofx from disk
     for (size_t jj = 0; jj < nens; ++jj) {
       obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
@@ -397,105 +351,11 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXLinear(
     config.set("save qc", false);
     config.set("save obs errors", false);
     config.set("iteration", std::to_string(iteration));
-    // keep in mind we are doing this across MPI_COMM_WORLD
-    for (size_t jj = 0; jj < ens_xx.local_ens_size(); ++jj) {
-      computeHofX4DSet(config, ens_xx, obsens[jj]);
-      Log::trace() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-      obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(mymember));
-    }
-    // Compute H(mean(Xb))
-    // set QC for the mean
-    config.set("save qc", true);
-    config.set("save obs errors", true);
-
-    computeHofX4DSet(config, xbmean_, y_mean_xb);
-
-    y_mean_xb.save("hofx_y_mean_xb"+std::to_string(iteration));
-
-    // QC flags and Obs errors are set to that of the H(mean(Xb))
-    R_->save("ObsError");
-  }
-  // set inverse variances
-  invVarR_.reset(new Departures_(R_->inverseVariance()));
-
-  // calculate H(x) ensemble mean
-  Log::trace() << "size of ensemble is " << obsens.size() << std::endl;
-  // There is no method to calculate the mean of Observations spread across communicators
-  Observations_ yb_mean(obsens.ens_mean(ens_xx.commEns()));
-
-  // treat the special case of nens=1
-  // default option: xbmean_=mean(xb) then yb_mean == y_mean_xb and action below is a tautology
-  // if use control member==true: xbmean_ was read from the controll member,
-  //                              then using H(xbmean_) is expected by downstream applications
-  if (nens == 1) {yb_mean = y_mean_xb;}
-
-  // calculate H(x) ensemble perturbations
-  for (size_t iens = 0; iens < nens; ++iens) {
-    Yb_[iens] = obsens[iens] - yb_mean;
-    invVarR_->mask(Yb_[iens]);
-    Yb_[iens].mask(*invVarR_);
-  }
-
-  // calculate obs departures and mask with qc flag
-  Observations_ yobs(obspaces_, "ObsValue");
-  omb_ = yobs - yb_mean;
-  invVarR_->mask(omb_);
-  omb_.mask(*invVarR_);
-
-  // return mean H(x)
-  return yb_mean;
-}
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL, typename OBS>
-void LocalEnsembleSolver<MODEL, OBS>::computeHofXAlone(const StateEnsemble4D_ & ens_xx,
-                                                   size_t iteration, bool readFromDisk) {
-  util::Timer timer(classname(), "computeHofX");
-
-  Log::info() << "hofxAlone 1" << std::endl;
-  ASSERT(ens_xx.size() == Yb_.size());
-
-  Log::info() << "hofxAlone 2" << std::endl;
-  const size_t nens = ens_xx.size();
-  Log::info() << "hofxAlone 3" << std::endl;
-  ObsEnsemble_ obsens(obspaces_, nens);
-  Log::info() << "hofxAlone 4" << std::endl;
-  Observations_ y_mean_xb(obspaces_);
-  Log::info() << "hofxAlone 1" << std::endl;
-
-  Log::info() << "computeHofXAlone now on iteration " << iteration << " of " << nens << std::endl;
-  if (readFromDisk) {
-    // read hofx from disk
-    Log::info() << "reading from disk now" << std::endl;
-    for (size_t jj = 0; jj < nens; ++jj) {
-      obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
-      Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-    }
-    R_.reset(new ObsErrors_(observersconf_, obspaces_));
-    y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));
-  } else {
-    // compute and save H(x)
-
-    // save QC filters and ob errors to be used for all other members
-    // do not save H(X) (saved explicitly below)
-    eckit::LocalConfiguration config;
-
-    // save hofx means that hofx will be written out into ObsSpace;
-    // if run computeHofX4D several times with save hofx on,
-    // the hofx will be overwritten,
-    // unless each time specifying iteration differently in the passed config.
-    config.set("save hofx", false);
-    config.set("save qc", false);
-    config.set("save obs errors", false);
-    config.set("iteration", std::to_string(iteration));
-
 
     computeHofX4DLinear(config, ens_xx, y_mean_xb, obsens);
     for (size_t jj = 0; jj < nens; ++jj) {
       Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
       obsens[jj].save("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
-      Log::info() << "Done H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
     }
 
     // Compute H(mean(Xb))

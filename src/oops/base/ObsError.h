@@ -152,10 +152,8 @@ typename ObsError<OBS>::ObsVector_ ObsError<OBS>::obserrors() const {
 template <typename OBS>
 void ObsError<OBS>::update(const ObsVector_ & obserr) {
   Log::trace() << "ObsError<OBS>::update starting" << std::endl;
-  Log::info() << "ObsError<OBS>::update starting" << obserr << std::endl;
   util::Timer timer(classname(), "update");
   err_->update(obserr);
-  Log::info() << "ObsError<OBS>::update done" << obserr << std::endl;
   Log::trace() << "ObsError<OBS>::update done" << std::endl;
 }
 

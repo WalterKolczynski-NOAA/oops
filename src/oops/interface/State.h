@@ -103,8 +103,6 @@ class State : public util::Printable,
   /// Serialize and deserialize (used in 4DEnVar, weak-constraint 4DVar and Block-Lanczos minimizer)
   size_t serialSize() const override;
   void serialize(std::vector<double> &) const override;
-  void serializeSect(std::vector<double> &, const int &, const int &, const int &, 
-     const int &, const int &) const;
   void deserialize(const std::vector<double> &, size_t &) override;
   void deserializeSect(std::vector<double> &, int, int, int, 
      int, int, int, int, int, int) const;
