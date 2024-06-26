@@ -69,7 +69,8 @@ namespace oops {
 
 static LibOOPS liboops;
 
-LibOOPS::LibOOPS() : Library("oops"), rank_(0), test_(false),
+LibOOPS::LibOOPS() : Library("oops"),
+                     initialised_(false), rank_(0), test_(false),
                      info_(false), preinfo_(""),
                      debug_(false), predebug_("OOPS_DEBUG"),
                      trace_(false), pretrace_("OOPS_TRACE"),
@@ -92,9 +93,8 @@ void LibOOPS::initialise() {
   std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   char nowstr[100];
   std::strftime(nowstr, sizeof(nowstr), "%F %T (UTC%z)", std::localtime(&now));
-  Log::info() << "OOPS Starting " << nowstr << std::endl;
-
   rank_ = oops::mpi::world().rank();
+  if (rank_ == 0) Log::info() << "OOPS Starting " << nowstr << std::endl;
 
   std::vector<int> iis(getEnvList("OOPS_INFO", std::vector<int>(1, 0)));
   if (rank_ == 0) info_ = true;  // INFO is always logged for rank 0
@@ -129,6 +129,8 @@ void LibOOPS::initialise() {
 #ifdef ENABLE_GPTL
   do_profile = getEnv("OOPS_PROFILE", 0);
 #endif
+
+  initialised_ = true;
 }
 
 /** Add a rank-dependent tee file
@@ -210,6 +212,8 @@ std::string LibOOPS::gitsha1(unsigned int count) const {
 }
 
 eckit::Channel& LibOOPS::traceChannel() const {
+  // use pre-main channel if library was not initialized
+  if (!initialised_) {return eckit::Log::info();}
   if (traceChannel_) {return *traceChannel_;}
   if (trace_) {
     traceChannel_.reset(new eckit::Channel(
@@ -232,6 +236,8 @@ eckit::Channel& LibOOPS::statsChannel() const {
 }
 
 eckit::Channel& LibOOPS::testChannel() const {
+  // use pre-main channel if library was not initialized
+  if (!initialised_) {return eckit::Log::info();}
   if (testChannel_) {return *testChannel_;}
   if (test_) {
     testChannel_.reset(new eckit::Channel(
@@ -245,6 +251,8 @@ eckit::Channel& LibOOPS::testChannel() const {
 }
 
 eckit::Channel& LibOOPS::infoChannel() const {
+  // use pre-main channel if library was not initialized
+  if (!initialised_) {return eckit::Log::info();}
   if (infoChannel_) {return *infoChannel_;}
   if (rank_ == 0) {
     return eckit::Log::info();
@@ -259,6 +267,8 @@ eckit::Channel& LibOOPS::infoChannel() const {
 }
 
 eckit::Channel& LibOOPS::debugChannel() const {
+  // use pre-main channel if library was not initialized
+  if (!initialised_) {return eckit::Log::info();}
   if (debugChannel_) {return *debugChannel_;}
   if (debug_) {
     debugChannel_.reset(new eckit::Channel(new eckit::PrefixTarget(predebug_)));

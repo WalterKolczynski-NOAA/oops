@@ -2,6 +2,7 @@ list( APPEND qg_testinput
   testinput/3densvar.yaml
   testinput/3dvar.yaml
   testinput/3dvar_change_var.yaml
+  testinput/3dvar_fc_from_an.yaml
   testinput/3dvar_full_inverse.yaml
   testinput/3dvar_hybrid.yaml
   testinput/3dvar_hybrid_wo_jb_evaluation.yaml
@@ -82,6 +83,7 @@ list( APPEND qg_testinput
   testinput/gen_ens_pert_B.yaml
   testinput/gen_ens_pert_B_5level_pert_heat.yaml
   testinput/gen_hybrid_linear_model_coeffs_pseudo.yaml
+  testinput/gen_hybrid_linear_model_coeffs_pseudo_multimodel_multigeometry.yaml
   testinput/gen_hybrid_linear_model_coeffs_with_subtimestep.yaml
   testinput/geometry_iterator.yaml
   testinput/geometry.yaml
@@ -138,6 +140,7 @@ list( APPEND qg_testinput
 list( APPEND qg_testoutput
   testoutput/3densvar.test
   testoutput/3dvar.test
+  testoutput/3dvar_fc_from_an.test
   testoutput/3dvar_change_var.test
   testoutput/3dvar_full_inverse.test
   testoutput/3dvar_hybrid.test
@@ -214,6 +217,7 @@ list( APPEND qg_testoutput
   testoutput/truth_5level_pert_heat.test
   testoutput/uniform_field_hybrid.test
   testoutput/uniform_field_inflation.test
+  testoutput/variable_change.test
 )
 
 # Create data directory for test input and symlink all files
@@ -578,6 +582,12 @@ ecbuild_add_test( TARGET test_qg_gen_hybrid_linear_model_coeffs_pseudo
                   COMMAND  qg_gen_hybrid_linear_model_coeffs.x
                   TEST_DEPENDS test_qg_forecast_5level_pert_heat test_qg_gen_ens_pert_B_5level_pert_heat )
 
+ecbuild_add_test( TARGET test_qg_gen_hybrid_linear_model_coeffs_pseudo_multimodel_multigeometry
+                  OMP 2
+                  ARGS testinput/gen_hybrid_linear_model_coeffs_pseudo_multimodel_multigeometry.yaml
+                  COMMAND  qg_gen_hybrid_linear_model_coeffs.x
+                  TEST_DEPENDS test_qg_forecast_5level_pert_heat test_qg_gen_ens_pert_B_5level_pert_heat )
+
 ecbuild_add_test( TARGET test_qg_gen_hybrid_linear_model_coeffs_with_subtimestep
                   OMP 2
                   ARGS testinput/gen_hybrid_linear_model_coeffs_with_subtimestep.yaml
@@ -765,6 +775,12 @@ ecbuild_add_test( TARGET test_qg_3dvar
                   ARGS testinput/3dvar.yaml
                   COMMAND  qg_4dvar.x
                   TEST_DEPENDS test_qg_forecast test_qg_make_obs_3d )
+
+ecbuild_add_test( TARGET test_qg_3dvar_fc_from_an
+                  OMP 2
+                  ARGS testinput/3dvar_fc_from_an.yaml
+                  COMMAND  qg_4dvar.x
+                  TEST_DEPENDS test_qg_forecast test_qg_3dvar )
 
 #--------------------------------------------------------------------
 

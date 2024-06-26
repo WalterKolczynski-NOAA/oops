@@ -23,6 +23,7 @@
 #include "oops/base/ObsErrors.h"
 #include "oops/base/ObsLocalizations.h"
 #include "oops/base/ObsSpaces.h"
+#include "oops/base/StateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/util/Logger.h"
 

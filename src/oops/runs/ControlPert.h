@@ -26,6 +26,8 @@
 #include "oops/base/State.h"
 #include "oops/base/StateInfo.h"
 #include "oops/base/StateWriter.h"
+#include "oops/base/StructuredGridPostProcessor.h"
+#include "oops/base/StructuredGridWriter.h"
 #include "oops/generic/instantiateLinearModelFactory.h"
 #include "oops/generic/instantiateNormFactory.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
@@ -302,19 +304,35 @@ template <typename MODEL, typename OBS> class ControlPert : public Application {
       dxOutput.write(incOutConfig);
     }
 
+    if (finalConfig.has("increment to structured grid")) {
+      const eckit::LocalConfiguration incLatlonConf(finalConfig, "increment to structured grid");
+      ControlIncrement<MODEL, OBS> dxOutput(dx);
+      const StructuredGridWriter<MODEL> latlon(incLatlonConf, dxOutput.states().geometry());
+      for (size_t jtime = 0; jtime < dxOutput.states().size(); ++jtime) {
+        latlon.interpolateAndWrite(dxOutput.states()[jtime], xxMemAnalysis.states()[jtime]);
+      }
+    }
+
 //  Compute final value of the cost function and, if an output configuration is specified,
-//  save the control member's analysis trajectory (or state)
+//  save the analysis trajectory (or state). For control member ONLY.
     PostProcessor<State_> post;
-    if (mymember == 0 && memberConf.has("output")) {
-      const eckit::LocalConfiguration outConfig(memberConf, "output");
-      post.enrollProcessor(new StateWriter<State_>(outConfig));
-      finalConfig.set("iteration", iouter);
+    if (mymember == 0) {
+      if (memberConf.has("output")) {
+        const eckit::LocalConfiguration outConfig(memberConf, "output");
+        post.enrollProcessor(new StateWriter<State_>(outConfig));
+        finalConfig.set("iteration", iouter);
+      }
+      if (finalConfig.has("analysis to structured grid")) {
+         const eckit::LocalConfiguration anLatlonConf(finalConfig, "analysis to structured grid");
+         post.enrollProcessor(new StructuredGridPostProcessor<MODEL, State_>(
+               anLatlonConf, xxMember.state().geometry() ));
+       }
+      if (finalConfig.has("prints")) {
+        const eckit::LocalConfiguration prtConfig(finalConfig, "prints");
+        post.enrollProcessor(new StateInfo<State_>("final", prtConfig));
+      }
+      J->evaluate(xxMember, finalConfig, post);
     }
-    if (finalConfig.has("prints")) {
-      const eckit::LocalConfiguration prtConfig(finalConfig, "prints");
-      post.enrollProcessor(new StateInfo<State_>("final", prtConfig));
-    }
-    J->evaluate(xxMember, finalConfig, post);
     Log::info() << "ControlPert: member " << mymember << " incremental assimilation done; "
                 << iouter << " iterations." << std::endl;
 
@@ -345,10 +363,18 @@ template <typename MODEL, typename OBS> class ControlPert : public Application {
 
 //    Save the ensemble members' analysis trajectory (or state) if an output configuration
 //    is specified
-      if (mymember > 0 && memberConf.has("output")) {
-        eckit::LocalConfiguration outConfig(memberConf, "output");
+      if (mymember > 0 &&
+         (memberConf.has("output") || (finalConfig.has("analysis to structured grid")))) {
         PostProcessor<State_> postMember;
-        postMember.enrollProcessor(new StateWriter<State_>(outConfig));
+        if (memberConf.has("output")) {
+          eckit::LocalConfiguration outConfig(memberConf, "output");
+          postMember.enrollProcessor(new StateWriter<State_>(outConfig));
+        }
+        if (finalConfig.has("analysis to structured grid")) {
+          const eckit::LocalConfiguration anLatlonConf(finalConfig, "analysis to structured grid");
+          postMember.enrollProcessor(new StructuredGridPostProcessor<MODEL, State_>(
+          anLatlonConf, xxMemAnalysis.state().geometry() ));
+        }
         J->runNL(xxMemAnalysis, postMember);
       }
 

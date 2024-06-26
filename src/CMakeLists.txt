@@ -110,6 +110,7 @@ oops/base/GeneralizedDepartures.h
 oops/base/Geometry.h
 oops/base/GeometryData.cc
 oops/base/GeometryData.h
+oops/base/GetValuePerts.h
 oops/base/GetValuePosts.h
 oops/base/GetValues.h
 oops/base/GetValueTLADs.h
@@ -128,8 +129,6 @@ oops/base/InflationBase.h
 oops/base/instantiateCovarFactory.h
 oops/base/instantiateInflationFactory.h
 oops/base/instantiateObsFilterFactory.h
-oops/base/LatLonGridPostProcessor.h
-oops/base/LatLonGridWriter.h
 oops/base/LinearModel.h
 oops/base/LinearVariableChangeParametersBase.h
 oops/base/Localization.h
@@ -162,7 +161,11 @@ oops/base/ObsSpaceBase.cc
 oops/base/ObsSpaceBase.h
 oops/base/ObsSpaces.h
 oops/base/ObsTypeParameters.h
+oops/base/ObsVariables.cc
+oops/base/ObsVariables.h
 oops/base/ObsVector.h
+oops/base/ParameterTraitsObsVariables.cc
+oops/base/ParameterTraitsObsVariables.h
 oops/base/ParameterTraitsVariables.cc
 oops/base/ParameterTraitsVariables.h
 oops/base/PostBase.h
@@ -184,6 +187,8 @@ oops/base/StateSaver.h
 oops/base/StateSet.h
 oops/base/StateSetSaver.h
 oops/base/StateWriter.h
+oops/base/StructuredGridPostProcessor.h
+oops/base/StructuredGridWriter.h
 oops/base/TrajectorySaver.h
 oops/base/TrivialSamplingMethodSelector.h
 oops/base/WriteParametersBase.cc
@@ -192,8 +197,15 @@ oops/base/VariableChangeParametersBase.h
 oops/base/variables_f.cc
 oops/base/variables_f.h
 oops/base/variables_mod.F90
+oops/base/obsvariables_f.cc
+oops/base/obsvariables_f.h
+oops/base/obsvariables_mod.F90
+oops/base/Variable.cc
+oops/base/Variable.h
 oops/base/Variables.cc
 oops/base/Variables.h
+oops/base/VariablesBase.cc
+oops/base/VariablesBase.h
 oops/base/WeightedDiff.h
 oops/base/WeightedDiffTLAD.h
 oops/base/WeightedMean.h
@@ -219,6 +231,8 @@ oops/coupled/instantiateCoupledFactory.h
 oops/generic/AnalyticInitBase.h
 oops/generic/AtlasInterpolator.cc
 oops/generic/AtlasInterpolator.h
+oops/generic/Diffusion.cc
+oops/generic/Diffusion.h
 oops/generic/fft_gpoint2spectral_f.F90
 oops/generic/fft_init_f.F90
 oops/generic/fft_interface_f.h
@@ -255,6 +269,7 @@ oops/generic/ObsErrorDiag.cc
 oops/generic/ObsErrorBase.h
 oops/generic/ObsFilterBase.h
 oops/generic/ObsFilterParametersBase.h
+oops/generic/PseudoLinearModelIncrement4D.h
 oops/generic/PseudoModel.h
 oops/generic/PseudoModelState4D.h
 oops/generic/SimpleLinearModel.h
@@ -310,7 +325,7 @@ oops/runs/Application.h
 oops/runs/ControlPert.h
 oops/runs/ConvertIncrement.h
 oops/runs/ConvertState.h
-oops/runs/ConvertToLatLon.h
+oops/runs/ConvertToStructuredGrid.h
 oops/runs/DiffStates.h
 oops/runs/EnsembleApplication.h
 oops/runs/EnsembleGETKFApplication.h
@@ -370,6 +385,8 @@ oops/util/FieldSetHelpers.cc
 oops/util/FieldSetHelpers.h
 oops/util/FieldSetOperations.cc
 oops/util/FieldSetOperations.h
+oops/util/FieldSetSubCommunicators.cc
+oops/util/FieldSetSubCommunicators.h
 oops/util/FloatCompare.h
 oops/util/FunctionSpaceHelpers.cc
 oops/util/FunctionSpaceHelpers.h
@@ -490,6 +507,7 @@ test/assimilation/TriDiagSolve.h
 test/assimilation/Vector3D.cc
 test/assimilation/Vector3D.h
 
+test/base/FieldSets.h
 test/base/Fortran.h
 test/base/NormBase.h
 test/base/ObsErrorCovariance.h
@@ -530,6 +548,8 @@ test/interface/VariableChange.h
 test/mpi/mpi.h
 
 test/generic/fft_multiple.h
+test/generic/GlobalInterpolator.h
+test/generic/LocalInterpolator.h
 test/generic/PseudoModelState4D.h
 test/generic/VerticalLocEV.h
 
@@ -575,15 +595,20 @@ endfunction(CREATE_SYMLINK)
 
 # oops test input files
 list( APPEND oops_test_input
-  test/testinput/random.yaml
-  test/testinput/pushstringvector.yaml
-  test/testinput/variables.yaml
-  test/testinput/parameters.yaml
+  test/testinput/atlas_global_interpolator.yaml
+  test/testinput/atlas_interpolator.yaml
   test/testinput/empty.yaml
-  test/testinput/mpi.yaml
-  test/testinput/spectrallmp.yaml
+  test/testinput/fieldsets.yaml
   test/testinput/fft_multiple.yaml
   test/testinput/hello.yaml
+  test/testinput/mpi.yaml
+  test/testinput/parameters.yaml
+  test/testinput/pushstringvector.yaml
+  test/testinput/random.yaml
+  test/testinput/spectrallmp.yaml
+  test/testinput/unstructured_global_interpolator.yaml
+  test/testinput/unstructured_interpolator.yaml
+  test/testinput/variables.yaml
 )
 # oops test output files
 list( APPEND oops_test_output
@@ -608,7 +633,7 @@ target_sources( ${PROJECT_NAME} PRIVATE ${oops_test_src_files})
 install( DIRECTORY test DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/oops FILES_MATCHING PATTERN "*.h")
 
 if(OpenMP_FOUND)
-    target_link_libraries( ${PROJECT_NAME} PUBLIC OpenMP::OpenMP_Fortran OpenMP::OpenMP_CXX )
+  target_link_libraries( ${PROJECT_NAME} PUBLIC OpenMP::OpenMP_Fortran OpenMP::OpenMP_CXX )
 endif()
 
 # Mark Boost as a system library to silence compiler warnings from Boost headers
@@ -623,7 +648,7 @@ target_link_libraries( ${PROJECT_NAME} PUBLIC fckit )
 target_link_libraries( ${PROJECT_NAME} PUBLIC atlas_f )
 target_link_libraries( ${PROJECT_NAME} PUBLIC Boost::boost )
 if ( GPTL_FOUND )
-	target_link_libraries( ${PROJECT_NAME} PUBLIC GPTL::GPTL )
+  target_link_libraries( ${PROJECT_NAME} PUBLIC GPTL::GPTL )
 endif()
 
 # Stack traces on floating point exceptions
@@ -632,7 +657,7 @@ include( backtrace_deps )
 # By using target_link_libraries on a CMake target, CMake knows to add this to the RPATH.
 # We effectively link to link libbacktrace twice in this case, but that's okay.
 if (OOPS_STACKTRACE_PROVIDER MATCHES "backtrace")
-	target_link_libraries( ${PROJECT_NAME} PUBLIC backtrace)
+    target_link_libraries( ${PROJECT_NAME} PUBLIC backtrace)
 endif()
 target_link_libraries( ${PROJECT_NAME} PUBLIC ${OOPS_STACKTRACE_LIBS_${OOPS_STACKTRACE_PROVIDER}} )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE ${OOPS_STACKTRACE_DEFS_${OOPS_STACKTRACE_PROVIDER}} )
@@ -781,6 +806,11 @@ ecbuild_add_test( TARGET  test_oops_base_variables
                   ARGS    "test/testinput/variables.yaml"
                   LIBS    oops )
 
+ecbuild_add_test( TARGET  test_oops_base_obsvariables
+                  SOURCES test/base/ObsVariables.cc
+                  ARGS    "test/testinput/variables.yaml"
+                  LIBS    oops )
+
 ecbuild_add_test( TARGET  test_base_posttimer
                   SOURCES test/base/PostTimer.cc
                   ARGS    "test/testinput/empty.yaml"
@@ -821,6 +851,46 @@ ecbuild_add_test( TARGET  test_util_parameters
                   SOURCES test/base/Parameters.cc
                   ARGS    "test/testinput/parameters.yaml"
                   LIBS    oops )
+
+ecbuild_add_executable(
+  TARGET  test_oops_generic_local_interpolator
+  SOURCES test/generic/LocalInterpolator.cc
+  LIBS oops
+)
+ecbuild_add_test( TARGET  test_generic_atlas_interpolator
+                  COMMAND test_oops_generic_local_interpolator
+                  ARGS    "test/testinput/atlas_interpolator.yaml"
+                  LIBS    oops eckit )
+ecbuild_add_test( TARGET  test_generic_unstructured_interpolator
+                  COMMAND test_oops_generic_local_interpolator
+                  ARGS    "test/testinput/unstructured_interpolator.yaml"
+                  LIBS    oops eckit )
+
+ecbuild_add_executable(
+  TARGET  test_oops_generic_global_interpolator
+  SOURCES test/generic/GlobalInterpolator.cc
+  LIBS oops
+)
+ecbuild_add_test( TARGET  test_generic_atlas_global_interpolator
+                  COMMAND test_oops_generic_global_interpolator
+                  ARGS    "test/testinput/atlas_global_interpolator.yaml"
+                  LIBS    oops eckit )
+# TODO: fix hang in AtlasInterpolator on multiple MPI ranks
+#       see https://github.com/JCSDA-internal/oops/issues/2664
+#ecbuild_add_test( TARGET  test_generic_atlas_global_interpolator_parallel
+#                  COMMAND test_oops_generic_global_interpolator
+#                  MPI     4
+#                  ARGS    "test/testinput/atlas_global_interpolator.yaml"
+#                  LIBS    oops eckit )
+ecbuild_add_test( TARGET  test_generic_unstructured_global_interpolator
+                  COMMAND test_oops_generic_global_interpolator
+                  ARGS    "test/testinput/unstructured_global_interpolator.yaml"
+                  LIBS    oops eckit )
+ecbuild_add_test( TARGET  test_generic_unstructured_global_interpolator_parallel
+                  COMMAND test_oops_generic_global_interpolator
+                  MPI     4
+                  ARGS    "test/testinput/unstructured_global_interpolator.yaml"
+                  LIBS    oops eckit )
 
 ecbuild_add_test( TARGET  test_generic_gc99
                   SOURCES test/generic/gc99.cc
@@ -957,19 +1027,34 @@ ecbuild_add_test( TARGET  test_util_arrayutil
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
 
+ecbuild_add_test( TARGET  test_base_fieldsets
+                  SOURCES test/base/FieldSets.cc
+                  ARGS    "test/testinput/fieldsets.yaml"
+                  LIBS    oops )
+
 ecbuild_add_test( TARGET  test_util_fieldset_helpers_and_operations
                   SOURCES test/util/FieldSetHelpersAndOperations.cc
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
 
-ecbuild_add_test( TARGET  test_util_functionspace_helpers
-                  SOURCES test/util/FunctionSpaceHelpers.cc
+ecbuild_add_test( TARGET  test_util_fieldset_subcommunicators
+                  MPI     2
+                  SOURCES test/util/FieldSetSubCommunicators.cc
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
 
+ecbuild_add_executable(
+  TARGET  test_oops_util_functionspace_helpers
+  SOURCES test/util/FunctionSpaceHelpers.cc
+  LIBS oops
+)
+ecbuild_add_test( TARGET  test_util_functionspace_helpers
+                  COMMAND test_oops_util_functionspace_helpers
+                  ARGS    "test/testinput/empty.yaml"
+                  LIBS    oops )
 ecbuild_add_test( TARGET  test_util_functionspace_helpers_parallel
+                  COMMAND test_oops_util_functionspace_helpers
                   MPI     2
-                  SOURCES test/util/FunctionSpaceHelpers.cc
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
 

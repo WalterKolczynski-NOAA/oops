@@ -18,11 +18,13 @@
 
 #include "oops/base/Geometry.h"
 #include "oops/base/GetValues.h"
+#include "oops/base/GetValueTLADs.h"
 #include "oops/base/Locations.h"
 #include "oops/base/ObsError.h"
 #include "oops/base/ObserverUtils.h"
 #include "oops/base/ObsFilters.h"
 #include "oops/base/ObsOperatorBase.h"
+#include "oops/base/ObsVariables.h"
 #include "oops/base/ObsVector.h"
 #include "oops/base/Variables.h"
 #include "oops/interface/GeoVaLs.h"
@@ -64,6 +66,7 @@ template <typename MODEL, typename OBS>
 class Observer {
   typedef Geometry<MODEL>              Geometry_;
   typedef GeoVaLs<OBS>                 GeoVaLs_;
+  typedef GetValueTLADs<MODEL, OBS>    GetValueTLADs_;
   typedef GetValues<MODEL, OBS>        GetValues_;
   typedef Locations<OBS>               Locations_;
   typedef ObsAuxControl<OBS>           ObsAuxCtrl_;
@@ -91,7 +94,8 @@ class Observer {
 /// \brief Computes H(x) from the filled in GeoVaLs
   void finalize(ObsVector_ &);
 
-  void resetObsOp(std::unique_ptr<ObsOperatorBase_>);
+  int resetObsPert(std::unique_ptr<ObsOperatorBase_>, const std::shared_ptr<GetValueTLADs_> &,
+                   int &);
 
  private:
   typedef std::vector<size_t> VariableSizes;
@@ -104,6 +108,7 @@ class Observer {
   std::unique_ptr<Locations_>       locations_;     // Obs locations
   const ObsAuxCtrl_ *               biascoeff_;     // bias coefficients
   ObsError_ *                       Rmat_;          // Obs error covariance
+  std::unique_ptr<Geometry_>        geom_;          // Geometry for GetValues
   std::unique_ptr<ObsFilters_>      filters_;       // QC filters
   std::unique_ptr<ObsDataVector_>   obserrfilter_;  // Obs error std dev for processed variables
   // Instances of GetValues. Each receives a list of model variables and a set of paths along which
@@ -143,6 +148,8 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
   Log::trace() << "Observer<MODEL, OBS>::initialize start" << std::endl;
 // Save information for finalize
   iterconf_.reset(new eckit::LocalConfiguration(conf));
+  if (conf.has("geometry"))
+    geom_.reset(new Geometry_(conf.getSubConfiguration("geometry"), geom.getComm()));
   biascoeff_ = &biascoeff;
   Rmat_ = &R;
 
@@ -153,29 +160,31 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
                                  qcflags_, *obserrfilter_, iterfilt));
   filters_->preProcess();
 
+  if (!initialized_) {
 // Get the list of required variables
-  oops::Variables geovars = obsop_->requiredVars();
-  geovars += biascoeff_->requiredVars();
-  geovars += filters_->requiredVars();
+    oops::Variables geovars = obsop_->requiredVars();
+    geovars += biascoeff_->requiredVars();
+    geovars += filters_->requiredVars();
 
 // Get the observation locations and their discretizations
-  locations_ = std::make_unique<Locations_>(obsop_->locations());
+    locations_ = std::make_unique<Locations_>(obsop_->locations());
 
   // Required variables grouped by the set of paths along which they'll be interpolated
-  const std::vector<oops::Variables> groupedVars = groupVariablesByLocationSamplingMethod(
-        geovars, *locations_);
+    const std::vector<oops::Variables> groupedVars = groupVariablesByLocationSamplingMethod(
+          geovars, *locations_);
 
 // Get variable sizes (i.e. the numbers of levels in the corresponding GeoVaLs)
-  const std::vector<VariableSizes> groupedVarSizes = variableSizes(groupedVars, geom);
+    const std::vector<VariableSizes> groupedVarSizes = variableSizes(groupedVars, geom);
 
-  std::tie(allVars_, allVarSizes_) = mergeVariablesAndSizes(groupedVars, groupedVarSizes);
+    std::tie(allVars_, allVarSizes_) = mergeVariablesAndSizes(groupedVars, groupedVarSizes);
 
 // Set up GetValues
-  getvals_ = makeGetValuesVector(parameters_.getValues, geom,
-                                 obspace_.timeWindow(),
-                                 *locations_, groupedVars);
+    getvals_ = makeGetValuesVector(parameters_.getValues, geom,
+                                   obspace_.timeWindow(),
+                                   *locations_, groupedVars);
+    initialized_ = true;
+  }
 
-  initialized_ = true;
   Log::trace() << "Observer<MODEL, OBS>::initialize done" << std::endl;
   return getvals_;
 }
@@ -189,10 +198,7 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   ASSERT(initialized_);
 
   // Fill GeoVaLs
-  GeoVaLs_ geovals(*locations_, allVars_, allVarSizes_);
-  for (size_t m = 0; m < getvals_.size(); ++m) {
-    getvals_[m]->fillGeoVaLs(geovals);
-  }
+  GeoVaLs_ geovals = makeAndFillGeoVaLs(*locations_, allVars_, allVarSizes_, getvals_);
 
   // Compute the reduced representation of the GeoVaLs for which it's been requested
   oops::Variables reducedVars = biascoeff_->requiredVars();
@@ -203,7 +209,7 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   filters_->priorFilter(geovals);
 
   /// Setup diagnostics
-  Variables vars;
+  ObsVariables vars;
   vars += filters_->requiredHdiagnostics();
   vars += biascoeff_->requiredHdiagnostics();
   // The current interface makes it possible to assign different location sampling methods not only
@@ -256,8 +262,21 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-void Observer<MODEL, OBS>::resetObsOp(std::unique_ptr<ObsOperatorBase_> obsOpBase) {
+int Observer<MODEL, OBS>::resetObsPert(std::unique_ptr<ObsOperatorBase_> obsOpBase,
+                                      const std::shared_ptr<GetValueTLADs_> & getValTLs,
+                                      int & index) {
+  ASSERT(geom_ != nullptr);
   obsop_ = std::move(obsOpBase);
+  int size = getvals_.size();
+  for (int ii = 0; ii < size; ++ii) {
+    getvals_[ii] = (*getValTLs)[ii + index];
+  }
+
+  allVars_ = obsop_->requiredVars();
+  allVarSizes_ = geom_->variableSizes(allVars_);
+  initialized_ = true;
+
+  return size + index;
 }
 
 // -----------------------------------------------------------------------------

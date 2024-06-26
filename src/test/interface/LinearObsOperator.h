@@ -17,6 +17,7 @@
 
 #include "eckit/testing/Test.h"
 #include "oops/base/ObsTypeParameters.h"
+#include "oops/base/ObsVariables.h"
 #include "oops/base/Variables.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
 #include "oops/interface/LinearObsOperator.h"
@@ -213,7 +214,7 @@ template <typename OBS> void testLinearity() {
     const ObsAuxCov_ Bobsbias(Test_::obspace()[jj], bconf);
 
     // set trajectory for TL/AD to be the geovals from the file
-    hoptl.setTrajectory(gval, ybias);
+    hoptl.setTrajectory(gval, ybias, qc_flags);
 
     // create obsvector
     ObsVector_ dy1(Test_::obspace()[jj]);
@@ -306,7 +307,7 @@ template <typename OBS> void testAdjoint() {
     hop.computeReducedVars(reducedHopvars, gval);
 
     // set TL/AD trajectory to the geovals from the file
-    hoptl.setTrajectory(gval, ybias);
+    hoptl.setTrajectory(gval, ybias, qc_flags);
 
     ObsVector_ dy1(Test_::obspace()[jj]);
     ObsVector_ dy2(Test_::obspace()[jj]);
@@ -399,9 +400,6 @@ template <typename OBS> void testTangentLinear() {
     hop.computeReducedVars(reducedHopvars, x0);
     hop.computeReducedVars(reducedHopvars, x);
 
-    // set TL trajectory to the geovals and the bias coeff. from the files
-    hoptl.setTrajectory(x0, ybias0);
-
     // create obsvectors
     ObsVector_ y1(Test_::obspace()[jj]);
     ObsVector_ y2(Test_::obspace()[jj]);
@@ -413,10 +411,13 @@ template <typename OBS> void testTangentLinear() {
       Test_::obspace()[jj].obsvariables(),
       std::string());
 
+    // set TL trajectory to the geovals and the bias coeff. from the files
+    hoptl.setTrajectory(x0, ybias0, qc_flags);
+
     bias.zero();
 
     // create obsdatavector to hold diags
-    oops::Variables diagvars;
+    oops::ObsVariables diagvars;
     diagvars += ybias0.requiredHdiagnostics();
     ObsDiags_ ydiag(Test_::obspace()[jj], hop.locations(), diagvars);
 
@@ -500,7 +501,7 @@ template <typename OBS> void testException() {
     hopvars += reducedHopvars;
     GeoVaLs_ gval(obsTypeParams.geovals, Test_::obspace()[jj], hopvars);
     hop.computeReducedVars(reducedHopvars, gval);
-    oops::Variables diagvars;
+    oops::ObsVariables diagvars;
     diagvars += ybias.requiredHdiagnostics();
     const oops::Variables hoptlvars = hoptl.requiredVars();
 
@@ -508,14 +509,14 @@ template <typename OBS> void testException() {
       // The setTrajectory method is expected to throw an exception
       // containing the specified string.
       const std::string expectedMessage = *obsTypeParams.expectSetTrajectoryToThrow.value();
-      EXPECT_THROWS_MSG(hoptl.setTrajectory(gval, ybias),
+      EXPECT_THROWS_MSG(hoptl.setTrajectory(gval, ybias, qc_flags),
                         expectedMessage.c_str());
       // Do not continue further because setTrajectory must be run
       // before simulateObsTL and simulateObsAD.
       continue;
     }
     if (obsTypeParams.expectSimulateObsTLToThrow.value() != boost::none) {
-      hoptl.setTrajectory(gval, ybias);
+      hoptl.setTrajectory(gval, ybias, qc_flags);
       ObsVector_ dy1(Test_::obspace()[jj]);
       GeoVaLs_ dx1(obsTypeParams.geovals, Test_::obspace()[jj], hoptlvars);
       dx1.random();
@@ -528,7 +529,7 @@ template <typename OBS> void testException() {
     }
 
     if (obsTypeParams.expectSimulateObsADToThrow.value() != boost::none) {
-      hoptl.setTrajectory(gval, ybias);
+      hoptl.setTrajectory(gval, ybias, qc_flags);
       ObsVector_ dy2(Test_::obspace()[jj]);
       GeoVaLs_ dx2(obsTypeParams.geovals, Test_::obspace()[jj], hoptlvars);
       Bobsbias.randomize(ybinc);

@@ -74,7 +74,7 @@ class State : public util::Printable,
   void updateTime(const util::Duration & dt) {state_->updateTime(dt);}
 
   /// Get run ID (used for generic PseudoModel class, set to -1 if not needed)
-  int ID() const {return ID_;}
+  size_t ID() const {return ID_;}
   /// Read this State from file
   void read(const eckit::Configuration &);
   /// Write this State out to file
@@ -106,10 +106,14 @@ class State : public util::Printable,
   void serializeSect(std::vector<double> &, const int &, const int &, const int &, 
      const int &, const int &) const;
   void deserialize(const std::vector<double> &, size_t &) override;
+  void deserializeSect(std::vector<double> &, int, int, int, 
+     int, int, int, int, int, int) const;
+  void serializeSect(std::vector<double> &, int, int, int, 
+     int, int) const;
 
  private:
   std::unique_ptr<State_> state_;
-  int ID_;
+  size_t ID_;
   void print(std::ostream &) const override;
 
  protected:
@@ -121,7 +125,7 @@ class State : public util::Printable,
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const Variables & vars,
                     const util::DateTime & time)
-  : state_(), ID_(-1)
+  : state_(), ID_(0)
 {
   Log::trace() << "State<MODEL>::State starting" << std::endl;
   util::Timer timer(classname(), "State");
@@ -134,10 +138,11 @@ State<MODEL>::State(const Geometry_ & resol, const Variables & vars,
 
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const eckit::Configuration & config)
-  : state_(), ID_(config.getInt("ID", -1))
+  : state_(), ID_(config.getUnsigned("ID", 0))
 {
   Log::trace() << "State<MODEL>::State read starting" << std::endl;
   util::Timer timer(classname(), "State");
+  ASSERT(ID_ >= 0);
   state_.reset(new State_(resol.geometry(), config));
   this->setObjectSize(state_->serialSize()*sizeof(double));
   Log::trace() << "State<MODEL>::State read done" << std::endl;
@@ -147,7 +152,7 @@ State<MODEL>::State(const Geometry_ & resol, const eckit::Configuration & config
 
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const State & other)
-  : state_(), ID_(-1)
+  : state_(), ID_(0)
 {
   Log::trace() << "State<MODEL>::State interpolated starting" << std::endl;
   util::Timer timer(classname(), "State");
@@ -160,7 +165,7 @@ State<MODEL>::State(const Geometry_ & resol, const State & other)
 
 template<typename MODEL>
 State<MODEL>::State(const Variables & vars, const State & other)
-  : state_()
+  : state_(), ID_(0)
 {
   Log::trace() << "State<MODEL>::State variables starting" << std::endl;
   util::Timer timer(classname(), "State");
@@ -211,7 +216,10 @@ template<typename MODEL>
 void State<MODEL>::read(const eckit::Configuration & conf) {
   Log::trace() << "State<MODEL>::read starting" << std::endl;
   util::Timer timer(classname(), "read");
-  if (ID_ == -1) ID_ = conf.getInt("ID", -1);
+  if (ID_ == 0) {
+    ID_ = conf.getUnsigned("ID", 0);
+    ASSERT(ID_ >= 0);
+  }
   state_->read(conf);
   Log::trace() << "State<MODEL>::read done" << std::endl;
 }
@@ -258,12 +266,24 @@ size_t State<MODEL>::serialSize() const {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-  void State<MODEL>::serializeSect(std::vector<double> & vect, const int & isc, const int & iec, 
-      const int & jsc, const int & jec, const int & size_fld) const {
+  void State<MODEL>::deserializeSect(std::vector<double> & vect, int size_fld, int isc, int iec, 
+      int jsc, int jec, int isc_sg, int iec_sg, int jsc_sg, int jec_sg) const {
+  std::cout << "in oops interface\n";
+  Log::trace() << "State<MODEL>::deserializeSect starting" << std::endl;
+  util::Timer timer(classname(), "serialize");
+  state_->deserializeSect(vect,size_fld,isc,iec,jsc,jec,isc_sg,iec_sg,jsc_sg,jec_sg);
+  std::cout << "coming out of oops interface\n";
+  Log::trace() << "State<MODEL>::serialize done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+  void State<MODEL>::serializeSect(std::vector<double> & vect, int size_fld, int isc, int iec, 
+      int jsc, int jec) const {
   std::cout << "in oops interface\n";
   Log::trace() << "State<MODEL>::serializeSect starting" << std::endl;
   util::Timer timer(classname(), "serialize");
-  state_->serializeSect(vect,isc,iec,jsc,jec,size_fld);
+  state_->serializeSect(vect,size_fld,isc,iec,jsc,jec);
   std::cout << "coming out of oops interface\n";
   Log::trace() << "State<MODEL>::serialize done" << std::endl;
 }

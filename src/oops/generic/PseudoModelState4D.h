@@ -13,7 +13,7 @@
 
 #include "oops/base/Geometry.h"
 #include "oops/base/State.h"
-#include "oops/base/State4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/generic/ModelBase.h"
 #include "oops/interface/ModelAuxControl.h"
 #include "oops/util/Duration.h"
@@ -28,14 +28,14 @@ class PseudoModelState4D : public ModelBase<MODEL> {
   typedef Geometry<MODEL>          Geometry_;
   typedef ModelAuxControl<MODEL>   ModelAux_;
   typedef State<MODEL>             State_;
-  typedef State4D<MODEL>           State4D_;
+  typedef StateSet<MODEL>           StateSet_;
 
  public:
   static const std::string classname() {return "oops::PseudoModelState4D";}
 
   /// Initialize pseudo model with \p state4d - 4D state to loop through
   /// in the model run and \p tstep - time resolution of the model
-  PseudoModelState4D(const State4D_ & state4d,
+  PseudoModelState4D(const StateSet_ & state4d,
                      const util::Duration & tstep = util::Duration(0));
 
   /// initialize forecast
@@ -52,7 +52,7 @@ class PseudoModelState4D : public ModelBase<MODEL> {
   void print(std::ostream &) const override;
 
   /// Reference to 4D state that is used in the model
-  const State4D_ & state4d_;
+  const StateSet_ & state4d_;
   /// Model's time resolution
   util::Duration   tstep_;
   /// Index of the current state
@@ -62,7 +62,7 @@ class PseudoModelState4D : public ModelBase<MODEL> {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-PseudoModelState4D<MODEL>::PseudoModelState4D(const State4D_ & state4d,
+PseudoModelState4D<MODEL>::PseudoModelState4D(const StateSet_ & state4d,
                                               const util::Duration & tstep)
   : state4d_(state4d), tstep_(tstep) {
   const std::vector<util::DateTime> validTimes = state4d_.validTimes();

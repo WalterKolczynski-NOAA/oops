@@ -26,12 +26,12 @@
 #include "oops/base/Increment.h"
 #include "oops/base/instantiateCovarFactory.h"
 #include "oops/base/instantiateObsFilterFactory.h"
-#include "oops/base/LatLonGridPostProcessor.h"
-#include "oops/base/LatLonGridWriter.h"
 #include "oops/base/PostProcessor.h"
 #include "oops/base/State.h"
 #include "oops/base/StateInfo.h"
 #include "oops/base/StateWriter.h"
+#include "oops/base/StructuredGridPostProcessor.h"
+#include "oops/base/StructuredGridWriter.h"
 #include "oops/generic/instantiateLinearModelFactory.h"
 #include "oops/generic/instantiateNormFactory.h"
 #include "oops/generic/instantiateObsErrorFactory.h"
@@ -47,6 +47,8 @@ namespace oops {
 template <typename MODEL, typename OBS> class Variational : public Application {
   typedef Increment<MODEL>           Increment_;
   typedef State<MODEL>               State_;
+  typedef Model<MODEL>                 Model_;
+  typedef ModelAuxControl<MODEL>       ModelAux_;
 
  public:
 // -----------------------------------------------------------------------------
@@ -108,14 +110,14 @@ template <typename MODEL, typename OBS> class Variational : public Application {
       dx.write(incOutConfig);
     }
 
-    if (finalConfig.has("increment to latlon")) {
-      const eckit::LocalConfiguration incLatlonConf(finalConfig, "increment to latlon");
+    if (finalConfig.has("increment to structured grid")) {
+      const eckit::LocalConfiguration incLatlonConf(finalConfig, "increment to structured grid");
 
       ControlVariable<MODEL, OBS> x_b(J->jb().getBackground());
       ControlIncrement<MODEL, OBS> dx(J->jb());
       dx.diff(xx, x_b);
 
-      const LatLonGridWriter<MODEL> latlon(incLatlonConf, dx.states().geometry());
+      const StructuredGridWriter<MODEL> latlon(incLatlonConf, dx.states().geometry());
       for (size_t jtime = 0; jtime < dx.states().size(); ++jtime) {
         latlon.interpolateAndWrite(dx.states()[jtime], xx.states()[jtime]);
       }
@@ -126,9 +128,9 @@ template <typename MODEL, typename OBS> class Variational : public Application {
       post.enrollProcessor(new StateInfo<State_>("final", prtConfig));
     }
 
-    if (finalConfig.has("analysis to latlon")) {
-      const eckit::LocalConfiguration anLatlonConf(finalConfig, "analysis to latlon");
-      post.enrollProcessor(new LatLonGridPostProcessor<MODEL, State_>(
+    if (finalConfig.has("analysis to structured grid")) {
+      const eckit::LocalConfiguration anLatlonConf(finalConfig, "analysis to structured grid");
+      post.enrollProcessor(new StructuredGridPostProcessor<MODEL, State_>(
             anLatlonConf, xx.state().geometry() ));
     }
 
@@ -136,6 +138,46 @@ template <typename MODEL, typename OBS> class Variational : public Application {
 
 //  Save ObsAux
     xx.obsVar().write(cfConf);
+
+    if (finalConfig.has("forecast from analysis")) {
+      const eckit::LocalConfiguration fcFromAnConf(finalConfig, "forecast from analysis");
+
+      //  Setup Model
+      const Model_ model(xx.state().geometry(), eckit::LocalConfiguration(fcFromAnConf, "model"));
+
+      //  Setup augmented state
+      const ModelAux_ moderr(xx.state().geometry(),
+                            eckit::LocalConfiguration(fcFromAnConf, "model aux control"));
+
+      //  Setup times
+      const util::Duration fclength(fcFromAnConf.getString("forecast length"));
+      const util::DateTime bgndate(xx.state().validTime());
+      const util::DateTime enddate(bgndate + fclength);
+      Log::info() << "Running forecast from " << bgndate << " to " << enddate << std::endl;
+
+      //  Setup forecast outputs
+      PostProcessor<State_> post;
+
+      eckit::LocalConfiguration prtConfig;
+      if (fcFromAnConf.has("prints")) {
+        prtConfig = eckit::LocalConfiguration(fcFromAnConf, "prints");
+        post.enrollProcessor(new StateInfo<State_>("fc", prtConfig));
+      }
+
+      eckit::LocalConfiguration outConfig;
+      if (fcFromAnConf.has("output")) {
+        outConfig = eckit::LocalConfiguration(fcFromAnConf, "output");
+        outConfig.set("date", bgndate.toString());
+        post.enrollProcessor(new StateWriter<State_>(outConfig));
+      }
+      //  Run forecast
+
+      Log::test() << "Inital state: " << xx.state() << std::endl;
+
+      model.forecast(xx.state(), moderr, fclength, post);
+
+      Log::test() << "Final state: " << xx.state() << std::endl;
+    }
 
     util::printRunStats("Variational end");
     Log::trace() << "Variational: execute done" << std::endl;

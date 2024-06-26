@@ -17,6 +17,7 @@
 #include "oops/base/Departures.h"
 #include "oops/base/DeparturesEnsemble.h"
 #include "oops/base/ObsErrors.h"
+#include "oops/base/StateSet.h"
 
 namespace oops {
   class Variables;
