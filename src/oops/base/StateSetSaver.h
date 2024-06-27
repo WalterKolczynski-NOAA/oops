@@ -79,8 +79,6 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
   ens_(ens)
 {
   Log::trace() << "StateSetSaver::size of stateset is " << ens_.size() << std::endl;
-  Log::trace() << "StateSetSaver::time[0] of stateset is " << times_[0] << std::endl;
-  Log::info() << "StateSetSaver::constructor" << std::endl;
 }
 // -----------------------------------------------------------------------------
 
@@ -97,10 +95,10 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
                            const util::DateTime & bgndate,
                            const util::Duration & fcstlen ) {
   if (!initialized_) {
-    Log::info() << "StateSetSaver::doInitialize start for times_ " << times_[0] << std::endl;
+    Log::trace() << "StateSetSaver::doInitialize start for times_ " << times_[0] << std::endl;
     States_.reset( new StateSet(resol_, x0.variables(), times_, commTime_, ens_, commEns_) );
     stateIndex_ = 0;
-    Log::info() << "StateSetSaver::doInitialize done " << std::endl;
+    Log::trace() << "StateSetSaver::doInitialize done " << std::endl;
   }
 }
 
@@ -110,7 +108,6 @@ template <typename MODEL>
 void StateSetSaver<MODEL>::doProcessing(const State_ & xx) {
   if ( initialized_ ) {
     Log::trace() << "StateSetSaver::doProcessing on stateIndex_ " << stateIndex_ << std::endl;
-    Log::trace() << "StateSetSaver::doProcessing on xx times is " << xx.validTime() << std::endl;
     (*States_)[stateIndex_] = xx;
     stateIndex_++;
     Log::info() << "StateSetSaver::doProcessing done" << std::endl;

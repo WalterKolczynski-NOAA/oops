@@ -21,7 +21,6 @@
 #include "oops/base/Geometry.h"
 #include "oops/base/Increment.h"
 #include "oops/base/State.h"
-#include "oops/interface/GeometryIterator.h"
 #include "oops/mpi/mpi.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
@@ -34,7 +33,6 @@ namespace oops {
 template<typename MODEL>
 class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   typedef Geometry<MODEL>                 Geometry_;
-  typedef GeometryIterator<MODEL>         GeometryIterator_;
   typedef Increment<MODEL>                Increment_;
   typedef State<MODEL>                    State_;
 
@@ -85,7 +83,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
   }
   this->check_consistency();
   Log::trace() << "StateSet::StateSet" << std::endl;
-  Log::info() << "StateSet::StateSet done" << std::endl;
 }
 
 
@@ -96,7 +93,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
   : DataSetBase<State_, Geometry_>(commTime, commEns)
 {
   Log::trace() << "StateSet::StateSet read start " << config << std::endl;
-  Log::info() << "StateSet::StateSet read start " << config << std::endl;
 
 // get vector of local configurations
   std::vector<eckit::LocalConfiguration> locals = this->configure(config);
@@ -113,7 +109,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
   this->check_consistency();
 
   Log::trace() << "StateSet::StateSet read done" << std::endl;
-  Log::info() << "StateSet::StateSet read done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -147,8 +142,19 @@ StateSet<MODEL>::StateSet(const StateSet & other, const int ensNum)
 
 template<typename MODEL>
 std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Comm & global,
-           const Geometry_ & subgeom, const int & mytask, const int & ensNum) const
+           const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const
 {
+/* This method collects parts of the distributed StateSet and places all ensemble
+   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet 
+   held in the local_ensemble. It is essentially a transpose of a distributed StateSet
+   to a locally held StateSet. The DAgeometry should be have a decomposition that is
+   spread across N (number of ensemble members) times the number of MPI tasks that the 
+   forecast geometry decomposition. In other words, if the forecast geometry has a 
+   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a 
+   layout that multiplies to 4*4*9 or something like 12,12. Note that the resolution
+   of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
+   is different between the geometries.
+*/
   int ist_fc, iend_fc, jst_fc, jend_fc, kst_fc, kend_fc, npz_fc;
   int ist_sg, iend_sg, jst_sg, jend_sg, kst_sg, kend_sg, npz_sg;
   std::unique_ptr<StateSet<MODEL> > local;
@@ -157,7 +163,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   std::vector<double> zz;
   for (int i = 1; i <= this->ens_size(); ++i) { local_ens.push_back(i); }
 
-  local = std::unique_ptr<StateSet<MODEL> >(new StateSet(subgeom, this->variables(), this->times(),
+  local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(), this->times(),
                   this->commTime(), local_ens, oops::mpi::myself()));
   std::vector<int> buf(11);
   std::vector<int> recipients;  // This will contain list of mpi tasks where local tile will be sent
@@ -165,7 +171,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   std::vector<int> tileEnsNum;  // This will contain list of ensemble numbers that I am receiving
   int mytile = this->geometry().tileNum();
   std::vector<int> global_indices = this->geometry().get_indices();  // pull from this geom and put
-                                                                     // into subgeom
+                                                                     // into DAgeometry
   ist_fc = global_indices[0];
   iend_fc = global_indices[1];
   jst_fc = global_indices[2];
@@ -177,7 +183,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   int nyg = jend_fc - jst_fc + 1;
   int nvars = this->variables().size();  // number of variable state
 
-  std::vector<int> indices = subgeom.get_indices();
+  std::vector<int> indices = DAgeometry.get_indices();
   ist_sg = indices[0];
   iend_sg = indices[1];
   jst_sg = indices[2];
@@ -190,7 +196,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   for (int i = 0; i < global.size(); ++i) {
     if (i == mytask) {  // mytask is global rank
       buf[0] = mytile;   // The tile number that this rank holds
-      buf[1] = subgeom.tileNum();  // The tile number that I need
+      buf[1] = DAgeometry.tileNum();  // The tile number that I need
       buf[2] = ensNum;   // the ensemble number this tile belongs to
       buf[3] = ist_fc;   // the start of my domain decomp in i
       buf[4] = iend_fc;  // the start of my domain decomp in j
@@ -202,7 +208,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
       buf[10] = jend_sg;  // the start of my j domain decomp I NEED
     }
     global.broadcast(buf, i);
-    if ((buf[0] == subgeom.tileNum()) &&   // *_fc indices will have a larger span than sg indices
+    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have a larger span than sg indices
       ((buf[3] <= ist_sg) && (buf[4] >= iend_sg)) &&  // *_sg indices must be within *_fc indices
       ((buf[5] <= jst_sg) && (buf[6] >= jend_sg))) {  //  if the tile, ist, and jst that the sender
                                               // has matches what I need, this is one of my senders
@@ -211,7 +217,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
     }
     if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED
        ((buf[7] >= ist_fc) && (buf[8] <= iend_fc)) &&  // NEEDED domain must be within my indices
-       ((buf[9] >= jst_fc) && (buf[10] <= jend_fc)) ) {  //  if the subgeometry tile needed
+       ((buf[9] >= jst_fc) && (buf[10] <= jend_fc)) ) {  //  if the DAgeometryetry tile needed
                                      // matches the tile I have, this is who I will send it to
       recipients.push_back(i);
     }
