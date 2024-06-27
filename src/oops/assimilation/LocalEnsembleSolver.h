@@ -97,8 +97,6 @@ class LocalEnsembleSolver {
                       bool readFromDisk);
   Observations_ computeHofXNonLinear(const StateEnsemble4D_ & xx, size_t iteration,
                       bool readFromDisk);
-  Observations_ computeYbMean(const StateEnsemble4D_ & xx, size_t iteration,
-                      bool readFromDisk);
 
   /// update background ensemble \p bg to analysis ensemble \p for all points on this PE
   virtual void measurementUpdate(const IncrementEnsemble4D_ & bg, IncrementEnsemble4D_ & an);
@@ -119,7 +117,6 @@ class LocalEnsembleSolver {
   void computeHofX4DLinear(const eckit::Configuration &, const StateEnsemble4D_ &, Observations_ &,
                            ObsEnsemble_ &);
   void computeHofX4DNonLinear(const eckit::Configuration &, const StateSet_ &, Observations_ &);
-  void computeHofX4D(const eckit::Configuration &, const StateSet_ &, Observations_ &);
   /// accessor to obs localizations
   const ObsLocalizations_ & obsloc() const {return obsloc_;}
   bool useLinearObserver() { return useLinearObserver_; }
@@ -370,39 +367,6 @@ Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeHofXLinear(
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration & config,
-                                                    const StateSet_ & xx, Observations_ & yy) {
-  // compute forecast length from StateSet times
-  const std::vector<util::DateTime> times = xx.validTimes();
-  const util::Duration flength = times[times.size()-1] - times[0];
-  // default_tstep = 2*observation window is passed to PseudoModel as the default
-  // pseudomodel time step. It is only used when StateSet has a single state, to enable
-  // processing of all observations in the specified window regardless of where in
-  // the time window the state is. Observations in
-  // ( max(winbgn, xx.time - tstep/2); min(winend, xx.time + tstep/2) ] are
-  // processed in H(x).
-  const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
-  // Setup PseudoModelState4D
-  std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
-  const Model_ model(std::move(pseudomodel));
-  // Setup model and obs biases; obs errors
-  ModelAux_ moderr(geometry_, eckit::LocalConfiguration());
-  ObsAux_ obsaux(obspaces_, observersconf_);
-  R_.reset(new ObsErrors_(observersconf_, obspaces_));
-  // Setup and run the model forecast with observers
-  State_ init_xx = xx[0];
-  PostProcessor<State_> post;
-  Observers_ hofx(obspaces_, obsconf_);
-
-  hofx.initialize(geometry_, obsaux, *R_, post, config);
-  model.forecast(init_xx, moderr, flength, post);
-  hofx.finalize(yy);
-}
-
-// -----------------------------------------------------------------------------
-// -----------------------------------------------------------------------------
-
-template <typename MODEL, typename OBS>
 void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DNonLinear(const eckit::Configuration & config,
                                                     const StateSet_ & xx, Observations_ & yy) {
   // compute forecast length from State4D times
@@ -434,51 +398,6 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DNonLinear(const eckit::Config
   hofx.finalize(yy);
 }
 
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL, typename OBS>
-Observations<OBS> LocalEnsembleSolver<MODEL, OBS>::computeYbMean(const StateEnsemble4D_ & ens_xx,
-                                                   size_t iteration, bool readFromDisk) {
-  const size_t nens = ens_xx.size();
-  ObsEnsemble_ obsens(obspaces_, nens);
-  Observations_ y_mean_xb(obspaces_);
-  // read hofx from disk
-  Log::info() << "computeYbMean reading from disk now" << std::endl;
-  for (size_t jj = 0; jj < nens; ++jj) {
-      obsens[jj].read("hofx"+std::to_string(iteration)+"_"+std::to_string(jj+1));
-      Log::test() << "H(x) for member " << jj+1 << ":" << std::endl << obsens[jj] << std::endl;
-  }
-  R_.reset(new ObsErrors_(observersconf_, obspaces_));
-  y_mean_xb.read("hofx_y_mean_xb"+std::to_string(iteration));
-  // set inverse variances
-  invVarR_.reset(new Departures_(R_->inverseVariance()));
-
-  // calculate H(x) ensemble mean
-  Observations_ yb_mean(obsens.mean());
-
-  // treat the special case of nens=1
-  // default option: xbmean_=mean(xb) then yb_mean == y_mean_xb and action below is a tautology
-  // if use control member==true: xbmean_ was read from the controll member,
-  //                              then using H(xbmean_) is expected by downstream applications
-  if (nens == 1) {yb_mean = y_mean_xb;}
-
-  // calculate H(x) ensemble perturbations
-  for (size_t iens = 0; iens < nens; ++iens) {
-    Yb_[iens] = obsens[iens] - yb_mean;
-    invVarR_->mask(Yb_[iens]);
-    Yb_[iens].mask(*invVarR_);
-  }
-
-  // calculate obs departures and mask with qc flag
-  Observations_ yobs(obspaces_, "ObsValue");
-  omb_ = yobs - yb_mean;
-  invVarR_->mask(omb_);
-  omb_.mask(*invVarR_);
-
-  // return mean H(x)
-  return yb_mean;
-}
 
 // -----------------------------------------------------------------------------
 
