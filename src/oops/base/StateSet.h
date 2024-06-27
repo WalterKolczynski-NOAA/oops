@@ -48,7 +48,6 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
            const eckit::mpi::Comm & commEns = oops::mpi::myself());
   // create a StateSet variable from a std::vector of State variables distributed
   // across communicators
-  StateSet(const Geometry_ &, const StateSet &, const int);
   StateSet(const Geometry_ &, const StateSet &);
   StateSet(const StateSet &) = default;
   StateSet(const StateSet &, const int);
@@ -132,20 +131,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const StateSet & other)
 }
 
 // -----------------------------------------------------------------------------
-
-template<typename MODEL>
-StateSet<MODEL>::StateSet(const Geometry_ & resol, const StateSet & other,
-     const int local_ens_size )
-  : DataSetBase<State_, Geometry_>(other.commTime(), oops::mpi::myself())
-{
-  Log::trace() << "StateSet::StateSet redist start" << std::endl;
-/*
-  for (size_t jj = 0; jj < other.size(); ++jj) {
-    this->dataset().emplace_back(std::make_unique<State_>(resol, other[jj]));
-  }
-*/
-  Log::trace() << "StateSet::StateSet redist done" << std::endl;
-}
 
 template<typename MODEL>
 StateSet<MODEL>::StateSet(const StateSet & other, const int ensNum)
