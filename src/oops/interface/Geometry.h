@@ -104,7 +104,7 @@ class Geometry : public util::Printable,
   /// Accessor for tile number
   int tileNum() const {return geom_->tileNum();}
 
-  /// Return a vector of indices denoting start/end of geometry 
+  /// Return a vector of indices denoting start/end of geometry
   std::vector<int> get_indices() const {return geom_->get_indices();}
 
   /// Accessor to MODEL::Geometry, used in the other interface classes in oops.

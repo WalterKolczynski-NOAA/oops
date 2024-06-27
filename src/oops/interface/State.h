@@ -104,9 +104,9 @@ class State : public util::Printable,
   size_t serialSize() const override;
   void serialize(std::vector<double> &) const override;
   void deserialize(const std::vector<double> &, size_t &) override;
-  void deserializeSect(std::vector<double> &, int, int, int, 
+  void deserializeSection(std::vector<double> &, int, int, int,
      int, int, int, int, int, int) const;
-  void serializeSect(std::vector<double> &, int, int, int, 
+  void serializeSection(std::vector<double> &, int, int, int,
      int, int) const;
 
  private:
@@ -264,24 +264,24 @@ size_t State<MODEL>::serialSize() const {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-  void State<MODEL>::deserializeSect(std::vector<double> & vect, int size_fld, int isc, int iec, 
+  void State<MODEL>::deserializeSection(std::vector<double> & vect, int size_fld, int isc, int iec,
       int jsc, int jec, int isc_sg, int iec_sg, int jsc_sg, int jec_sg) const {
   std::cout << "in oops interface\n";
-  Log::trace() << "State<MODEL>::deserializeSect starting" << std::endl;
+  Log::trace() << "State<MODEL>::deserializeSection starting" << std::endl;
   util::Timer timer(classname(), "serialize");
-  state_->deserializeSect(vect,size_fld,isc,iec,jsc,jec,isc_sg,iec_sg,jsc_sg,jec_sg);
+  state_->deserializeSection(vect, size_fld, isc, iec, jsc, jec, isc_sg, iec_sg, jsc_sg, jec_sg);
   std::cout << "coming out of oops interface\n";
   Log::trace() << "State<MODEL>::serialize done" << std::endl;
 }
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-  void State<MODEL>::serializeSect(std::vector<double> & vect, int size_fld, int isc, int iec, 
+  void State<MODEL>::serializeSection(std::vector<double> & vect, int size_fld, int isc, int iec,
       int jsc, int jec) const {
   std::cout << "in oops interface\n";
-  Log::trace() << "State<MODEL>::serializeSect starting" << std::endl;
+  Log::trace() << "State<MODEL>::serializeSection starting" << std::endl;
   util::Timer timer(classname(), "serialize");
-  state_->serializeSect(vect,size_fld,isc,iec,jsc,jec);
+  state_->serializeSection(vect, size_fld, isc, iec, jsc, jec);
   std::cout << "coming out of oops interface\n";
   Log::trace() << "State<MODEL>::serialize done" << std::endl;
 }

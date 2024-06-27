@@ -34,12 +34,11 @@
 #include "oops/base/ObsLocalizations.h"
 #include "oops/base/ObsSpaces.h"
 #include "oops/base/State.h"
-#include "oops/base/StateSet.h"
 #include "oops/base/StateEnsemble4D.h"
+#include "oops/base/StateSet.h"
 #include "oops/base/TrajectorySaver.h"
 #include "oops/generic/PseudoLinearModelIncrement4D.h"
 #include "oops/generic/PseudoModelState4D.h"
-#include "oops/generic/PseudoModelStateSet.h"
 #include "oops/interface/GeometryIterator.h"
 #include "oops/interface/ModelAuxControl.h"
 #include "oops/util/abor1_cpp.h"
@@ -393,7 +392,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4D(const eckit::Configuration &
   // ( max(winbgn, xx.time - tstep/2); min(winend, xx.time + tstep/2) ] are
   // processed in H(x).
   const util::Duration default_tstep = (obspaces_.windowEnd() - obspaces_.windowStart()) * 2;
-  // Setup PseudoModelStateSet
+  // Setup PseudoModelState4D
   std::unique_ptr<PseudoModel_> pseudomodel(new PseudoModel_(xx, default_tstep));
   const Model_ model(std::move(pseudomodel));
   // Setup model and obs biases; obs errors

@@ -50,7 +50,7 @@ template<typename MODEL> class StateEnsemble4D {
   StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
                   StateSet_ & stateSet);
 
-  StateEnsemble4D( StateSet_ & stateSet);
+  explicit StateEnsemble4D(StateSet_ & stateSet);
 
   /// calculate ensemble mean
   StateSet_ mean() const;
@@ -74,20 +74,16 @@ template<typename MODEL> class StateEnsemble4D {
 // ====================================================================================
 
 template<typename MODEL>
-StateEnsemble4D<MODEL>::StateEnsemble4D( StateSet_ & stateSet) : stateSet_(stateSet) {
+StateEnsemble4D<MODEL>::StateEnsemble4D(StateSet_ & stateSet) : stateSet_(stateSet) {
   // copy each of local ens states from stateSet into its own stateset
-  Log::info() << "in SE4d dist ctr, states_ size is " << stateSet.local_time_size() << "," << stateSet.size() << std::endl;
+  Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
   std::vector<int> members;
   members.push_back(0);
-//  states_.reserve(stateSet.size());
-  for(int i = 0; i < stateSet.size(); ++i ){
-     std::cout << "creating stateset from ensemble " << i << std::endl;
-     StateSet_ *newSS = new StateSet(stateSet.geometry(), stateSet.variables(), stateSet.times(), stateSet.commTime(), members, oops::mpi::myself());
-     std::cout << "created stateset from ensemble " << i << std::endl;
-     (*newSS)(0,0) = stateSet(0,i);
-     std::cout << "copied state for " << i << "," << states_.size() << std::endl;
+  for (int i = 0; i < stateSet.size(); ++i) {
+     StateSet_ *newSS = new StateSet(stateSet.geometry(), stateSet.variables(),
+            stateSet.times(), stateSet.commTime(), members, oops::mpi::myself());
+     (*newSS)(0, 0) = stateSet(0, i);
      states_.push_back(*newSS);
-     std::cout << "done creating stateset from ensemble " << i << std::endl;
   }
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
 }
@@ -98,7 +94,7 @@ template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
                   StateSet_ & stateSet) : states_(), stateSet_(resol, config) {
   // copy stateSet into class
-  Log::info() << "in SE4d ctr, states_ size is " << stateSet.size() << stateSet.local_ens_size() << std::endl;
+  Log::trace() << "StateEnsemble4D:contructor starting" << std::endl;
   states_.emplace_back(stateSet);
 
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
@@ -115,7 +111,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const std::vector<int> & ens,
                                         const eckit::mpi::Comm & commEns,
                                         const int mymember)
-  : states_(), stateSet_(resol,vars,times,commTime,ens,commEns) {
+  : states_(), stateSet_(resol, vars, times, commTime, ens, commEns) {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsemble4D:constructor: both members and members from template are specified");
@@ -173,7 +169,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const eckit::Configuration & config)
-  : states_(), stateSet_(resol,config) {
+  : states_(), stateSet_(resol, config) {
   // Abort if both "members" and "members from template" are specified
   if (config.has("members") && config.has("members from template"))
     ABORT("StateEnsemble4D:constructor: both members and members from template are specified");

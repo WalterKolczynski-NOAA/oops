@@ -106,7 +106,8 @@ IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateSet_ & ensemble,
 template<typename MODEL>
 IncrementEnsemble4D<MODEL>::IncrementEnsemble4D(const StateEnsemble4D_ & ensemble,
                                                 const StateSet_ & mean, const Variables & vars)
-  : ensemblePerturbs_(), ensemblePerturbsSet_(mean.geometry(), mean.variables(), ensemble[0].times(), oops::mpi::myself())
+  : ensemblePerturbs_(), ensemblePerturbsSet_(mean.geometry(), mean.variables(),
+    ensemble[0].times(), oops::mpi::myself())
 {
   ensemblePerturbs_.reserve(ensemble.size());
   for (size_t ii = 0; ii < ensemble.size(); ++ii) {

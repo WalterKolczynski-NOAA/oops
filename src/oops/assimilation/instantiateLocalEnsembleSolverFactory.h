@@ -8,11 +8,11 @@
 #ifndef OOPS_ASSIMILATION_INSTANTIATELOCALENSEMBLESOLVERFACTORY_H_
 #define OOPS_ASSIMILATION_INSTANTIATELOCALENSEMBLESOLVERFACTORY_H_
 
-#include "oops/base/StateSet.h"
 #include "oops/assimilation/GETKFSolver.h"
 #include "oops/assimilation/LETKFSolver.h"
 #include "oops/assimilation/LETKFSolverGSI.h"
 #include "oops/assimilation/LocalEnsembleSolver.h"
+#include "oops/base/StateSet.h"
 
 namespace oops {
 
