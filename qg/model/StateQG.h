@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "oops/util/DateTime.h"
+#include "oops/util/Logger.h"
 #include "oops/util/ObjectCounter.h"
 #include "oops/util/Printable.h"
 
@@ -78,6 +79,9 @@ class StateQG : public util::Printable,
   size_t serialSize() const;
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
+  void deserializeSect(std::vector<double> & vect, int size_fld, int isc, int iec, 
+     int jsc, int jec, int isc_sg, int iec_sg, int jsc_sg, int jec_sg) 
+     const { oops::Log::error() << "deserializeSect not implemented in QG" << std::endl; }
 
 /// ATLAS FieldSet
   void toFieldSet(atlas::FieldSet &) const;
@@ -86,6 +90,7 @@ class StateQG : public util::Printable,
 /// Other
   void zero();
   void accumul(const double &, const StateQG &);
+
 
  private:
   void print(std::ostream &) const;
