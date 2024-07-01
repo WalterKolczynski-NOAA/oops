@@ -75,13 +75,17 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
                           const eckit::mpi::Comm & commEns)
   : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
 {
-  size_t mytime = this->local_time_size() * commTime.rank();
+//  size_t mytime = this->local_time_size() * commTime.rank();
+  util::DateTime localtime = times[0];
+  std::cout << "MYDBG setting time to be " << localtime << " in ctr " << std::endl;
   for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
     for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
-      this->dataset().emplace_back(new State_(resol, vars, times[mytime + jt]));
+      this->dataset().emplace_back(new State_(resol, vars, times[jt]));
     }
   }
+  this->sync_times();
   this->check_consistency();
+  std::cout << "MYDBG time is " << this->times()[0] << " at end of ctr " << std::endl;
   Log::trace() << "StateSet::StateSet" << std::endl;
 }
 
@@ -165,6 +169,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
 
   local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(), this->times(),
                   this->commTime(), local_ens, oops::mpi::myself()));
+  std::cout << "MYDBG in localize, the time is " << this->times()[0] << std::endl;
+  std::cout << "MYDBG in localize, the time local has times " << local->times()[0] << std::endl;
   std::vector<int> buf(11);
   std::vector<int> recipients;  // This will contain list of mpi tasks where local tile will be sent
   std::vector<int> senders;  // This will contain list of mpi tasks which will be sending data to me
@@ -251,9 +257,10 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
       size_t itask = ensNum-1;
       zz_recv[itask] = zz;
       indx = 0;
-      int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
-      (*local)(0, itask).deserializeSection(zz_recv[itask], zz_recv[itask].size(), ist_fc, iend_fc,
-              jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg);  // deserialize state section
+  //    int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
+      int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
+      (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_fc, iend_fc,
+              jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg, indx);  // deserialize state section
     }
   }
 
@@ -264,11 +271,16 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
     ASSERT(rst.error() == 0);
     size_t itask = recv_tasks_[ireq] - 1;
     indx = 0;
-    int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
-    (*local)(0, itask).deserializeSection(zz_recv[itask], zz_recv[itask].size(), ist_fc, iend_fc,
-             jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg);  // deserialize state section
+    //int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
+    int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
+    (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_fc, iend_fc,
+             jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg, indx);  // deserialize state section
   }
-  const std::vector<util::DateTime> times = (*local).validTimes();
+//  (*local).times()[0] = this->times()[0];
+//  const std::vector<util::DateTime> times = (*local).validTimes();
+//  std::cout << "MYDBG times[0] at end of localize is " << times[0] << std::endl;
+  local->sync_times();
+  std::cout << "MYDBG times[0] after sync_times is " << local->times()[0] << std::endl;
   return(std::move(local));
 }
 

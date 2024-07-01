@@ -115,7 +115,7 @@ template<typename MODEL>
 void Model<MODEL>::forecast(State_ & xx, const ModelAux_ & maux,
                             const util::Duration & len,
                             PostProcessor<State_> & post) const {
-  Log::trace() << "Model<MODEL>::forecast starting" << std::endl;
+  Log::trace() << "Model<MODEL>::forecast starting " << xx.validTime() << std::endl;
 
   const util::DateTime end(xx.validTime() + len);
   Log::info() << "Model:forecast: forecast starting: " << xx << std::endl;

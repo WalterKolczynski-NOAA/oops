@@ -94,9 +94,9 @@ class StateL95 : public util::Printable,
   size_t serialSize() const;
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
-  void deserializeSection(std::vector<double> & vect, int size_fld, int isc, int iec, 
-     int jsc, int jec, int isc_sg, int iec_sg, int jsc_sg, int jec_sg) 
-     const { oops::Log::error() << "deserializeSection not implemented in L95" << std::endl; }
+  void deserializeSection(std::vector<double> & vect, int & size_fld, int & isc, int & iec, 
+     int & jsc, int & jec, int & isc_sg, int & iec_sg, int & jsc_sg, int & jec_sg, size_t & ind_local) 
+     { oops::Log::error() << "deserializeSection not implemented in L95" << std::endl; }
 
  private:
   void print(std::ostream &) const;

@@ -385,6 +385,10 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DNonLinear(const eckit::Config
   // Setup model and obs biases; obs errors
   R_.reset(new ObsErrors_(observersconf_, obspaces_));
   // Setup and run the model forecast with observers
+//  std::cout << "MYDBG setting up model from state[0] " << xx.validTimes() << std::endl;
+//  std::cout << "MYDBG setting up model flength is " << flength << std::endl;
+  std::cout << "MYDBG times[0] is " << times[0] << std::endl;
+  std::cout << "MYDBG times[size] is " << times.size()-1 << ", " << times[times.size()-1] << std::endl;
   State_ init_xx = xx[0];
   PostProcessor<State_> post;
   Observers_ hofx(obspaces_, obsconf_);
@@ -393,9 +397,12 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DNonLinear(const eckit::Config
   ObsAux_  obsaux(obspaces_, observersconf_);
   ObsAuxInc_  obsauxinc(obspaces_, observersconf_);
 
+  std::cout << "MYDBG initialize hofx" << std::endl;
   hofx.initialize(geometry_, obsaux, *R_, post, config);
+  std::cout << "MYDBG model forecast" << std::endl;
   model.forecast(init_xx, moderr, flength, post);
   hofx.finalize(yy);
+  std::cout << "MYDBG done with forecast and hofx finalize" << std::endl;
 }
 
 
