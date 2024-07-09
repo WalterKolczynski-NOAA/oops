@@ -401,6 +401,7 @@ void LocalEnsembleSolver<MODEL, OBS>::computeHofX4DNonLinear(const eckit::Config
   hofx.initialize(geometry_, obsaux, *R_, post, config);
   std::cout << "MYDBG model forecast" << std::endl;
   model.forecast(init_xx, moderr, flength, post);
+  std::cout << "MYDBG model forecast DONE" << std::endl;
   hofx.finalize(yy);
   std::cout << "MYDBG done with forecast and hofx finalize" << std::endl;
 }

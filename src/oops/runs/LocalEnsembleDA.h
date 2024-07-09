@@ -294,6 +294,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // compute H(x)
     Observations_ yb_mean = solver->computeHofXNonLinear(*ens_xx, 0,
+//    Observations_ yb_mean = solver->computeHofXLinear(*ens_xx, 0,
               params.driver.value().readHofX);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
@@ -603,6 +604,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
                   oops::mpi::myself(), faceMember));
     }
 
+    Log::trace() << "Here is the State after reading into SS" << (*ens_SS)[0] << std::endl;
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::unique_ptr<StateEnsemble4D_> ens_xx = std::unique_ptr<StateEnsemble4D_>

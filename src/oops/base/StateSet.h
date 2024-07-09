@@ -160,7 +160,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
    is different between the geometries.
 */
   int ist_fc, iend_fc, jst_fc, jend_fc, kst_fc, kend_fc, npz_fc;
-  int ist_sg, iend_sg, jst_sg, jend_sg, kst_sg, kend_sg, npz_sg;
+  int ist_da, iend_da, jst_da, jend_da, kst_da, kend_da, npz_da;
+  int ist_rcv, iend_rcv, jst_rcv, jend_rcv, kst_rcv, kend_rcv, npz_rcv;
   std::unique_ptr<StateSet<MODEL> > local;
   std::vector<int> local_ens;
   size_t dataSize = (*this)(0, 0).serialSize()-3;  // would be good to make this a method
@@ -190,41 +191,49 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   int nvars = this->variables().size();  // number of variable state
 
   std::vector<int> indices = DAgeometry.get_indices();
-  ist_sg = indices[0];
-  iend_sg = indices[1];
-  jst_sg = indices[2];
-  jend_sg = indices[3];
-  kst_sg = indices[4];
-  kend_sg = indices[5];
-  npz_sg = indices[6];
+  ist_da = indices[0];
+  iend_da = indices[1];
+  jst_da = indices[2];
+  jend_da = indices[3];
+  kst_da = indices[4];
+  kend_da = indices[5];
+  npz_da = indices[6];
 
+//std::cout << "geom vars broadcasting are " << ist_fc << ", " << iend_fc << ", " << jst_fc << ", " << jend_fc << ", " << std::endl;
+//std::cout << "geom vars needed are " << ist_da << ", " << iend_da << ", " << jst_da << ", " << jend_da << ", " << std::endl;
 
   for (int i = 0; i < global.size(); ++i) {
     if (i == mytask) {  // mytask is global rank
       buf[0] = mytile;   // The tile number that this rank holds
       buf[1] = DAgeometry.tileNum();  // The tile number that I need
       buf[2] = ensNum;   // the ensemble number this tile belongs to
-      buf[3] = ist_fc;   // the start of my domain decomp in i
-      buf[4] = iend_fc;  // the start of my domain decomp in j
-      buf[5] = jst_fc;   // the start of my domain decomp in i
-      buf[6] = jend_fc;  // the start of my domain decomp in j
-      buf[7] = ist_sg;   // the start of my i domain decomp I NEED
-      buf[8] = iend_sg;  // the start of my j domain decomp I NEED
-      buf[9] = jst_sg;   // the start of my i domain decomp I NEED
-      buf[10] = jend_sg;  // the start of my j domain decomp I NEED
+      buf[3] = ist_fc;   // the start of my broadcast domain decomp in i
+      buf[4] = iend_fc;  // the start of my broadcast domain decomp in i
+      buf[5] = jst_fc;   // the start of my broadcast domain decomp in j
+      buf[6] = jend_fc;  // the start of my broadcast domain decomp in j
+      buf[7] = ist_da;   // the start of my i domain decomp I NEED
+      buf[8] = iend_da;  // the start of my i domain decomp I NEED
+      buf[9] = jst_da;   // the start of my j domain decomp I NEED
+      buf[10] = jend_da;  // the start of my j domain decomp I NEED
     }
-    global.broadcast(buf, i);
-    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have a larger span than sg indices
-      ((buf[3] <= ist_sg) && (buf[4] >= iend_sg)) &&  // *_sg indices must be within *_fc indices
-      ((buf[5] <= jst_sg) && (buf[6] >= jend_sg))) {  //  if the tile, ist, and jst that the sender
+    global.broadcast(buf, i);                 // This is to figure out who is sending domain I NEED
+    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have a larger span than *_da indices
+      ((buf[3] <= ist_da) && (iend_da <= buf[4] )) &&  // *_da indices must be within *_fc indices
+      ((buf[5] <= jst_da) && (jend_da <= buf[6] ))) {  //  if the tile, ist, and jst that the sender
                                               // has matches what I need, this is one of my senders
       senders.push_back(i);
+      ist_rcv = buf[3];
+      iend_rcv = buf[4];
+      jst_rcv = buf[5];
+      jend_rcv = buf[6];
+//    std::cout << "proc " << i << " is sending " << buf[3] << ", " << buf[4] << ", " << buf[5] << ", " << buf[6] << ", " << std::endl;
       tileEnsNum.push_back(buf[2]);
     }
-    if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED
-       ((buf[7] >= ist_fc) && (buf[8] <= iend_fc)) &&  // NEEDED domain must be within my indices
-       ((buf[9] >= jst_fc) && (buf[10] <= jend_fc)) ) {  //  if the DAgeometryetry tile needed
+    if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED by the other processor
+       ((ist_fc <= buf[7]) && (buf[8] <= iend_fc)) &&  // NEEDED domain must be within my indices
+       ((jst_fc <= buf[9]) && (buf[10] <= jend_fc)) ) {  //  if the DAgeometryetry tile needed
                                      // matches the tile I have, this is who I will send it to
+//    std::cout << "proc " << i << " will recive " << ist_fc << ", " << iend_fc<< ", " << jst_fc << ", " <<jend_fc << ", " << std::endl;
       recipients.push_back(i);
     }
   }
@@ -259,8 +268,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
       indx = 0;
   //    int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
       int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
-      (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_fc, iend_fc,
-              jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg, indx);  // deserialize state section
+      (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
+              jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
     }
   }
 
@@ -273,8 +282,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
     indx = 0;
     //int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
     int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
-    (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_fc, iend_fc,
-             jst_fc, jend_fc, ist_sg, iend_sg, jst_sg, jend_sg, indx);  // deserialize state section
+    (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
+             jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
   }
 //  (*local).times()[0] = this->times()[0];
 //  const std::vector<util::DateTime> times = (*local).validTimes();
