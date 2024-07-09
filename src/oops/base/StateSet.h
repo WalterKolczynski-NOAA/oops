@@ -216,7 +216,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
                                               // has matches what I need, this is one of my senders
       senders.push_back(i);
       ist_rcv = buf[3];    // need to specify the indices of the patch that is received
-      iend_rcv = buf[4;    // because they may be different than the tile currently held
+      iend_rcv = buf[4];    // because they may be different than the tile currently held
       jst_rcv = buf[5];
       jend_rcv = buf[6];
       tileEnsNum.push_back(buf[2]);
