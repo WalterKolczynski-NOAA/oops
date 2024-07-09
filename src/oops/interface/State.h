@@ -264,12 +264,14 @@ size_t State<MODEL>::serialSize() const {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-  void State<MODEL>::deserializeSection(const std::vector<double> & vect, int & size_fld, int & isc, int & iec,
-      int & jsc, int & jec, int & isc_sg, int & iec_sg, int & jsc_sg, int & jec_sg, size_t & ind_local) {
+  void State<MODEL>::deserializeSection(const std::vector<double> & vect, int & size_fld, int & isc,
+      int & iec, int & jsc, int & jec, int & isc_sg, int & iec_sg, int & jsc_sg, int & jec_sg,
+      size_t & ind_local) {
   std::cout << "in oops interface\n";
   Log::trace() << "State<MODEL>::deserializeSection starting" << std::endl;
   util::Timer timer(classname(), "serialize");
-  state_->deserializeSection(vect, size_fld, isc, iec, jsc, jec, isc_sg, iec_sg, jsc_sg, jec_sg, ind_local);
+  state_->deserializeSection(vect, size_fld, isc, iec, jsc, jec, isc_sg, iec_sg, jsc_sg, jec_sg,
+             ind_local);
   std::cout << "coming out of oops interface\n";
   Log::trace() << "State<MODEL>::serialize done" << std::endl;
 }
