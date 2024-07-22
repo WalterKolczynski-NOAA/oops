@@ -55,7 +55,7 @@ class Resolution : public util::Printable {
   int closestTask(const double, const double) const { return 0; }
   std::vector<int> get_indices() const { oops::Log::error() << "get_indices not implemented in L95" << std::endl; }
   int tileNum() const { oops::Log::error() << "tileNum not implemented in L95" << std::endl; }
-  void deserializeSection(std::vector<double> & vect, int & size_fld, int & isc, int & iec, 
+  void deserializeSection(const std::vector<double> & vect, int & size_fld, int & isc, int & iec, 
      int & jsc, int & jec, int & isc_sg, int & iec_sg, int & jsc_sg, int & jec_sg, size_t & ind_local) 
      { oops::Log::error() << "tileNum not implemented in L95" << std::endl; }
  private:

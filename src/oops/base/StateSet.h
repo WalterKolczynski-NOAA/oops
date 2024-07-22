@@ -288,6 +288,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
 //  (*local).times()[0] = this->times()[0];
 //  const std::vector<util::DateTime> times = (*local).validTimes();
 //  std::cout << "MYDBG times[0] at end of localize is " << times[0] << std::endl;
+  oops::mpi::world().barrier();
   local->sync_times();
   std::cout << "MYDBG times[0] after sync_times is " << local->times()[0] << std::endl;
   return(std::move(local));
