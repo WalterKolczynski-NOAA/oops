@@ -77,7 +77,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
 {
 //  size_t mytime = this->local_time_size() * commTime.rank();
   util::DateTime localtime = times[0];
-  std::cout << "MYDBG setting time to be " << localtime << " in ctr " << std::endl;
   for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
     for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
       this->dataset().emplace_back(new State_(resol, vars, times[jt]));
@@ -85,7 +84,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
   }
   this->sync_times();
   this->check_consistency();
-  std::cout << "MYDBG time is " << this->times()[0] << " at end of ctr " << std::endl;
   Log::trace() << "StateSet::StateSet" << std::endl;
 }
 
@@ -168,10 +166,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   std::vector<double> zz;
   for (int i = 1; i <= this->ens_size(); ++i) { local_ens.push_back(i); }
 
-  local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(), this->times(),
-                  this->commTime(), local_ens, oops::mpi::myself()));
-  std::cout << "MYDBG in localize, the time is " << this->times()[0] << std::endl;
-  std::cout << "MYDBG in localize, the time local has times " << local->times()[0] << std::endl;
+  local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
+     this->times(), this->commTime(), local_ens, oops::mpi::myself()));
   std::vector<int> buf(11);
   std::vector<int> recipients;  // This will contain list of mpi tasks where local tile will be sent
   std::vector<int> senders;  // This will contain list of mpi tasks which will be sending data to me
@@ -179,7 +175,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   int mytile = this->geometry().tileNum();
   std::vector<int> global_indices = this->geometry().get_indices();  // pull from this geom and put
                                                                      // into DAgeometry
-  ist_fc = global_indices[0];
+  ist_fc = global_indices[0];   // indices for the forecast geometry
   iend_fc = global_indices[1];
   jst_fc = global_indices[2];
   jend_fc = global_indices[3];
@@ -191,16 +187,13 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   int nvars = this->variables().size();  // number of variable state
 
   std::vector<int> indices = DAgeometry.get_indices();
-  ist_da = indices[0];
+  ist_da = indices[0];  // indices for the da geometry
   iend_da = indices[1];
   jst_da = indices[2];
   jend_da = indices[3];
   kst_da = indices[4];
   kend_da = indices[5];
   npz_da = indices[6];
-
-//std::cout << "geom vars broadcasting are " << ist_fc << ", " << iend_fc << ", " << jst_fc << ", " << jend_fc << ", " << std::endl;
-//std::cout << "geom vars needed are " << ist_da << ", " << iend_da << ", " << jst_da << ", " << jend_da << ", " << std::endl;
 
   for (int i = 0; i < global.size(); ++i) {
     if (i == mytask) {  // mytask is global rank
@@ -217,23 +210,22 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
       buf[10] = jend_da;  // the start of my j domain decomp I NEED
     }
     global.broadcast(buf, i);                 // This is to figure out who is sending domain I NEED
-    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have a larger span than *_da indices
-      ((buf[3] <= ist_da) && (iend_da <= buf[4] )) &&  // *_da indices must be within *_fc indices
-      ((buf[5] <= jst_da) && (jend_da <= buf[6] ))) {  //  if the tile, ist, and jst that the sender
+    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have larger span than *_da idxs
+      ((buf[3] <= ist_da) && (iend_da <= buf[4])) &&  // *_da indices must be within *_fc indices
+      ((buf[5] <= jst_da) && (jend_da <= buf[6]))) {  //  if the tile, ist, and jst that the sender
                                               // has matches what I need, this is one of my senders
       senders.push_back(i);
-      ist_rcv = buf[3];
-      iend_rcv = buf[4];
+      ist_rcv = buf[3];    // need to specify the indices of the patch that is received
+      iend_rcv = buf[4];    // because they may be different than the tile currently held
       jst_rcv = buf[5];
       jend_rcv = buf[6];
-//    std::cout << "proc " << i << " is sending " << buf[3] << ", " << buf[4] << ", " << buf[5] << ", " << buf[6] << ", " << std::endl;
       tileEnsNum.push_back(buf[2]);
     }
-    if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED by the other processor
+    if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED by
+                                // the other processor
        ((ist_fc <= buf[7]) && (buf[8] <= iend_fc)) &&  // NEEDED domain must be within my indices
        ((jst_fc <= buf[9]) && (buf[10] <= jend_fc)) ) {  //  if the DAgeometryetry tile needed
                                      // matches the tile I have, this is who I will send it to
-//    std::cout << "proc " << i << " will recive " << ist_fc << ", " << iend_fc<< ", " << jst_fc << ", " <<jend_fc << ", " << std::endl;
       recipients.push_back(i);
     }
   }
@@ -269,7 +261,7 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   //    int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
       int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
       (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
-              jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
+         jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
     }
   }
 
@@ -280,17 +272,12 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
     ASSERT(rst.error() == 0);
     size_t itask = recv_tasks_[ireq] - 1;
     indx = 0;
-    //int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
     int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
     (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
-             jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
+           jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
   }
-//  (*local).times()[0] = this->times()[0];
-//  const std::vector<util::DateTime> times = (*local).validTimes();
-//  std::cout << "MYDBG times[0] at end of localize is " << times[0] << std::endl;
   oops::mpi::world().barrier();
   local->sync_times();
-  std::cout << "MYDBG times[0] after sync_times is " << local->times()[0] << std::endl;
   return(std::move(local));
 }
 
