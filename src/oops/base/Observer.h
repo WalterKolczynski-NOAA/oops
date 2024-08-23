@@ -92,10 +92,10 @@ class Observer {
                                                       ObsError_ &, const eckit::Configuration &);
 
 /// \brief Computes H(x) from the filled in GeoVaLs
-  void finalize(ObsVector_ &);
+  void finalize(ObsVector_ &, ObsDataInt_ &);
 
-  int resetObsPert(std::unique_ptr<ObsOperatorBase_>, const std::shared_ptr<GetValueTLADs_> &,
-                   int &);
+  int resetObsPert(const Geometry_ &, std::unique_ptr<ObsOperatorBase_>,
+                   const std::shared_ptr<GetValueTLADs_> &, int &);
 
  private:
   typedef std::vector<size_t> VariableSizes;
@@ -108,7 +108,6 @@ class Observer {
   std::unique_ptr<Locations_>       locations_;     // Obs locations
   const ObsAuxCtrl_ *               biascoeff_;     // bias coefficients
   ObsError_ *                       Rmat_;          // Obs error covariance
-  std::unique_ptr<Geometry_>        geom_;          // Geometry for GetValues
   std::unique_ptr<ObsFilters_>      filters_;       // QC filters
   std::unique_ptr<ObsDataVector_>   obserrfilter_;  // Obs error std dev for processed variables
   // Instances of GetValues. Each receives a list of model variables and a set of paths along which
@@ -148,8 +147,6 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
   Log::trace() << "Observer<MODEL, OBS>::initialize start" << std::endl;
 // Save information for finalize
   iterconf_.reset(new eckit::LocalConfiguration(conf));
-  if (conf.has("geometry"))
-    geom_.reset(new Geometry_(conf.getSubConfiguration("geometry"), geom.getComm()));
   biascoeff_ = &biascoeff;
   Rmat_ = &R;
 
@@ -192,7 +189,7 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
+void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim, ObsDataInt_ & qcflags) {
   oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   ASSERT(initialized_);
 
@@ -266,6 +263,9 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
 
   Log::info() << "Observer::finalize QC = " << *qcflags_ << std::endl;
 
+  // Copy qc flags to pass out
+  qcflags = *qcflags_;
+
   initialized_ = false;
   Log::trace() << "Observer<MODEL, OBS>::finalize done" << std::endl;
 }
@@ -273,10 +273,10 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-int Observer<MODEL, OBS>::resetObsPert(std::unique_ptr<ObsOperatorBase_> obsOpBase,
-                                      const std::shared_ptr<GetValueTLADs_> & getValTLs,
-                                      int & index) {
-  ASSERT(geom_ != nullptr);
+int Observer<MODEL, OBS>::resetObsPert(const Geometry_ & geom,
+                                       std::unique_ptr<ObsOperatorBase_> obsOpBase,
+                                       const std::shared_ptr<GetValueTLADs_> & getValTLs,
+                                       int & index) {
   obsop_ = std::move(obsOpBase);
   int size = getvals_.size();
   for (int ii = 0; ii < size; ++ii) {
@@ -284,7 +284,7 @@ int Observer<MODEL, OBS>::resetObsPert(std::unique_ptr<ObsOperatorBase_> obsOpBa
   }
 
   allVars_ = obsop_->requiredVars();
-  allVarSizes_ = geom_->variableSizes(allVars_);
+  allVarSizes_ = geom.variableSizes(allVars_);
   initialized_ = true;
 
   return size + index;

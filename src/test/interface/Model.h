@@ -206,7 +206,7 @@ template <typename MODEL> void testModelReForecast() {
 template <typename MODEL>
 class Model : public oops::Test {
  public:
-  Model() {}
+  using oops::Test::Test;
   virtual ~Model() {ModelFixture<MODEL>::reset();}
  private:
   std::string testid() const override {return "test::Model<" + MODEL::name() + ">";}

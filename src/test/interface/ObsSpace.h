@@ -81,7 +81,7 @@ template <typename OBS> void testSubwindows() {
 template <typename OBS> class ObsSpace : public oops::Test {
   typedef ObsTestsFixture<OBS> Test_;
  public:
-  ObsSpace() {}
+  using oops::Test::Test;
   virtual ~ObsSpace() {}
  private:
   std::string testid() const override {return "test::ObsSpace<" + OBS::name() + ">";}

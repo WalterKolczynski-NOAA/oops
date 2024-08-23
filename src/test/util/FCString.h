@@ -81,7 +81,7 @@ void testPushStringVector() {
 
 class FCString : public oops::Test {
  public:
-  FCString() {}
+  using oops::Test::Test;
   virtual ~FCString() {}
 
  private:

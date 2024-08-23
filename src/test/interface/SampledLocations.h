@@ -44,7 +44,7 @@ template <typename OBS> void testConstructor() {
 template <typename OBS>
 class SampledLocations : public oops::Test {
  public:
-  SampledLocations() {}
+  using oops::Test::Test;
   virtual ~SampledLocations() {}
  private:
   std::string testid() const override {

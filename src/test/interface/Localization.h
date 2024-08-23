@@ -130,7 +130,7 @@ template <typename MODEL> class Localization : public oops::Test {
   typedef LocalizationFixture<MODEL> Test_;
 
  public:
-  Localization() {}
+  using oops::Test::Test;
   virtual ~Localization() {}
 
  private:

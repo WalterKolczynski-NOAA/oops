@@ -248,7 +248,7 @@ template <typename MODEL> void testModelAuxIncrementAxpy() {
 
 template <typename MODEL> class ModelAuxIncrement : public oops::Test {
  public:
-  ModelAuxIncrement() {}
+  using oops::Test::Test;
   virtual ~ModelAuxIncrement() {}
 
  private:

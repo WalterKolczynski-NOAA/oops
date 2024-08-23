@@ -108,7 +108,7 @@ void testNorm2() {
 template <typename MODEL>
 class TestNorm : public oops::Test {
  public:
-  TestNorm() = default;
+  using oops::Test::Test;
   virtual ~TestNorm() = default;
 
  private:

@@ -131,7 +131,7 @@ template <typename MODEL> void testVerticalLocEV() {
 template <typename MODEL>
 class VerticalLocEV : public oops::Test {
  public:
-  VerticalLocEV() = default;
+  using oops::Test::Test;
   virtual ~VerticalLocEV() = default;
 
  private:

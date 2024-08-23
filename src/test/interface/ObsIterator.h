@@ -90,7 +90,7 @@ template <typename OBS> void testBasic() {
 template <typename OBS> class ObsIterator : public oops::Test {
   typedef ObsTestsFixture<OBS> Test_;
  public:
-  ObsIterator() = default;
+  using oops::Test::Test;
   virtual ~ObsIterator() = default;
 
  private:

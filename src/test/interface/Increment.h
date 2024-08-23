@@ -614,7 +614,7 @@ template <typename MODEL> void testIncrementSchur() {
 template <typename MODEL>
 class Increment : public oops::Test {
  public:
-  Increment() {}
+  using oops::Test::Test;
   virtual ~Increment() {IncrementFixture<MODEL>::reset();}
 
  private:
