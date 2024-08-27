@@ -21,6 +21,7 @@
 #include "oops/base/Geometry.h"
 #include "oops/base/Increment.h"
 #include "oops/base/State.h"
+#include "oops/interface/State.h"
 #include "oops/mpi/mpi.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
@@ -168,6 +169,17 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
 
   local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
      this->times(), this->commTime(), local_ens, oops::mpi::myself()));
+
+  /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
+  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+//        State_ localstate = State_((*local)[0]);
+//        State_ FCstate = (*this)(jt, jm);
+//        localstate.transpose(FCstate.state(), global, mytask, ensNum);
+        (*local)[0].transpose((*this)(jt,jm).state(), global, mytask, ensNum);
+    }
+  }
+#if 0 
   std::vector<int> buf(11);
   std::vector<int> recipients;  // This will contain list of mpi tasks where local tile will be sent
   std::vector<int> senders;  // This will contain list of mpi tasks which will be sending data to me
@@ -277,7 +289,9 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
            jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
   }
   oops::mpi::world().barrier();
+#endif
   local->sync_times();
+  Log::trace() << "local state looks like this " << (*local) << std::endl;
   return(std::move(local));
 }
 

@@ -63,6 +63,9 @@ class State : public util::Printable,
   /// Assignment operator
   State & operator =(const State &);
 
+  void transpose( const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask, 
+       const int & ensNum ) { state_->transpose(FCState, global, mytask, ensNum);}
+
   /// Accessor
   State_ & state() {if (fset_) {fset_->clear();} return *state_;}
   /// const accessor
@@ -171,7 +174,6 @@ State<MODEL>::State(const Variables & vars, const State & other)
   this->setObjectSize(state_->serialSize()*sizeof(double));
   Log::trace() << "State<MODEL>::State variables done" << std::endl;
 }
-
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
