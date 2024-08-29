@@ -170,128 +170,25 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
      this->times(), this->commTime(), local_ens, oops::mpi::myself()));
 
+  std::cout << "local has local_ens_size of " << local->local_ens_size() << std::endl;
+  Log::trace() << "local state looks like this " << (*local)(0,0) << std::endl;
+  Log::trace() << "local1 state looks like this " << (*local)(0,1) << std::endl;
   /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
-  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
-    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+//  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+//    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+  for (size_t jm = 0; jm < this->ens_size(); ++jm) {
 //        State_ localstate = State_((*local)[0]);
 //        State_ FCstate = (*this)(jt, jm);
 //        localstate.transpose(FCstate.state(), global, mytask, ensNum);
-        (*local)[0].transpose((*this)(jt,jm).state(), global, mytask, ensNum);
-    }
+        std::cout << "starting transpose number " << jm << std::endl;
+        Log::trace() << "fcst state looks like this before transpose " << (*this)(0,0) << std::endl;
+        (*local)(0,jm).transpose((*this)(0,0).state(), global, mytask, ensNum, jm);
+        std::cout << "done with transpose number " << jm << std::endl;
   }
-#if 0 
-  std::vector<int> buf(11);
-  std::vector<int> recipients;  // This will contain list of mpi tasks where local tile will be sent
-  std::vector<int> senders;  // This will contain list of mpi tasks which will be sending data to me
-  std::vector<int> tileEnsNum;  // This will contain list of ensemble numbers that I am receiving
-  int mytile = this->geometry().tileNum();
-  std::vector<int> global_indices = this->geometry().get_indices();  // pull from this geom and put
-                                                                     // into DAgeometry
-  ist_fc = global_indices[0];   // indices for the forecast geometry
-  iend_fc = global_indices[1];
-  jst_fc = global_indices[2];
-  jend_fc = global_indices[3];
-  kst_fc = global_indices[4];
-  kend_fc = global_indices[5];
-  npz_fc = global_indices[6];
-  int nxg = iend_fc - ist_fc + 1;
-  int nyg = jend_fc - jst_fc + 1;
-  int nvars = this->variables().size();  // number of variable state
-
-  std::vector<int> indices = DAgeometry.get_indices();
-  ist_da = indices[0];  // indices for the da geometry
-  iend_da = indices[1];
-  jst_da = indices[2];
-  jend_da = indices[3];
-  kst_da = indices[4];
-  kend_da = indices[5];
-  npz_da = indices[6];
-
-  for (int i = 0; i < global.size(); ++i) {
-    if (i == mytask) {  // mytask is global rank
-      buf[0] = mytile;   // The tile number that this rank holds
-      buf[1] = DAgeometry.tileNum();  // The tile number that I need
-      buf[2] = ensNum;   // the ensemble number this tile belongs to
-      buf[3] = ist_fc;   // the start of my broadcast domain decomp in i
-      buf[4] = iend_fc;  // the start of my broadcast domain decomp in i
-      buf[5] = jst_fc;   // the start of my broadcast domain decomp in j
-      buf[6] = jend_fc;  // the start of my broadcast domain decomp in j
-      buf[7] = ist_da;   // the start of my i domain decomp I NEED
-      buf[8] = iend_da;  // the start of my i domain decomp I NEED
-      buf[9] = jst_da;   // the start of my j domain decomp I NEED
-      buf[10] = jend_da;  // the start of my j domain decomp I NEED
-    }
-    global.broadcast(buf, i);                 // This is to figure out who is sending domain I NEED
-    if ((buf[0] == DAgeometry.tileNum()) &&   // *_fc indices will have larger span than *_da idxs
-      ((buf[3] <= ist_da) && (iend_da <= buf[4])) &&  // *_da indices must be within *_fc indices
-      ((buf[5] <= jst_da) && (jend_da <= buf[6]))) {  //  if the tile, ist, and jst that the sender
-                                              // has matches what I need, this is one of my senders
-      senders.push_back(i);
-      ist_rcv = buf[3];    // need to specify the indices of the patch that is received
-      iend_rcv = buf[4];    // because they may be different than the tile currently held
-      jst_rcv = buf[5];
-      jend_rcv = buf[6];
-      tileEnsNum.push_back(buf[2]);
-    }
-    if ((buf[1] == mytile) &&   // buf here contains indices of domain that is NEEDED by
-                                // the other processor
-       ((ist_fc <= buf[7]) && (buf[8] <= iend_fc)) &&  // NEEDED domain must be within my indices
-       ((jst_fc <= buf[9]) && (buf[10] <= jend_fc)) ) {  //  if the DAgeometryetry tile needed
-                                     // matches the tile I have, this is who I will send it to
-      recipients.push_back(i);
-    }
-  }
-
-// ---- now  send and collect messages
-  std::vector<eckit::mpi::Request> send_req_;
-  std::vector<eckit::mpi::Request> recv_req_;
-  std::vector<size_t> recv_tasks_;
-  size_t indx = 0;
-  std::vector<double> yy;
-
-  (*this)(0, 0).serialize(zz);  // serialize the forecast state in time 0 and local_ens_number 0
-  std::vector<std::vector<double> > zz_recv(senders.size());  // vector of vectors to receive
-                                                              // each buffer
-  for ( int j = 0; j < recipients.size(); ++j ) {  // reserve space for receiving
-     for ( int k = 0; k < zz.size(); ++k ) {  // fill up recv buffers with zeros
-       zz_recv[j].push_back(0.0);
-     }
-  }
-
-  for ( int j = 0; j < recipients.size(); ++j ) {  // loop through list of rcpts/sndrs and send/recv
-    if (recipients[j] != mytask) {  // dont send anything to myself
-      send_req_.push_back(global.iSend(&zz.front(), zz.size(), recipients[j], ensNum));
-    }
-    if (senders[j] != mytask) {  // dont need to receive from myself
-        recv_req_.push_back(global.iReceive(&zz_recv[j][0], zz.size(), senders[j], tileEnsNum[j]));
-        recv_tasks_.push_back(tileEnsNum[j]);
-    } else {  // I already have this forecast state
-      // copy from my local version
-      size_t itask = ensNum-1;
-      zz_recv[itask] = zz;
-      indx = 0;
-  //    int size_fld = (*local)(0, 0).serialSize() - 3;  // get the serialsize of the local tile
-      int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
-      (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
-         jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
-    }
-  }
-
-// Start looking for messages
-  for (size_t r = 0; r < recv_req_.size(); ++r) {
-    int ireq = -1;
-    eckit::mpi::Status rst = global.waitAny(recv_req_, ireq);
-    ASSERT(rst.error() == 0);
-    size_t itask = recv_tasks_[ireq] - 1;
-    indx = 0;
-    int size_fld = zz_recv[itask].size();  // get the serialsize of the local tile
-    (*local)(0, itask).deserializeSection(zz_recv[itask], size_fld, ist_rcv, iend_rcv,
-           jst_rcv, jend_rcv, ist_da, iend_da, jst_da, jend_da, indx);  // deserialize state section
-  }
-  oops::mpi::world().barrier();
-#endif
   local->sync_times();
-  Log::trace() << "local state looks like this " << (*local) << std::endl;
+  Log::trace() << "size of local is " << local->local_ens_size() << std::endl;
+  Log::trace() << "local state looks like this " << (*local)[0] << std::endl;
+  Log::trace() << "local1 state looks like this " << (*local)[1] << std::endl;
   return(std::move(local));
 }
 

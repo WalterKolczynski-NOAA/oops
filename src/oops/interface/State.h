@@ -64,7 +64,7 @@ class State : public util::Printable,
   State & operator =(const State &);
 
   void transpose( const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask, 
-       const int & ensNum ) { state_->transpose(FCState, global, mytask, ensNum);}
+       const int & ensNum, const int & transNum );
 
   /// Accessor
   State_ & state() {if (fset_) {fset_->clear();} return *state_;}
@@ -136,7 +136,6 @@ State<MODEL>::State(const Geometry_ & resol, const Variables & vars,
 }
 
 // -----------------------------------------------------------------------------
-
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const eckit::Configuration & config)
   : state_(), ID_(config.getUnsigned("ID", 0))
@@ -198,6 +197,20 @@ State<MODEL>::~State() {
   Log::trace() << "State<MODEL>::~State done" << std::endl;
 }
 
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void State<MODEL>::transpose( const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask, 
+       const int & ensNum, const int & transNum ) { 
+
+  // The FCState has a distributed set of states. Transpose returns a vector of local states on a smaller
+  // patch of geometry
+  std::cout << "State<MODEL>::transpose interface starting" << std::endl;
+  state_->transpose(FCState, global, mytask, ensNum, transNum);
+  std::cout << "State<MODEL>::transpose interface done" << std::endl;
+//  Log::trace() << "State<MODEL>::transpose done" << std::endl;
+
+}
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
