@@ -205,10 +205,9 @@ void State<MODEL>::transpose( const State_ & FCState, const eckit::mpi::Comm & g
 
   // The FCState has a distributed set of states. Transpose returns a vector of local states on a smaller
   // patch of geometry
-  std::cout << "State<MODEL>::transpose interface starting" << std::endl;
+  Log::trace() << "State<MODEL>::transpose interface starting" << std::endl;
   state_->transpose(FCState, global, mytask, ensNum, transNum);
-  std::cout << "State<MODEL>::transpose interface done" << std::endl;
-//  Log::trace() << "State<MODEL>::transpose done" << std::endl;
+  Log::trace() << "State<MODEL>::transpose interface done" << std::endl;
 
 }
 // -----------------------------------------------------------------------------

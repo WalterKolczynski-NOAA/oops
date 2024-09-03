@@ -170,7 +170,6 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
   local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
      this->times(), this->commTime(), local_ens, oops::mpi::myself()));
 
-  std::cout << "local has local_ens_size of " << local->local_ens_size() << std::endl;
   Log::trace() << "local state looks like this " << (*local)(0,0) << std::endl;
   Log::trace() << "local1 state looks like this " << (*local)(0,1) << std::endl;
   /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
@@ -180,10 +179,8 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
 //        State_ localstate = State_((*local)[0]);
 //        State_ FCstate = (*this)(jt, jm);
 //        localstate.transpose(FCstate.state(), global, mytask, ensNum);
-        std::cout << "starting transpose number " << jm << std::endl;
         Log::trace() << "fcst state looks like this before transpose " << (*this)(0,0) << std::endl;
         (*local)(0,jm).transpose((*this)(0,0).state(), global, mytask, ensNum, jm);
-        std::cout << "done with transpose number " << jm << std::endl;
   }
   local->sync_times();
   Log::trace() << "size of local is " << local->local_ens_size() << std::endl;
