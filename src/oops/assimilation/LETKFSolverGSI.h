@@ -30,7 +30,7 @@ class LETKFSolverGSI : public LETKFSolver<MODEL, OBS> {
   typedef Geometry<MODEL>           Geometry_;
   typedef ObsErrors<OBS>            ObsErrors_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
-  typedef StateSet<MODEL>            StateSet_;
+  typedef StateSet<MODEL>           StateSet_;
  public:
   LETKFSolverGSI(ObsSpaces_ &, const Geometry_ &, const eckit::Configuration &, size_t,
                  const StateSet_ &, const Variables &);

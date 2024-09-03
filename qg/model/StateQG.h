@@ -91,7 +91,6 @@ class StateQG : public util::Printable,
   void zero();
   void accumul(const double &, const StateQG &);
 
-
  private:
   void print(std::ostream &) const;
   const bool lbc_ = true;

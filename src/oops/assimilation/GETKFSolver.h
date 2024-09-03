@@ -70,7 +70,7 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   typedef PseudoModelState4D<MODEL>   PseudoModel_;
   typedef PseudoLinearModelIncrement4D<MODEL> PseudoLinearModel_;
   typedef State<MODEL>                State_;
-  typedef StateSet<MODEL>              StateSet_;
+  typedef StateSet<MODEL>             StateSet_;
   typedef StateEnsemble4D<MODEL>      StateEnsemble4D_;
   typedef VerticalLocEV<MODEL>        VerticalLocEV_;
 

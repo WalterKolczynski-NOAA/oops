@@ -132,6 +132,7 @@ State<MODEL>::State(const Geometry_ & resol, const Variables & vars,
 }
 
 // -----------------------------------------------------------------------------
+
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const eckit::Configuration & config)
   : state_(), ID_(config.getUnsigned("ID", 0))

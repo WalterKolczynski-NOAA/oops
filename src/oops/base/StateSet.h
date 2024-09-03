@@ -76,7 +76,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
                           const eckit::mpi::Comm & commEns)
   : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
 {
-//  size_t mytime = this->local_time_size() * commTime.rank();
   util::DateTime localtime = times[0];
   for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
     for (size_t jt = 0; jt < this->local_time_size(); ++jt) {

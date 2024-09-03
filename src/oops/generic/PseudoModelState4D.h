@@ -28,7 +28,7 @@ class PseudoModelState4D : public ModelBase<MODEL> {
   typedef Geometry<MODEL>          Geometry_;
   typedef ModelAuxControl<MODEL>   ModelAux_;
   typedef State<MODEL>             State_;
-  typedef StateSet<MODEL>           StateSet_;
+  typedef StateSet<MODEL>          StateSet_;
 
  public:
   static const std::string classname() {return "oops::PseudoModelState4D";}

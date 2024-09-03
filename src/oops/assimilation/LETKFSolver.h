@@ -51,7 +51,7 @@ class LETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   typedef ObsErrors<OBS>              ObsErrors_;
   typedef ObsLocalizations<MODEL, OBS> ObsLocalizations_;
   typedef ObsSpaces<OBS>              ObsSpaces_;
-  typedef StateSet<MODEL>              StateSet_;
+  typedef StateSet<MODEL>             StateSet_;
 
  public:
   static const std::string classname() {return "oops::LETKFSolver";}

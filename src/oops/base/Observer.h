@@ -18,13 +18,11 @@
 
 #include "oops/base/Geometry.h"
 #include "oops/base/GetValues.h"
-#include "oops/base/GetValueTLADs.h"
 #include "oops/base/Locations.h"
 #include "oops/base/ObsError.h"
 #include "oops/base/ObserverUtils.h"
 #include "oops/base/ObsFilters.h"
 #include "oops/base/ObsOperatorBase.h"
-#include "oops/base/ObsVariables.h"
 #include "oops/base/ObsVector.h"
 #include "oops/base/Variables.h"
 #include "oops/interface/GeoVaLs.h"
@@ -66,7 +64,6 @@ template <typename MODEL, typename OBS>
 class Observer {
   typedef Geometry<MODEL>              Geometry_;
   typedef GeoVaLs<OBS>                 GeoVaLs_;
-  typedef GetValueTLADs<MODEL, OBS>    GetValueTLADs_;
   typedef GetValues<MODEL, OBS>        GetValues_;
   typedef Locations<OBS>               Locations_;
   typedef ObsAuxControl<OBS>           ObsAuxCtrl_;
@@ -92,10 +89,9 @@ class Observer {
                                                       ObsError_ &, const eckit::Configuration &);
 
 /// \brief Computes H(x) from the filled in GeoVaLs
-  void finalize(ObsVector_ &, ObsDataInt_ &);
+  void finalize(ObsVector_ &);
 
-  int resetObsPert(const Geometry_ &, std::unique_ptr<ObsOperatorBase_>,
-                   const std::shared_ptr<GetValueTLADs_> &, int &);
+  void resetObsOp(std::unique_ptr<ObsOperatorBase_>);
 
  private:
   typedef std::vector<size_t> VariableSizes;
@@ -157,31 +153,29 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
                                  qcflags_, *obserrfilter_, iterfilt));
   filters_->preProcess();
 
-  if (!initialized_) {
 // Get the list of required variables
-    oops::Variables geovars = obsop_->requiredVars();
-    geovars += biascoeff_->requiredVars();
-    geovars += filters_->requiredVars();
+  oops::Variables geovars = obsop_->requiredVars();
+  geovars += biascoeff_->requiredVars();
+  geovars += filters_->requiredVars();
 
 // Get the observation locations and their discretizations
-    locations_ = std::make_unique<Locations_>(obsop_->locations());
+  locations_ = std::make_unique<Locations_>(obsop_->locations());
 
   // Required variables grouped by the set of paths along which they'll be interpolated
-    const std::vector<oops::Variables> groupedVars = groupVariablesByLocationSamplingMethod(
-          geovars, *locations_);
+  const std::vector<oops::Variables> groupedVars = groupVariablesByLocationSamplingMethod(
+        geovars, *locations_);
 
 // Get variable sizes (i.e. the numbers of levels in the corresponding GeoVaLs)
-    const std::vector<VariableSizes> groupedVarSizes = variableSizes(groupedVars, geom);
+  const std::vector<VariableSizes> groupedVarSizes = variableSizes(groupedVars, geom);
 
-    std::tie(allVars_, allVarSizes_) = mergeVariablesAndSizes(groupedVars, groupedVarSizes);
+  std::tie(allVars_, allVarSizes_) = mergeVariablesAndSizes(groupedVars, groupedVarSizes);
 
 // Set up GetValues
-    getvals_ = makeGetValuesVector(parameters_.getValues, geom,
-                                   obspace_.timeWindow(),
-                                   *locations_, groupedVars);
-    initialized_ = true;
-  }
+  getvals_ = makeGetValuesVector(parameters_.getValues, geom,
+                                 obspace_.timeWindow(),
+                                 *locations_, groupedVars);
 
+  initialized_ = true;
   Log::trace() << "Observer<MODEL, OBS>::initialize done" << std::endl;
   return getvals_;
 }
@@ -189,60 +183,52 @@ Observer<MODEL, OBS>::initialize(const Geometry_ & geom, const ObsAuxCtrl_ & bia
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim, ObsDataInt_ & qcflags) {
+void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim) {
   oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   ASSERT(initialized_);
 
   // Fill GeoVaLs
-  oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
-  GeoVaLs_ geovals = makeAndFillGeoVaLs(*locations_, allVars_, allVarSizes_, getvals_);
+  GeoVaLs_ geovals(*locations_, allVars_, allVarSizes_);
+  for (size_t m = 0; m < getvals_.size(); ++m) {
+    getvals_[m]->fillGeoVaLs(geovals);
+  }
 
   // Compute the reduced representation of the GeoVaLs for which it's been requested
   oops::Variables reducedVars = biascoeff_->requiredVars();
   reducedVars += filters_->requiredVars();
   obsop_->computeReducedVars(reducedVars, geovals);
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   /// Call prior filters
   filters_->priorFilter(geovals);
 
   /// Setup diagnostics
-  ObsVariables vars;
+  Variables vars;
   vars += filters_->requiredHdiagnostics();
   vars += biascoeff_->requiredHdiagnostics();
-  oops::Log::trace() << "Observer<MODEL, OBS>::finalize start" << std::endl;
   // The current interface makes it possible to assign different location sampling methods not only
   // to GeoVaLs, but also to ObsDiagnostics. We could simplify things and assume there'll always
   // be a 1-to-1 mapping between obs locations and columns of ObsDiagnostics.
   ObsDiags_ ydiags(obspace_, *locations_, vars);
 
   // Setup bias vector
-  oops::Log::trace() << "Observer<MODEL, OBS>::ybias start" << std::endl;
   ObsVector_ ybias(obspace_);
   ybias.zero();
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::simulateObs start" << std::endl;
   /// Compute H(x)
   obsop_->simulateObs(geovals, yobsim, *biascoeff_, *qcflags_, ybias, ydiags);
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::postFilter start" << std::endl;
   /// Call posterior filters
   filters_->postFilter(geovals, yobsim, ybias, ydiags);
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::obserr start" << std::endl;
   // Update R with obs errors that filters might have updated
   ObsVector_ obserr(Rmat_->obserrors());
-  oops::Log::trace() << "Observer<MODEL, OBS>::obserr 2" << std::endl;
   obserr = *obserrfilter_;
-  oops::Log::trace() << "Observer<MODEL, OBS>::obserr 3" << std::endl;
   Rmat_->update(obserr);
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::obserr done" << std::endl;
   // Save current obs, obs error estimates and QC flags (for diagnostics use only)
   std::string siter = "";
   if (iterconf_->has("iteration")) siter = iterconf_->getString("iteration");
 
-  oops::Log::trace() << "Observer<MODEL, OBS>::getBools start" << std::endl;
   if (iterconf_->getBool("save qc", true)) {
     const std::string qcname = "EffectiveQC" + siter;
     qcflags_->save(qcname);
@@ -251,7 +237,6 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim, ObsDataInt_ & qcflags) 
     const std::string obsname = "hofx" + siter;
     yobsim.save(obsname);
   }
-  oops::Log::trace() << "Observer<MODEL, OBS>::getBools middle" << std::endl;
   if (iterconf_->getBool("save obs errors", true)) {
     const std::string errname = "EffectiveError" + siter;
     obserrfilter_->save(errname);
@@ -263,9 +248,6 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim, ObsDataInt_ & qcflags) 
 
   Log::info() << "Observer::finalize QC = " << *qcflags_ << std::endl;
 
-  // Copy qc flags to pass out
-  qcflags = *qcflags_;
-
   initialized_ = false;
   Log::trace() << "Observer<MODEL, OBS>::finalize done" << std::endl;
 }
@@ -273,21 +255,8 @@ void Observer<MODEL, OBS>::finalize(ObsVector_ & yobsim, ObsDataInt_ & qcflags) 
 // -----------------------------------------------------------------------------
 
 template <typename MODEL, typename OBS>
-int Observer<MODEL, OBS>::resetObsPert(const Geometry_ & geom,
-                                       std::unique_ptr<ObsOperatorBase_> obsOpBase,
-                                       const std::shared_ptr<GetValueTLADs_> & getValTLs,
-                                       int & index) {
+void Observer<MODEL, OBS>::resetObsOp(std::unique_ptr<ObsOperatorBase_> obsOpBase) {
   obsop_ = std::move(obsOpBase);
-  int size = getvals_.size();
-  for (int ii = 0; ii < size; ++ii) {
-    getvals_[ii] = (*getValTLs)[ii + index];
-  }
-
-  allVars_ = obsop_->requiredVars();
-  allVarSizes_ = geom.variableSizes(allVars_);
-  initialized_ = true;
-
-  return size + index;
 }
 
 // -----------------------------------------------------------------------------

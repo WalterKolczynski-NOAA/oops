@@ -60,7 +60,7 @@ template <typename MODEL>
 StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf, const Geometry_ & resol):
   PostBase<State_>(conf), resol_(resol)
 {
-  Log::info() << "StateSetSaver::constructor1" << std::endl;
+  Log::trace() << "StateSetSaver::constructor" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -84,7 +84,7 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
 
 template <typename MODEL>
 std::unique_ptr<StateSet<MODEL> > & StateSetSaver<MODEL>::getStateSet(void) {
-  Log::info() << "StateSetSaver::returning StateSet" << std::endl;
+  Log::trace() << "StateSetSaver::returning StateSet" << std::endl;
   return(States_);
 }
 
@@ -107,16 +107,14 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
 template <typename MODEL>
 void StateSetSaver<MODEL>::doProcessing(const State_ & xx) {
   if ( initialized_ ) {
-    Log::trace() << "StateSetSaver::doProcessing on stateIndex_ " << stateIndex_ << std::endl;
     (*States_)[stateIndex_] = xx;
     stateIndex_++;
-    Log::info() << "StateSetSaver::doProcessing done" << std::endl;
   }
   initialized_ = true;
 }
 template <typename MODEL>
 void StateSetSaver<MODEL>::doFinalize(const State_ & xx) {
-  Log::info() << "StateSetSaver::doFinalize (empty) done" << std::endl;
+  Log::trace() << "StateSetSaver::doFinalize (empty) done" << std::endl;
 }
 // -----------------------------------------------------------------------------
 

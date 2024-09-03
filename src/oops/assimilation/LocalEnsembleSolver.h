@@ -70,7 +70,7 @@ class LocalEnsembleSolver {
   typedef PseudoModelState4D<MODEL>   PseudoModel_;
   typedef PseudoLinearModelIncrement4D<MODEL> PseudoLinearModel_;
   typedef State<MODEL>                State_;
-  typedef StateSet<MODEL>              StateSet_;
+  typedef StateSet<MODEL>             StateSet_;
   typedef Increment<MODEL>            Increment_;
   typedef Increment4D<MODEL>          Increment4D_;
   typedef LinearModel<MODEL>          LinearModel_;
@@ -553,7 +553,7 @@ template <typename MODEL, typename OBS>
 class LocalEnsembleSolverFactory {
   typedef Geometry<MODEL>           Geometry_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
-  typedef StateSet<MODEL>            StateSet_;
+  typedef StateSet<MODEL>           StateSet_;
  public:
   static std::unique_ptr<LocalEnsembleSolver<MODEL, OBS>> create(ObsSpaces_ &, const Geometry_ &,
                                                         const eckit::Configuration &,
@@ -578,7 +578,7 @@ template<class MODEL, class OBS, class T>
 class LocalEnsembleSolverMaker : public LocalEnsembleSolverFactory<MODEL, OBS> {
   typedef Geometry<MODEL>           Geometry_;
   typedef ObsSpaces<OBS>            ObsSpaces_;
-  typedef StateSet<MODEL>            StateSet_;
+  typedef StateSet<MODEL>           StateSet_;
 
   virtual LocalEnsembleSolver<MODEL, OBS> * make(ObsSpaces_ & obspaces, const Geometry_ & geometry,
                                         const eckit::Configuration & conf, size_t nens,

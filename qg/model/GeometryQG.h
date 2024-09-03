@@ -21,7 +21,6 @@
 
 #include "eckit/mpi/Comm.h"
 
-#include "oops/util/Logger.h"
 #include "oops/util/ObjectCounter.h"
 #include "oops/util/Printable.h"
 
@@ -64,6 +63,8 @@ class GeometryQG : public util::Printable,
   bool levelsAreTopDown() const {return true;}
 
   std::vector<size_t> variableSizes(const oops::Variables & vars) const;
+
+  void latlon(std::vector<double> &, std::vector<double> &, const bool) const;
 
  private:
   GeometryQG & operator=(const GeometryQG &);

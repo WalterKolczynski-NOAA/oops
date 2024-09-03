@@ -12,7 +12,6 @@
 #include "oops/assimilation/LETKFSolver.h"
 #include "oops/assimilation/LETKFSolverGSI.h"
 #include "oops/assimilation/LocalEnsembleSolver.h"
-#include "oops/base/StateSet.h"
 
 namespace oops {
 

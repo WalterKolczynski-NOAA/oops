@@ -24,7 +24,6 @@
 
 #include "oops/base/Variables.h"
 #include "oops/mpi/mpi.h"
-#include "oops/util/Logger.h"
 #include "oops/util/Printable.h"
 
 namespace lorenz95 {
@@ -50,9 +49,11 @@ class Resolution : public util::Printable {
   std::vector<size_t> variableSizes(const oops::Variables &) const;
   bool levelsAreTopDown() const {return true;}
   const eckit::mpi::Comm & getComm() const {return comm_;}
+  void latlon(std::vector<double> &, std::vector<double> &, const bool) const;
   const atlas::FunctionSpace & functionSpace() const {return noFunctionSpace_;}
   const atlas::FieldSet & fields() const {return noFields_;}
   int closestTask(const double, const double) const { return 0; }
+
  private:
   void print(std::ostream & os) const {os << resol_;}
   const int resol_;
