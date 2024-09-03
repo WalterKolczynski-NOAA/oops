@@ -158,34 +158,18 @@ std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Co
    of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
    is different between the geometries.
 */
-  int ist_fc, iend_fc, jst_fc, jend_fc, kst_fc, kend_fc, npz_fc;
-  int ist_da, iend_da, jst_da, jend_da, kst_da, kend_da, npz_da;
-  int ist_rcv, iend_rcv, jst_rcv, jend_rcv, kst_rcv, kend_rcv, npz_rcv;
   std::unique_ptr<StateSet<MODEL> > local;
   std::vector<int> local_ens;
-  size_t dataSize = (*this)(0, 0).serialSize()-3;  // would be good to make this a method
-  std::vector<double> zz;
   for (int i = 1; i <= this->ens_size(); ++i) { local_ens.push_back(i); }
 
   local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
      this->times(), this->commTime(), local_ens, oops::mpi::myself()));
 
-  Log::trace() << "local state looks like this " << (*local)(0,0) << std::endl;
-  Log::trace() << "local1 state looks like this " << (*local)(0,1) << std::endl;
   /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
-//  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
-//    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
   for (size_t jm = 0; jm < this->ens_size(); ++jm) {
-//        State_ localstate = State_((*local)[0]);
-//        State_ FCstate = (*this)(jt, jm);
-//        localstate.transpose(FCstate.state(), global, mytask, ensNum);
-        Log::trace() << "fcst state looks like this before transpose " << (*this)(0,0) << std::endl;
-        (*local)(0,jm).transpose((*this)(0,0).state(), global, mytask, ensNum, jm);
+    (*local)(0, jm).transpose((*this)(0, 0).state(), global, mytask, ensNum, jm);
   }
   local->sync_times();
-  Log::trace() << "size of local is " << local->local_ens_size() << std::endl;
-  Log::trace() << "local state looks like this " << (*local)[0] << std::endl;
-  Log::trace() << "local1 state looks like this " << (*local)[1] << std::endl;
   return(std::move(local));
 }
 

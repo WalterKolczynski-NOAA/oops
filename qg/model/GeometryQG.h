@@ -64,8 +64,6 @@ class GeometryQG : public util::Printable,
   bool levelsAreTopDown() const {return true;}
 
   std::vector<size_t> variableSizes(const oops::Variables & vars) const;
-  std::vector<int> get_indices() const { oops::Log::error() << "get_indices not implemented in QG" << std::endl; }
-  int tileNum() const { oops::Log::error() << "tileNum not implemented in QG" << std::endl; }
 
  private:
   GeometryQG & operator=(const GeometryQG &);

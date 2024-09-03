@@ -63,8 +63,8 @@ class State : public util::Printable,
   /// Assignment operator
   State & operator =(const State &);
 
-  void transpose( const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask, 
-       const int & ensNum, const int & transNum );
+  void transpose(const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask,
+       const int & ensNum, const int & transNum);
 
   /// Accessor
   State_ & state() {if (fset_) {fset_->clear();} return *state_;}
@@ -107,10 +107,6 @@ class State : public util::Printable,
   size_t serialSize() const override;
   void serialize(std::vector<double> &) const override;
   void deserialize(const std::vector<double> &, size_t &) override;
-  void deserializeSection(const std::vector<double> &, int &, int &, int &,
-     int &, int &, int &, int &, int &, int &, size_t &);
-  void serializeSection(std::vector<double> &, int, int, int,
-     int, int) const;
 
  private:
   std::unique_ptr<State_> state_;
@@ -200,16 +196,15 @@ State<MODEL>::~State() {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-void State<MODEL>::transpose( const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask, 
-       const int & ensNum, const int & transNum ) { 
-
-  // The FCState has a distributed set of states. Transpose returns a vector of local states on a smaller
-  // patch of geometry
+void State<MODEL>::transpose(const State_ & FCState, const eckit::mpi::Comm & global,
+       const int & mytask, const int & ensNum, const int & transNum) {
+  // The FCState has a distributed set of states. Transpose returns a vector of local
+  // states on a smaller patch of geometry
   Log::trace() << "State<MODEL>::transpose interface starting" << std::endl;
   state_->transpose(FCState, global, mytask, ensNum, transNum);
   Log::trace() << "State<MODEL>::transpose interface done" << std::endl;
-
 }
+
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
@@ -273,28 +268,6 @@ size_t State<MODEL>::serialSize() const {
   Log::trace() << "State<MODEL>::serialSize" << std::endl;
   util::Timer timer(classname(), "serialSize");
   return state_->serialSize();
-}
-
-// -----------------------------------------------------------------------------
-
-template<typename MODEL>
-  void State<MODEL>::deserializeSection(const std::vector<double> & vect, int & size_fld, int & isc, int & iec,
-      int & jsc, int & jec, int & isc_sg, int & iec_sg, int & jsc_sg, int & jec_sg, size_t & ind_local) {
-  Log::trace() << "State<MODEL>::deserializeSection starting" << std::endl;
-
-  util::Timer timer(classname(), "deserializeSect");
-  state_->deserializeSection(vect, size_fld, isc, iec, jsc, jec, isc_sg, iec_sg, jsc_sg, jec_sg, ind_local);
-  Log::trace() << "State<MODEL>::deserializeSect done" << std::endl;
-}
-// -----------------------------------------------------------------------------
-
-template<typename MODEL>
-  void State<MODEL>::serializeSection(std::vector<double> & vect, int size_fld, int isc, int iec,
-      int jsc, int jec) const {
-  Log::trace() << "State<MODEL>::serializeSection starting" << std::endl;
-  util::Timer timer(classname(), "serializeSect");
-  state_->serializeSection(vect, size_fld, isc, iec, jsc, jec);
-  Log::trace() << "State<MODEL>::serializeSect done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

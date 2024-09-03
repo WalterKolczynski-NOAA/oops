@@ -527,7 +527,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // the layout here needs to be nmembers * the layout for the forecast geometry
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
-    std::vector<int> global_indices = DAgeometry->get_indices();
     Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
                 << tasks_per_member << " MPI tasks per member." << std::endl;
