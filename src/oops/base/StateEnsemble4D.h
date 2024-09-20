@@ -65,7 +65,7 @@ template<typename MODEL> class StateEnsemble4D {
   const StateSet_ & stateSet() const {return stateSet_;}
 
  private:
-  void getMembers(const eckit::Configuration & );
+  void getMembers(const eckit::Configuration &);
   std::vector<eckit::LocalConfiguration> membersConfig;
   std::vector<StateSet_> states_;
   StateSet_ stateSet_;
