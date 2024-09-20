@@ -512,7 +512,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const bool HofXOnly = inlineParams.hofXOnly.value();
     const bool runForecast = inlineParams.runForecast.value();
     const std::vector<std::string> &files = inlineParams.files.value();
-    const int batchsize = inlineParams.batch.value();
+    const int batchSize = inlineParams.batch.value();
     const int zpad = inlineParams.zpad.value();
     const std::string pattern = inlineParams.pattern.value();
 
@@ -539,13 +539,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
     const int subrank = commMember.rank();
 
-    //  Create the communicator for each face of cubed sphere, named face_member_{i}:
-    std::string faceNameStr = "face_member_" + std::to_string(subrank);
-    char const *faceName = faceNameStr.c_str();
-    eckit::mpi::Comm & faceMember = this->getComm().split(subrank, faceName);
-    const int subface = faceMember.rank();
+    //  Create the communicator for each decomposed patch of geometry
+    std::string patchNameStr = "patch_member_" + std::to_string(subrank);
+    char const *patchName = patchNameStr.c_str();
+    eckit::mpi::Comm & patchMember = this->getComm().split(subrank, patchName);
+    const int subpatch = patchMember.rank();
 
-    Log::info() << "size of faceMember/ENS comm is " << faceMember.size() << std::endl;
+    Log::info() << "size of patchMember/ENS comm is " << patchMember.size() << std::endl;
     //  Each member uses a different configuration:
     eckit::PathName confPath = files[mymember-1];
     eckit::YAMLConfiguration memberConf(confPath);
@@ -585,7 +585,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
       StateSetSaver<MODEL> *saver_ =
         new StateSetSaver<MODEL>(memberConf, FCgeometry, times, oops::mpi::myself(),
-                    ens, faceMember);
+                    ens, patchMember);
       post.enrollProcessor(saver_);
   //  Each member uses a different configuration:
       for (int m = 1; m <=nmembers; m++) {
@@ -594,8 +594,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
            executeForecast(FCgeometry, memberConf, validate, post);
            Log::info() << "Done with ens execute\n";
          }
-         if ( batchsize > 0 ) {  // don't divide by zero
-           if (m % batchsize == 0) oops::mpi::world().barrier();
+         if ( batchSize > 0 ) {  // don't divide by zero
+           if (m % batchSize == 0) oops::mpi::world().barrier();
          }
        }
        oops::mpi::world().barrier();
@@ -605,10 +605,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       std::vector<eckit::LocalConfiguration> membersConfig;
       eckit::LocalConfiguration background = params.background;
       ens_SS = std::unique_ptr<StateSet_>(new StateSet_(FCgeometry, background,
-                  oops::mpi::myself(), faceMember));
+                  oops::mpi::myself(), patchMember));
     }
 
-    Log::trace() << "Here is the State after reading into SS" << (*ens_SS)[0] << std::endl;
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::unique_ptr<StateEnsemble4D_> ens_xx = std::unique_ptr<StateEnsemble4D_>
