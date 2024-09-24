@@ -293,9 +293,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     util::printRunStats("LocalEnsembleDA before computeHofX");
 
     // compute H(x)
-    Observations_ yb_mean = solver->computeHofXNonLinear(*ens_xx, 0,
-//    Observations_ yb_mean = solver->computeHofXLinear(*ens_xx, 0,
-              params.driver.value().readHofX);
+    Observations_ yb_mean = solver->computeHofX(*ens_xx, 0, params.driver.value().readHofX);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
