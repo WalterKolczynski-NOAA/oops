@@ -80,8 +80,9 @@ class StateQG : public util::Printable,
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
   void transpose(const StateQG & FCState, const eckit::mpi::Comm & global, const int & mytask,
-     const int & ensNum, const int & transNum)
-     { oops::Log::error() << "transpose not implemented in QG" << std::endl; }
+     const int & ensNum, const int & transNum) {
+     throw eckit::NotImplemented("StateQG::transpose not implemented", Here());
+  }
 
 /// ATLAS FieldSet
   void toFieldSet(atlas::FieldSet &) const;

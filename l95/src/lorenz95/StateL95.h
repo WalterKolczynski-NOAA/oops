@@ -95,8 +95,9 @@ class StateL95 : public util::Printable,
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
   void transpose(const StateL95 & FCState, const eckit::mpi::Comm & global, const int & mytask,
-     const int & ensNum, const int & transNum)
-     { oops::Log::error() << "transpose not implemented in L95" << std::endl; }
+     const int & ensNum, const int & transNum) {
+     throw eckit::NotImplemented("StateL95::transpose not implemented", Here());
+  }
 
  private:
   void print(std::ostream &) const;

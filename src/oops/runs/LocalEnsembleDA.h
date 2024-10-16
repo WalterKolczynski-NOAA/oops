@@ -608,8 +608,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
+    std::vector<StateSet_> localVec = ens_SS->localizeVec(this->getComm(), *DAgeometry, mytask, mymember);
     std::unique_ptr<StateEnsemble4D_> ens_xx = std::unique_ptr<StateEnsemble4D_>
-       (new StateEnsemble4D_(*(ens_SS->localize(this->getComm(), *DAgeometry, mytask, mymember))) );
+       (new StateEnsemble4D_(localVec, 0));
     return(ens_xx);
   }
 
