@@ -62,29 +62,33 @@ template<typename MODEL> class StateEnsemble4D {
 
   /// Information
   const Variables & variables() const {return states_[0].variables();}
-  const StateSet_ & stateSet() const {return stateSet_;}
+  const StateSet_ & stateSet() const {return *stateSet_;}
 
  private:
   void getMembers(const eckit::Configuration &);
   std::vector<eckit::LocalConfiguration> membersConfig;
   std::vector<StateSet_> states_;
-  StateSet_ stateSet_;
+  StateSet_ *stateSet_ = NULL;
 };
 
 // ====================================================================================
 
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(std::vector<StateSet_> & stateSetVec, const int ensNum ) : 
-   states_(stateSetVec), stateSet_(stateSetVec, ensNum ) {
+   states_(stateSetVec) {
+  if(ensNum > 0) {
+    stateSet_ = new StateSet(stateSetVec, ensNum);
+  }
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
 }
 
 // ====================================================================================
 
 template<typename MODEL>
-StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ &, const eckit::Configuration &,
-                  StateSet_ & stateSet) : states_(), stateSet_(resol, config) {
+StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol, const eckit::Configuration & config,
+                  StateSet_ & stateSet) : states_() {
   // copy stateSet into class
+//  stateSet_ = new StateSet_(resol, config);
   Log::trace() << "StateEnsemble4D:contructor starting" << std::endl;
   states_.emplace_back(stateSet);
 
@@ -102,9 +106,10 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const std::vector<int> & ens,
                                         const eckit::mpi::Comm & commEns,
                                         const int mymember)
-  : states_(), stateSet_(resol, vars, times, commTime, ens, commEns) {
+  : states_() {
   // Abort if both "members" and "members from template" are specified
-
+  
+//  stateSet_ = new StateSet_(resol, vars, times, commTime, ens, commEns);
   getMembers(config);
   // Reserve memory to hold ensemble
   states_.reserve(times.size());
@@ -119,8 +124,9 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
 template<typename MODEL>
 StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const eckit::Configuration & config)
-  : states_(), stateSet_(resol, config) {
+  : states_() {
   // Abort if both "members" and "members from template" are specified
+//  stateSet_ = new StateSet_(resol, config);
   getMembers(config);
 
   // Reserve memory to hold ensemble
