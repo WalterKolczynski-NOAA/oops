@@ -229,18 +229,22 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
-    std::unique_ptr<StateEnsemble4D_> ens_xx;
     std::unique_ptr<Geometry_> geometry;
 
-    if (params.runInline.value() == false) {
-      // Setup geometry and StateEnsemble4D
-      geometry = std::unique_ptr<Geometry_>(new Geometry_(params.geometry, this->getComm() ));
-      ens_xx = std::unique_ptr<StateEnsemble4D_>
-               (new StateEnsemble4D_(*geometry, params.background) );
-    } else {
-      // Run (or read in) the forecasts and return a StateEnsemble4D
-      ens_xx = localizeEnsembleFC(fullConfig, validate, params, geometry);
-    }
+
+    // Instantiate ens_xx depending on whether we are running inline or not
+    auto ens_xx = [&] {
+      if (params.runInline.value() == false) {
+        geometry = std::unique_ptr<Geometry_>(new Geometry_(params.geometry, this->getComm() ));
+        auto object = StateEnsemble4D_(*geometry, params.background);
+        return object;
+      } else {
+        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, validate, params, geometry);
+        auto object = StateEnsemble4D_(localVec, 0);
+        return object;
+      }
+    }(); 
+
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
@@ -260,15 +264,15 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     Observations_ yobs(obsdb, "ObsValue");
 
     // Read all ensemble members and compute the ensemble mean
-    const size_t nens = ens_xx->size();
-    const Variables statevars = ens_xx->variables();
+    const size_t nens = ens_xx.size();
+    const Variables statevars = ens_xx.variables();
     Variables incvars;
     if (params.incvars.value() == boost::none) {
       incvars += statevars;
     } else {
       incvars += *params.incvars.value();
     }
-    StateSet_ bkg_mean = ens_xx->mean();
+    StateSet_ bkg_mean = ens_xx.mean();
     // if control member is present use that instead of the ensemble mean
     if (params.driver.value().useControlMember) {
       StateSet_ controlMember(*geometry, *params.controlMember.value());
@@ -286,14 +290,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     bool do_test_prints = params.driver.value().doTestPrints;
     if (do_test_prints) {
       for (size_t jj = 0; jj < nens; ++jj) {
-        Log::test() << "Initial state for member " << jj+1 << ":" << (*ens_xx)[jj] << std::endl;
+        Log::test() << "Initial state for member " << jj+1 << ":" << ens_xx[jj] << std::endl;
       }
     }
 
     util::printRunStats("LocalEnsembleDA before computeHofX");
 
     // compute H(x)
-    Observations_ yb_mean = solver->computeHofX(*ens_xx, 0, params.driver.value().readHofX);
+    Observations_ yb_mean = solver->computeHofX(ens_xx, 0, params.driver.value().readHofX);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
@@ -316,10 +320,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     }
 
     // calculate background ensemble perturbations
-    IncrementEnsemble4D_ bkg_pert(*ens_xx, bkg_mean, incvars);
+    IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
     // initialize empty analysis perturbations
-    IncrementEnsemble4D_ ana_pert(*geometry, incvars, (*ens_xx)[0].validTimes(), bkg_pert.size());
+    IncrementEnsemble4D_ ana_pert(*geometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
 
     // run the solver at each gridpoint
     Log::info() << "Beginning core local solver..." << std::endl;
@@ -336,17 +340,17 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // calculate final analysis states
     if (incvars == statevars) {
       for (size_t jj = 0; jj < nens; ++jj) {
-        (*ens_xx)[jj] = bkg_mean;
-        (*ens_xx)[jj] += ana_pert[jj];
+        ens_xx[jj] = bkg_mean;
+        ens_xx[jj] += ana_pert[jj];
       }
     } else {
-      Increment4D_ ana_increment(*geometry, incvars, (*ens_xx)[0].validTimes());
+      Increment4D_ ana_increment(*geometry, incvars, ens_xx[0].validTimes());
       for (size_t jj = 0; jj < nens; ++jj) {
         ana_increment = ana_pert[jj];
         for (size_t itime = 0; itime < bkg_pert[jj].size(); ++itime) {
           ana_increment[itime] -= bkg_pert[jj][itime];
         }
-        (*ens_xx)[jj] += ana_increment;
+        ens_xx[jj] += ana_increment;
       }
     }
 
@@ -372,7 +376,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     }
 
     // save the posterior mean
-    StateSet_ ana_mean = ens_xx->mean();   // calculate analysis mean
+    StateSet_ ana_mean = ens_xx.mean();   // calculate analysis mean
     if (do_test_prints) {
       Log::test() << "Analysis mean :" << ana_mean << std::endl;
     }
@@ -395,7 +399,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       eckit::LocalConfiguration outConfig = *params.output.value();
       for (size_t jj = 0; jj < nens; ++jj) {
         outConfig.set("member", jj+1);
-        (*ens_xx)[jj].write(outConfig);
+        ens_xx[jj].write(outConfig);
       }
     }
 
@@ -463,7 +467,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       std::unique_ptr<LocalSolver_> posteriorSolver =
          LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, *geometry, fullConfig,
                                                         nens, ana_mean, incvars);
-      Observations_ ya_mean = posteriorSolver->computeHofX(*ens_xx, 1, false);
+      Observations_ ya_mean = posteriorSolver->computeHofX(ens_xx, 1, false);
       Log::test() << "H(x) ensemble analysis mean: " << std::endl << ya_mean << std::endl;
 
       // calculate analysis obs departures
@@ -488,7 +492,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 // -----------------------------------------------------------------------------
 
-  std::unique_ptr<StateEnsemble4D_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
+  std::vector<StateSet_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
           bool validate, LocalEnsembleDAParameters_ & params,
           std::unique_ptr<Geometry_> & DAgeometry) const {
   // This function creates a DA geometry that has the same resolution as the forecast geometry, but
@@ -609,9 +613,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::vector<StateSet_> localVec = ens_SS->localizeVec(this->getComm(), *DAgeometry, mytask, mymember);
-    std::unique_ptr<StateEnsemble4D_> ens_xx = std::unique_ptr<StateEnsemble4D_>
-       (new StateEnsemble4D_(localVec, 0));
-    return(ens_xx);
+    return(localVec);
   }
 
 // -----------------------------------------------------------------------------
