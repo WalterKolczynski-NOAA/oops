@@ -53,9 +53,7 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   // Calculate the ensemble mean and return a new StateSet variable
   StateSet ens_mean() const;
   // Collect distributed states and return a local subset
-  std::unique_ptr<StateSet> localize(const eckit::mpi::Comm &, const Geometry_ &, const int &,
-       const int &) const;
-  std::vector<StateSet> localizeVec(const eckit::mpi::Comm & global,
+  std::vector<StateSet> transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const;
   /// Zero
   void zero();
@@ -153,7 +151,7 @@ StateSet<MODEL>::StateSet(const std::vector<StateSet> & other, const int & ensNu
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-std::vector<StateSet<MODEL> > StateSet<MODEL>::localizeVec(const eckit::mpi::Comm & global,
+std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const
 {
 /* This method collects parts of the distributed StateSet and places all ensemble
@@ -186,37 +184,7 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::localizeVec(const eckit::mpi::Com
 }
 
 // -----------------------------------------------------------------------------
-template<typename MODEL>
-std::unique_ptr<StateSet<MODEL> > StateSet<MODEL>::localize(const eckit::mpi::Comm & global,
-           const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const
-{
-/* This method collects parts of the distributed StateSet and places all ensemble
-   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet 
-   held in the local_ensemble. It is essentially a transpose of a distributed StateSet
-   to a locally held StateSet. The DAgeometry should be have a decomposition that is
-   spread across N (number of ensemble members) times the number of MPI tasks that the 
-   forecast geometry decomposition. In other words, if the forecast geometry has a 
-   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a 
-   layout that multiplies to 4*4*9 or something like 12,12. Note that the resolution
-   of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
-   is different between the geometries.
-*/
-  std::unique_ptr<StateSet<MODEL> > local;
-  std::vector<int> local_ens;
-  for (int i = 1; i <= this->ens_size(); ++i) { local_ens.push_back(i); }
 
-  local = std::unique_ptr<StateSet<MODEL> >(new StateSet(DAgeometry, this->variables(),
-     this->times(), this->commTime(), local_ens, oops::mpi::myself()));
-
-  /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
-  for (size_t jm = 0; jm < this->ens_size(); ++jm) {
-    (*local)(0, jm).transpose((*this)(0, 0).state(), global, mytask, ensNum, jm);
-  }
-  local->sync_times();
-  return(std::move(local));
-}
-
-// -----------------------------------------------------------------------------
 template<typename MODEL>
 StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
   Log::trace() << "StateSet::ens_mean start" << std::endl;
@@ -235,7 +203,7 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
 
 // add up all the state values on the local communicator and put them in zz[0][:]
     for (size_t jm = 1; jm < this->local_ens_size(); ++jm) {
-      for (int i = 0; i < dataSize; ++i) {
+      for (size_t i = 0; i < dataSize; ++i) {
           zz[0][i] += zz[jm][i]; }
     }
     if (this->local_ens_size() != this->ens_size()) {
@@ -243,7 +211,7 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
       this->commEns().allReduceInPlace(&(zz[0].front()), dataSize, eckit::mpi::Operation::SUM);
     }
     // Divide by total number of members to get average
-    for ( int i = 0; i < dataSize; ++i) zz[0][i] *= fact;
+    for ( size_t i = 0; i < dataSize; ++i) zz[0][i] *= fact;
 
 // deserialize back to stateSet
     size_t indx = 0;
