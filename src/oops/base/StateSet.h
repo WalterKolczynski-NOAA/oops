@@ -137,7 +137,7 @@ StateSet<MODEL>::StateSet(const std::vector<StateSet> & other, const int & ensNu
                                    other[0].members(), other[0].commEns())
 {
   Log::trace() << "StateSet::StateSet other ctr starting" << std::endl;
-  if(ensNum > 0) {
+  if (ensNum > 0) {
 /*
     std::unique_ptr<State_> data;
     data = std::unique_ptr<State_>( new State_((other[ensNum])[0]));
@@ -170,12 +170,12 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm 
 */
   std::vector<StateSet<MODEL> > local;
   std::vector<int> local_ens;
-  local_ens.push_back(1); 
+  local_ens.push_back(1);
 
 
   /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
   for (size_t jm = 0; jm < this->ens_size(); ++jm) {
-    local.emplace_back( StateSet(DAgeometry, this->variables(),
+    local.emplace_back(StateSet(DAgeometry, this->variables(),
        this->times(), this->commTime(), local_ens, oops::mpi::myself()));
     local[jm](0, 0).transpose((*this)(0, 0).state(), global, mytask, ensNum, jm);
     local[jm].sync_times();

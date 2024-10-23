@@ -239,11 +239,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         auto object = StateEnsemble4D_(*geometry, params.background);
         return object;
       } else {
-        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, validate, params, geometry);
+        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, validate, params,
+            geometry);
         auto object = StateEnsemble4D_(localVec, 0);
         return object;
       }
-    }(); 
+    }();
 
     //  Setup observation window
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
@@ -612,7 +613,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
-    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry, mytask, mymember);
+    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry, mytask,
+       mymember);
     return(localVec);
   }
 

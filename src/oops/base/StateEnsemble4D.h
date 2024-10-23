@@ -72,16 +72,16 @@ template<typename MODEL> class StateEnsemble4D {
 // ====================================================================================
 
 template<typename MODEL>
-StateEnsemble4D<MODEL>::StateEnsemble4D(std::vector<StateSet_> & stateSetVec, const int ensNum ) : 
-   states_(stateSetVec) {
+StateEnsemble4D<MODEL>::StateEnsemble4D(std::vector<StateSet_> & stateSetVec, const int ensNum) :
+  states_(stateSetVec) {
   Log::trace() << "StateEnsemble4D:contructor done" << std::endl;
 }
 
 // ====================================================================================
 
 template<typename MODEL>
-StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol, const eckit::Configuration & config,
-                  StateSet_ & stateSet) : states_() {
+StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
+      const eckit::Configuration & config, StateSet_ & stateSet) : states_() {
   Log::trace() << "StateEnsemble4D:contructor starting" << std::endl;
   states_.emplace_back(stateSet);
 
@@ -101,7 +101,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const int mymember)
   : states_() {
   // Abort if both "members" and "members from template" are specified
-  
+
   getMembers(config);
   // Reserve memory to hold ensemble
   states_.reserve(times.size());
