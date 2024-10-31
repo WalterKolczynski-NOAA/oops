@@ -65,11 +65,12 @@ class Model : public util::Printable,
   /// State will be used within oops)
   const util::Duration & timeResolution() const {return model_->timeResolution();}
 
- private:
   /// \brief Forecast initialization, called before every forecast run
   void initialize(State_ &) const;
   /// \brief Forecast "step", called during forecast run; updates state to the next time
   void step(State_ &, const ModelAux_ &) const;
+
+ private:
   /// \brief Forecast finalization; called after each forecast run
   void finalize(State_ &) const;
   /// \brief Print, used in logging

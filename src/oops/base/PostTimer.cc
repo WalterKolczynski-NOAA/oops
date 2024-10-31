@@ -77,19 +77,27 @@ bool PostTimer::itIsTime(const util::DateTime & now) {
 
   if (now >= bgn_ && now <= end_) {
     // use at every step, and no prespecified steps?
+    std::cout << "In PostTimer 1 " << std::endl;
     doit = (frequency_.toSeconds() == 0 && times_.empty());
     // frequency specified?
     if (!doit && frequency_.toSeconds() > 0) {
+      std::cout << "In PostTimer 2 " << std::endl;
       const util::Duration dt = now - bgn_;
       doit = (dt >= util::Duration(0) && dt % frequency_ == 0);
     }
     // steps are prespecified?
     if (!doit && !times_.empty()) {
+      std::cout << "In PostTimer 3 " << std::endl;
       auto it = find(times_.begin(), times_.end(), now);
       doit = (it != times_.end());
     }
   }
 
+//  Log::trace() << "In PostTimer:itIsTime, times_ = " << times_ << ", times_.empty= " << times_.empty() << std::endl;
+//  Log::trace() << "In PostTimer:itIsTime, times_ = " << times_ << std::endl;
+  Log::trace() << "In PostTimer:itIsTime, freq.toSeconds = " << frequency_.toSeconds() << std::endl;
+  Log::trace() << "In PostTimer:itIsTime, util_dur = " << util::Duration(0) << ", frequency_ = " << frequency_ << std::endl;
+  Log::trace() << "In PostTimer:itIsTime, bgn = " << bgn_ << ", end_ = " << end_ << std::endl;
   Log::trace() << "In PostTimer:itIsTime, time = " << now << ", doit = " << doit << std::endl;
   return doit;
 }

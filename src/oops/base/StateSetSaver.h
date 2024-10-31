@@ -84,7 +84,10 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
 
 template <typename MODEL>
 std::unique_ptr<StateSet<MODEL> > & StateSetSaver<MODEL>::getStateSet(void) {
+  std::cout << "statesetsaver returning this state [0] " << (*States_)[0] << std::endl;
+//  std::cout << "statesetsaver returning this state [1] " << (*States_)[1] << std::endl;
   Log::trace() << "StateSetSaver::returning StateSet" << std::endl;
+  Log::trace() << "StateSetSaver::StateSet size is " << States_->size() << std::endl;
   return(States_);
 }
 
@@ -100,16 +103,22 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
     stateIndex_ = 0;
     Log::trace() << "StateSetSaver::doInitialize done " << std::endl;
   }
+  initialized_ = true;
+  Log::trace() << "StateSetSaver::doInitialize initialized_ is " << initialized_ << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 
 template <typename MODEL>
 void StateSetSaver<MODEL>::doProcessing(const State_ & xx) {
+  
+  Log::trace() << "StateSetSaver::doProcessing initialized_ is " << initialized_ << std::endl;
   if ( initialized_ ) {
     (*States_)[stateIndex_] = xx;
     stateIndex_++;
   }
+  std::cout << "StateSetSaver::doProcessing initialized_ is " << initialized_ << "and idx " << stateIndex_ << std::endl;
+  std::cout << "statesetsaver pushed back this state [stateIndex_] " << (*States_)[stateIndex_-1] << std::endl;
   initialized_ = true;
 }
 template <typename MODEL>

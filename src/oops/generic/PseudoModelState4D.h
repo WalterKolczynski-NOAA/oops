@@ -83,8 +83,9 @@ void PseudoModelState4D<MODEL>::initialize(State_ & xx) const {
 
 template<typename MODEL>
 void PseudoModelState4D<MODEL>::step(State_ & xx, const ModelAux_ & merr) const {
-  Log::trace() << "PseudoModelState4D<MODEL>:step Starting " << std::endl;
+  Log::trace() << "PseudoModelState4D<MODEL>:step Starting " << currentstate_ << std::endl;
   xx = state4d_[currentstate_++];
+  Log::trace() << "PseudoModelState4D<MODEL>:step time is " << xx.validTime() << std::endl;
   Log::trace() << "PseudoModelState4D<MODEL>::step done" << std::endl;
 }
 

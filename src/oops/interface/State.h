@@ -318,7 +318,7 @@ void State<MODEL>::fromFieldSet(const atlas::FieldSet & fset) {
 
 template<typename MODEL>
 void State<MODEL>::print(std::ostream & os) const {
-  Log::trace() << "State<MODEL>::print starting" << std::endl;
+  Log::trace() << "State<MODEL>::print starting " << state_->validTime() << std::endl;
   util::Timer timer(classname(), "print");
   os << *state_;
   Log::trace() << "State<MODEL>::print done" << std::endl;
