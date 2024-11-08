@@ -98,6 +98,10 @@ class StateL95 : public util::Printable,
      const int & ensNum, const int & transNum) {
      throw eckit::NotImplemented("StateL95::transpose not implemented", Here());
   }
+  void Rtranspose(const StateL95 & DAState, const eckit::mpi::Comm & global, const int & mytask,
+     const int & ensNum, const int & transNum) {
+     throw eckit::NotImplemented("StateL95::Rtranspose not implemented", Here());
+  }
 
  private:
   void print(std::ostream &) const;

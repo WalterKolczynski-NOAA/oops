@@ -55,6 +55,9 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   // Collect distributed states and return a local subset
   std::vector<StateSet> transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const;
+  State_ Rtranspose(const eckit::mpi::Comm & global,
+           const Geometry_ & DAgeometry, const int & mytask, const int & ensNum,
+           const int transNum) const;
   /// Zero
   void zero();
   /// Accumulator
@@ -181,6 +184,24 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm 
     local[jm].sync_times();
   }
   return(local);
+}
+
+template<typename MODEL>
+State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
+           const Geometry_ & FCgeometry, const int & mytask, const int & ensNum,
+           const int transNum) const
+{
+/* This method performs a reverse transpose from a stateset of DA geometry and 
+   returns the full forecast State for the given ensNum
+*/
+
+  /* Rtranspose stateSet to get all FCState back on the bigger FC geometry */
+  /* Since the StateEnsemble4D is a std::vector of statesets, we this 
+     stateset is always going to point to (0,0) 
+  */
+  State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(), (*this)(0, 0).state().validTime());
+  FCState.Rtranspose((*this)(0, 0).state(), global, mytask, ensNum, transNum);
+  return(FCState);
 }
 
 // -----------------------------------------------------------------------------

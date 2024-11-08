@@ -311,14 +311,34 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     for(int ii = 0; ii < 2; ii++){
     if( ii != 0) {
-
-      PostProcessor<State_> post2;  // Create the post processor where StateSet will be stored
+      // use the updated state from ens_xx
+      std::cout << "before deleting fcst state " << FCVars.state() << std::endl;
+      delete FCVars.state_;
+      std::cout << "HEY, mymbmer is " << FCVars.mymember << std::endl;
+      std::cout << "HEY, nmembers is " << FCVars.nmembers << std::endl;
+      std::cout << "HEY, ntasks is " << FCVars.ntasks << std::endl;
+      std::cout << "HEY, ens_xx size is " << ens_xx.size() << std::endl;
+      // ens_xx has states of DA geometry which needs to be re-mapped into the forecast geometry to send back to UFS
+      std::vector<State_> states_;
+      for(size_t ens=0; ens < ens_xx.size(); ++ens){
+        states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(), FCVars.mytask,
+           FCVars.mymember,ens)));
+        
+        if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << states_[0] << std::endl;
+      }
+      FCVars.state_ = new State_(states_[FCVars.mymember - 1]);
+      if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << FCVars.state() << std::endl;
+//      std::cout << "new state is now " << FCVars.state() << std::endl;
+      std::cout << "FCState comm size is " << FCVars.geometry().getComm().size() << std::endl;
+/*
+*/
+      PostProcessor<State_> *post2 = new PostProcessor<State_>();  // Create the post processor where StateSet will be stored
       std::cout << "calling localEnsStep to advance forecast again " << std::endl;
       std::vector<StateSet_> localVec = localizeEnsembleStep(fullConfig, validate, params,
-            geometry, post2, saver_, FCVars);
+            geometry, *post2, saver_, FCVars);
       ens_xx = StateEnsemble4D_(localVec, 0);
       std::cout << "Done calling localEnsStep to advance forecast again " << std::endl;
-
+      delete post2;
     } 
 
 
@@ -606,6 +626,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
+    std::cout << "creating DAgeometry " << std::endl;
+    std::cout << "subconfig is " << subconfig << std::endl;
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
     Log::info() << "Running " << FCVars.nmembers << " EnsembleGETKFApplication members handled by "
@@ -631,6 +653,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     fcstparams.validate(FCVars.mConf());
     fcstparams.deserialize(FCVars.mConf());
 
+    std::cout << "creating FCgeometry " << std::endl;
+    std::cout << "fcstconfig is " << fcstparams.fcstConf.geometry << std::endl;
     FCVars.FCgeometry = new Geometry_(fcstparams.fcstConf.geometry, FCVars.commMem());
     Log::info() << "done with geometry" << std::endl;
 
@@ -641,8 +665,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::LocalConfiguration ic = fcstparams.fcstConf.initialCondition;
     const util::DateTime bgndate(ic.getString("datetime"));
     FCVars.fclength = fcstparams.fcstConf.forecastLength;
-    FCVars.enddate = (bgndate + FCVars.fclength + FCVars.fclength);
-    FCVars.fclength = FCVars.fclength + FCVars.fclength;
+//    FCVars.enddate = (bgndate + FCVars.fclength + FCVars.fclength);
+    FCVars.enddate = (bgndate + util::Duration("PT6H"));
+//    FCVars.fclength = FCVars.fclength + FCVars.fclength;
+    FCVars.fclength = util::Duration("PT6H");
     std::vector<util::DateTime> times;
     const Variables vars(ic, "state variables");
 
@@ -744,14 +770,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
                     FCVars.ens, FCVars.patch());
     util::DateTime enddate("2021-03-23T12:00:00Z");
     std::cout << "HEY, initializing post with end of " << enddate << std::endl;
+    std::cout << "HEY, initializing post with FCVars end of " << FCVars.enddate << std::endl;
     post.enrollProcessor(saver_);
-    post.initialize(FCVars.state(), enddate, FCVars.fclength);
+    post.initialize(FCVars.state(), FCVars.enddate, FCVars.fclength);
     std::unique_ptr<StateSet_> ens_SS;
-    //  Each member uses a different configuration:
-    eckit::PathName confPath = files[FCVars.mymember-1];
   //  Each member uses a different configuration:
     for (int m = 1; m <=FCVars.nmembers; m++) {
          if ( m == FCVars.mymember ) {
+           Log::trace() << "fcst state after transpose is " << FCVars.state() << std::endl;
            Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
            stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
            Log::info() << "Done with ens execute\n";
@@ -912,11 +938,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 //  Run forecast
     Log::info() << "Forecast:running forecast" << std::endl;
-    std::cout << "Forecast:starting forecast state is " << xx << std::endl;
+//    std::cout << "Forecast:starting forecast state is " << xx << std::endl;
     std::cout << "Forecast:running forecast from " << xx.validTime() << std::endl;
     model_.step(xx, moderr);
     std::cout << "Forecast:stepped forecast to " << xx.validTime() << std::endl;
-    std::cout << "Forecast:stepped forecast state is " << xx << std::endl;
+//    std::cout << "Forecast:stepped forecast state is " << xx << std::endl;
     post.process(xx);
 //    std::cout << "Forecast:post state is processed " << std::endl;
 //    post.finalize(xx);
