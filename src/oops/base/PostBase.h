@@ -50,8 +50,8 @@ template <typename FLDS> class PostBase : private boost::noncopyable {
 /// Setup
   void initialize(const FLDS & xx, const util::DateTime & end,
                   const util::Duration & tstep) {
-    std::cout << "in Postbase, initializing timer_ " << xx.validTime() << std::endl;
-    std::cout << "in Postbase, initializing timer_ end is " << end << std::endl;
+//  std::cout << "in Postbase, initializing timer_ " << xx.validTime() << std::endl;
+//  std::cout << "in Postbase, initializing timer_ end is " << end << std::endl;
     timer_.initialize(xx.validTime(), end);
 //    std::cout << "in Postbase, timer(validtime) is " << timer_.itIsTime(xx.validTime()) << std::endl;
     this->doInitialize(xx, end, tstep);
@@ -59,22 +59,22 @@ template <typename FLDS> class PostBase : private boost::noncopyable {
 
 /// Process state or increment
   void process(const FLDS & xx) {
-    std::cout << "in Postbase process, validtime is " << xx.validTime() << std::endl;
+//  std::cout << "in Postbase process, validtime is " << xx.validTime() << std::endl;
 //    std::cout << "in Postbase process, timer(validtime) is " << timer_.itIsTime(xx.validTime()) << std::endl;
     if (timer_.itIsTime(xx.validTime())) {
-        std::cout << "in Postbase, xx is " << xx << std::endl;
+//      std::cout << "in Postbase, xx is " << xx << std::endl;
         this->doProcessing(xx);  
     } else {
       std::cout << "in Postbase, DID NOT PROCESS " << std::endl;
     }
-    std::cout << "in Postbase, leaving process " << xx.validTime() << std::endl;
+//  std::cout << "in Postbase, leaving process " << xx.validTime() << std::endl;
   }
 
 /// Final
   void finalize(const FLDS & xx) {
-    std::cout << "in Postbase, starting finalize" << xx.validTime() << std::endl;
+//  std::cout << "in Postbase, starting finalize" << xx.validTime() << std::endl;
     this->doFinalize(xx);
-    std::cout << "in Postbase, done finalize" << xx.validTime() << std::endl;
+//  std::cout << "in Postbase, done finalize" << xx.validTime() << std::endl;
   }
 
  private:

@@ -312,12 +312,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     for(int ii = 0; ii < 2; ii++){
     if( ii != 0) {
       // use the updated state from ens_xx
-      std::cout << "before deleting fcst state " << FCVars.state() << std::endl;
+//      std::cout << "before deleting fcst state " << FCVars.state() << std::endl;
       delete FCVars.state_;
-      std::cout << "HEY, mymbmer is " << FCVars.mymember << std::endl;
-      std::cout << "HEY, nmembers is " << FCVars.nmembers << std::endl;
-      std::cout << "HEY, ntasks is " << FCVars.ntasks << std::endl;
-      std::cout << "HEY, ens_xx size is " << ens_xx.size() << std::endl;
+//      std::cout << "HEY, mymbmer is " << FCVars.mymember << std::endl;
+//      std::cout << "HEY, nmembers is " << FCVars.nmembers << std::endl;
+//      std::cout << "HEY, ntasks is " << FCVars.ntasks << std::endl;
+//      std::cout << "HEY, ens_xx size is " << ens_xx.size() << std::endl;
       // ens_xx has states of DA geometry which needs to be re-mapped into the forecast geometry to send back to UFS
       std::vector<State_> states_;
       for(size_t ens=0; ens < ens_xx.size(); ++ens){
@@ -329,7 +329,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       FCVars.state_ = new State_(states_[FCVars.mymember - 1]);
       if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << FCVars.state() << std::endl;
 //      std::cout << "new state is now " << FCVars.state() << std::endl;
-      std::cout << "FCState comm size is " << FCVars.geometry().getComm().size() << std::endl;
+//      std::cout << "FCState comm size is " << FCVars.geometry().getComm().size() << std::endl;
 /*
 */
       PostProcessor<State_> *post2 = new PostProcessor<State_>();  // Create the post processor where StateSet will be stored
@@ -626,8 +626,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
-    std::cout << "creating DAgeometry " << std::endl;
-    std::cout << "subconfig is " << subconfig << std::endl;
+//    std::cout << "creating DAgeometry " << std::endl;
+//    std::cout << "subconfig is " << subconfig << std::endl;
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
     Log::info() << "Running " << FCVars.nmembers << " EnsembleGETKFApplication members handled by "
@@ -653,8 +653,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     fcstparams.validate(FCVars.mConf());
     fcstparams.deserialize(FCVars.mConf());
 
-    std::cout << "creating FCgeometry " << std::endl;
-    std::cout << "fcstconfig is " << fcstparams.fcstConf.geometry << std::endl;
+//    std::cout << "creating FCgeometry " << std::endl;
+//    std::cout << "fcstconfig is " << fcstparams.fcstConf.geometry << std::endl;
     FCVars.FCgeometry = new Geometry_(fcstparams.fcstConf.geometry, FCVars.commMem());
     Log::info() << "done with geometry" << std::endl;
 
@@ -688,11 +688,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
                     FCVars.ens, FCVars.patch());
       post.enrollProcessor(saver_);
 
-      std::cout << "instantiate model" << std::endl;
+//      std::cout << "instantiate model" << std::endl;
       FCVars.model_ = new Model_(FCVars.geometry(), model );
-      std::cout << "instantiate geometry" << std::endl;
+//      std::cout << "instantiate geometry" << std::endl;
       FCVars.state_ = new State_(FCVars.geometry(), fcstparams.fcstConf.initialCondition);
-      std::cout << "DONE instantiate geometry" << std::endl;
+//      std::cout << "DONE instantiate geometry" << std::endl;
   //  Each member uses a different configuration:
       for (int m = 1; m <=FCVars.nmembers; m++) {
          if ( m == FCVars.mymember ) {
@@ -707,7 +707,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
        }
        oops::mpi::world().barrier();
        ens_SS = std::move(saver_->getStateSet());
-       std::cout << "after std::move ens_SS[0] is " << (*ens_SS)[0] << std::endl;
+//       std::cout << "after std::move ens_SS[0] is " << (*ens_SS)[0] << std::endl;
 //       std::cout << "after std::move ens_SS[1] is " << (*ens_SS)[1] << std::endl;
     } else {  // read in the states
       Log::info() << "creating new stateset " << std::endl;
@@ -769,8 +769,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     saver_ = new StateSetSaver<MODEL>(FCVars.mConf(), FCVars.geometry(), times, oops::mpi::myself(),
                     FCVars.ens, FCVars.patch());
     util::DateTime enddate("2021-03-23T12:00:00Z");
-    std::cout << "HEY, initializing post with end of " << enddate << std::endl;
-    std::cout << "HEY, initializing post with FCVars end of " << FCVars.enddate << std::endl;
+//    std::cout << "HEY, initializing post with end of " << enddate << std::endl;
+//    std::cout << "HEY, initializing post with FCVars end of " << FCVars.enddate << std::endl;
     post.enrollProcessor(saver_);
     post.initialize(FCVars.state(), FCVars.enddate, FCVars.fclength);
     std::unique_ptr<StateSet_> ens_SS;
