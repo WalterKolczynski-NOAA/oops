@@ -308,8 +308,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const eckit::mpi::Comm & time = oops::mpi::myself();
     ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
     Observations_ yobs(obsdb, "ObsValue");
-
-    for(int ii = 0; ii < 2; ii++){
+    size_t ii = 0;
+    bool run_loop = true;
+//    for(int ii = 0; ii < 3; ii++){
+    while(run_loop) {
     if( ii != 0) {
       // use the updated state from ens_xx
 //      std::cout << "before deleting fcst state " << FCVars.state() << std::endl;
@@ -324,10 +326,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(), FCVars.mytask,
            FCVars.mymember,ens)));
         
-        if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << states_[0] << std::endl;
+//        if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << states_[0] << std::endl;
       }
       FCVars.state_ = new State_(states_[FCVars.mymember - 1]);
-      if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << FCVars.state() << std::endl;
+//      if(FCVars.mymember == 1) std::cout << "state on ens 1 is " << FCVars.state() << std::endl;
 //      std::cout << "new state is now " << FCVars.state() << std::endl;
 //      std::cout << "FCState comm size is " << FCVars.geometry().getComm().size() << std::endl;
 /*
@@ -337,9 +339,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       std::vector<StateSet_> localVec = localizeEnsembleStep(fullConfig, validate, params,
             geometry, *post2, saver_, FCVars);
       ens_xx = StateEnsemble4D_(localVec, 0);
+      Log::trace() << "State validtime and enddate are " << FCVars.state().validTime() << " " << FCVars.enddate << std::endl;
+      if(FCVars.state().validTime() == FCVars.enddate) run_loop = false;
       std::cout << "Done calling localEnsStep to advance forecast again " << std::endl;
       delete post2;
     } 
+    ii++;
 
 
     // Read all ensemble members and compute the ensemble mean
@@ -673,11 +678,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const Variables vars(ic, "state variables");
 
     // Don't save the initial state
+/*
+// the line below works for 3H forecast in middle of window
     for (util::DateTime ii=(bgndate+FCVars.tstep); ii < FCVars.enddate; ii=ii+FCVars.tstep) {
-//    for (util::DateTime ii=(bgndate); ii <= FCVars.enddate; ii=ii+FCVars.tstep) {
        Log::info() << "pushing back time " << ii << std::endl;
        times.push_back(ii);
     }
+*/
+   times.push_back(bgndate+FCVars.tstep);
     for (int m = 1; m <=FCVars.nmembers; m++) { FCVars.ens.push_back(m); }
 
     std::unique_ptr<StateSet_> ens_SS;
