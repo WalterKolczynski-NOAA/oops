@@ -115,7 +115,6 @@ StateCoupled<MODEL1, MODEL2>::StateCoupled(const GeometryCoupled_ & resol,
                                            const eckit::Configuration & config)
   : geom_(new GeometryCoupled_(resol)), xx1_(), xx2_(), parallel_(resol.isParallel()) {
   Log::trace() << "StateCoupled::StateCoupled read starting" << std::endl;
-  Log::debug() << "StateCoupled: config " << config << std::endl;
 
   const eckit::LocalConfiguration conf1(config, MODEL1::name());
   const eckit::LocalConfiguration conf2(config, MODEL2::name());

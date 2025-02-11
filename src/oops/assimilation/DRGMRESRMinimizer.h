@@ -25,6 +25,7 @@
 #include "oops/base/IdentityMatrix.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -94,6 +95,7 @@ double DRGMRESRMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh, CtrlIn
                                             const CtrlInc_ &,
                                             const double costJ0Jb, const double costJ0JoJc,
                                             const int maxiter, const double tolerance) {
+  util::printRunStats("DRGMRESR start");
   IdentityMatrix<CtrlInc_> precond;
   std::vector<CtrlInc_> c;
   std::vector<CtrlInc_> u;
@@ -115,7 +117,11 @@ double DRGMRESRMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh, CtrlIn
   Log::info() << std::endl;
   for (int jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << " DRGMRESR Starting Iteration " << jiter+1 << std::endl;
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("DRGMRESR iteration " + std::to_string(jiter+1));
+    }
 
     precond.multiply(rr, zh);  // returns zh as approxmate solve of (BA)zh = r
     B.multiply(zh, zz);        // x=B zh
@@ -152,6 +158,8 @@ double DRGMRESRMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh, CtrlIn
       break;
     }
   }
+
+  util::printRunStats("DRGMRESR end");
   return normReduction;
 }
 

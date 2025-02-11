@@ -42,10 +42,8 @@ template <typename MODEL> class HybridGainParameters : public ApplicationParamet
   OOPS_CONCRETE_PARAMETERS(HybridGainParameters, ApplicationParameters);
 
  public:
-  typedef typename Geometry<MODEL>::Parameters_   GeometryParameters_;
-
   /// Geometry parameters.
-  RequiredParameter<GeometryParameters_> geometry{"geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> geometry{"geometry", this};
 
   /// Hybrid weights.
   RequiredParameter<HybridWeightsParameters> hybridWeights{"hybrid weights", this};
@@ -85,10 +83,9 @@ template <typename MODEL> class HybridGain : public Application {
   // -----------------------------------------------------------------------------
   virtual ~HybridGain() {}
   // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     // Deserialize parameters
     HybridGainParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
     // Setup Geometry
@@ -185,16 +182,6 @@ template <typename MODEL> class HybridGain : public Application {
     }
 
     return 0;
-  }
-  // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    HybridGainParameters_ params;
-    params.outputSchema(outputPath);
-  }
-  // -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    HybridGainParameters_ params;
-    params.validate(fullConfig);
   }
   // -----------------------------------------------------------------------------
  private:

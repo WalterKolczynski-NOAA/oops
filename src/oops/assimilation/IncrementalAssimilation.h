@@ -59,8 +59,8 @@ int IncrementalAssimilation(ControlVariable<MODEL, OBS> & xx, CostFunction<MODEL
     util::printRunStats("IncrementalAssimilation iteration " + std::to_string(jouter));
 
 //  Append any new obs if they are in the config
-    if (iterconfs[jouter].has("obs append directory")) {
-      J.appendObs(iterconfs[jouter]);
+    if (iterconfs[jouter].has("continuous DA")) {
+      J.applyContDaUpdate(iterconfs[jouter].getSubConfiguration("continuous DA"));
     }
 
 //  Setup for the trajectory run

@@ -70,7 +70,7 @@ variational:
       depths: [4500.0, 5500.0]
     linear model:
       trajectory:
-        tstep: PT30M
+        tstep: PT1H
       tstep: PT1H
       variable change: Identity
       name: QgTLM
@@ -83,7 +83,7 @@ variational:
     linear model:
       trajectory:
         tstep: PT30M
-      tstep: PT1H
+      tstep: PT30M
       variable change: Identity
       name: QgTLM
 final:

@@ -1,10 +1,10 @@
 /*
  * (C) Copyright 2009-2016 ECMWF.
  * (C) Crown Copyright 2024, the Met Office.
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
- * In applying this licence, ECMWF does not waive the privileges and immunities 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
  */
@@ -21,6 +21,7 @@
 #include "oops/assimilation/UpTriSolve.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 
 namespace oops {
 
@@ -69,6 +70,7 @@ template <typename VECTOR, typename AMATRIX, typename PMATRIX>
 double FGMRES(VECTOR & x, const VECTOR & b,
               const AMATRIX & A, const PMATRIX & precond,
               const int maxiter, const double tolerance) {
+  util::printRunStats("FGMRES start");
   std::vector<VECTOR> V;
   std::vector<VECTOR> Z;
   std::vector< std::vector<double> > H;
@@ -97,7 +99,7 @@ double FGMRES(VECTOR & x, const VECTOR & b,
 
   printNormReduction(0, rnrm2, normReduction);
 
-  // Initialiaze (maxiter + 1) by maxiter matrix H
+  // Initialize (maxiter + 1) by maxiter matrix H
   H.resize(maxiter);
   for (int ii = 0; ii <= maxiter-1; ii++) {
     H[ii].resize(maxiter + 1);
@@ -115,6 +117,10 @@ double FGMRES(VECTOR & x, const VECTOR & b,
   Log::info() << std::endl;
   for (jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << " FGMRES Starting Iteration " << jiter+1 << std::endl;
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0 || jiter + 1 == maxiter) {
+      util::printRunStats("FGMRES iteration " + std::to_string(jiter+1));
+    }
 
     precond.multiply(V[jiter], z);
     Z.push_back(z);
@@ -192,6 +198,7 @@ double FGMRES(VECTOR & x, const VECTOR & b,
 
   Log::info() << "FGMRES: end" << std::endl;
 
+  util::printRunStats("FGMRES end");
   return normReduction;
 }
 

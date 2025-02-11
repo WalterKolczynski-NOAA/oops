@@ -39,19 +39,6 @@ template <typename MODEL> class ConvertStateStatesParameters : public Parameters
   RequiredParameter<eckit::LocalConfiguration> output{"output", this};
 };
 
-/// Options controlling variable change in the ConvertState application.
-template <typename MODEL> class VarChangeParameters : public Parameters {
-  OOPS_CONCRETE_PARAMETERS(VarChangeParameters, Parameters)
-  typedef typename VariableChange<MODEL>::Parameters_ VariableChangeParameters_;
-
- public:
-  // parameters for variable change.
-  VariableChangeParameters_ varChange{this};
-  Parameter<bool> doInverse{"do inverse",
-                            "apply inverse variable change instead of variable change",
-                            false, this};
-};
-
 // -------------------------------------------------------------------------------------------------
 // -------------------------------------------------------------------------------------------------
 
@@ -61,16 +48,14 @@ template <typename MODEL> class ConvertStateParameters : public ApplicationParam
   typedef Geometry<MODEL> Geometry_;
 
  public:
-  typedef typename Geometry_::Parameters_ GeometryParameters_;
-
   /// Input Geometry parameters.
-  RequiredParameter<GeometryParameters_> inputGeometry{"input geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> inputGeometry{"input geometry", this};
 
   /// Output Geometry parameters.
-  RequiredParameter<GeometryParameters_> outputGeometry{"output geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> outputGeometry{"output geometry", this};
 
   /// Variable change parameters (and option to do inverse).
-  OptionalParameter<VarChangeParameters<MODEL>> varChange{"variable change", this};
+  OptionalParameter<eckit::LocalConfiguration> varChange{"variable change", this};
 
   /// States to be converted
   RequiredParameter<std::vector<ConvertStateStatesParameters<MODEL>>> states{"states", this};
@@ -92,10 +77,9 @@ template <typename MODEL> class ConvertState : public Application {
 // -------------------------------------------------------------------------------------------------
   virtual ~ConvertState() {}
 // -------------------------------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     ConvertStateParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Setup resolution for input and output
@@ -107,7 +91,7 @@ template <typename MODEL> class ConvertState : public Application {
     oops::Variables varout;
     bool inverse = false;
     if (params.varChange.value() != boost::none) {
-      eckit::LocalConfiguration chconf(params.varChange.value()->toConfiguration());
+      eckit::LocalConfiguration chconf(params.varChange.value().value());
       if (chconf.has("output variables")) {
         vc.reset(new VariableChange_(chconf, resol2));
         varout = Variables(chconf, "output variables");
@@ -157,21 +141,11 @@ template <typename MODEL> class ConvertState : public Application {
     return 0;
   }
 // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    ConvertStateParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    ConvertStateParameters_ params;
-    params.validate(fullConfig);
-  }
-// -------------------------------------------------------------------------------------------------
  private:
   std::string appname() const override {
     return "oops::ConvertState<" + MODEL::name() + ">";
   }
-// -------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 };
 
 }  // namespace oops

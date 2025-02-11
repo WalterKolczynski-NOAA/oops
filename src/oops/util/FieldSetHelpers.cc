@@ -305,8 +305,8 @@ atlas::FieldSet createSmoothFieldSet(const eckit::mpi::Comm & comm,
         for (std::size_t n1 = m1; n1 <= static_cast<std::size_t>(N); ++n1) {
           for (const auto & part : {"real", "imaginary"}) {
             for (atlas::idx_t jlevel = 0; jlevel < field.shape(1); ++jlevel) {
-              if (n1 == 0 && (field.name() == "streamfunction" ||
-                              field.name() == "velocity_potential")) {
+              if (n1 == 0 && (field.name() == "air_horizontal_streamfunction" ||
+                              field.name() == "air_horizontal_velocity_potential")) {
                 view(jnode, jlevel) = 0.0;  // Force zero mean
               } else {
                 view(jnode, jlevel) *= gaussian(n1, sigma);
@@ -880,6 +880,22 @@ void printDiagValues(const eckit::mpi::Comm & timeComm,
 
 // -----------------------------------------------------------------------------
 
+void checkDimensionSize(const int & ncid,
+                        const std::string dimName,
+                        const size_t & dimSize) {
+  oops::Log::trace() << "checkDimensionSize starting" << std::endl;
+
+  int retval, dimid;
+  if ((retval = nc_inq_dimid(ncid, dimName.c_str(), &dimid))) ERR(retval, dimName);
+  size_t dim_in_file;
+  if ((retval = nc_inq_dimlen(ncid, dimid, &dim_in_file))) ERR(retval, dimName);
+  ASSERT(dim_in_file == dimSize);
+
+  oops::Log::trace() << "checkDimensionSize done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
 void readFieldSet(const eckit::mpi::Comm & comm,
                   const atlas::FunctionSpace & fspace,
                   const std::vector<size_t> & variableSizes,
@@ -889,6 +905,9 @@ void readFieldSet(const eckit::mpi::Comm & comm,
   // Options with one file per MPI task
   const bool oneFilePerTask = config.getBool("one file per task", false);
   ASSERT(oneFilePerTask || (fspace.type() != "PointCloud"));
+
+  // Option to check dimensions
+  const bool checkDims = config.getBool("check dimensions", true);
 
   // Build filepath
   std::string filepath = config.getString("filepath");
@@ -928,7 +947,7 @@ void readFieldSet(const eckit::mpi::Comm & comm,
   if (tempretval == NC_NOERR) {  // i.e. if flag exists
     if ((tempretval = nc_close(tempncid))) ERR(tempretval, ncfilepath);
     ASSERT(oneFilePerTask);
-    readRank3FieldSet(fspace, variableSizes, vars, fset, ncfilepath);
+    readRank3FieldSet(fspace, variableSizes, vars, fset, ncfilepath, checkDims);
     fset.set_dirty();  // code is too complicated, mark dirty to be safe
     return;
   }
@@ -970,7 +989,17 @@ void readFieldSet(const eckit::mpi::Comm & comm,
       if (ghostView(jnode) == 0) ++nb_nodes;
     }
 
+    if (checkDims) {
+      // Check the number of nodes
+      checkDimensionSize(ncid, "nb_nodes", nb_nodes);
+    }
+
     for (size_t jvar = 0; jvar < vars.size(); ++jvar) {
+      if (checkDims) {
+        // Check the number of vertical levels
+        checkDimensionSize(ncid, "nz_" + vars[jvar], variableSizes[jvar]);
+      }
+
       // Read data
       std::vector<double> zvar(nb_nodes * variableSizes[jvar]);
       if ((retval = nc_get_var_double(ncid, var_id[jvar], zvar.data()))) ERR(retval, vars[jvar]);
@@ -1023,8 +1052,13 @@ void readFieldSet(const eckit::mpi::Comm & comm,
         // Open NetCDF file
         if ((retval = nc_open(ncfilepath.c_str(), NC_NOWRITE, &ncid))) ERR(retval, ncfilepath);
 
-        // Get variables
         for (size_t jvar = 0; jvar < vars.size(); ++jvar) {
+          if (checkDims) {
+            // Check the number of vertical levels
+            checkDimensionSize(ncid, "nz_" + vars[jvar], variableSizes[jvar]);
+          }
+
+          // Get variables
           if ((retval = nc_inq_varid(ncid, vars[jvar].c_str(), &var_id[jvar]))) {
             ERR(retval, vars[jvar]);
           }
@@ -1066,8 +1100,13 @@ void readFieldSet(const eckit::mpi::Comm & comm,
         // Open NetCDF file
         if ((retval = nc_open(ncfilepath.c_str(), NC_NOWRITE, &ncid))) ERR(retval, ncfilepath);
 
-        // Get variables
         for (size_t jvar = 0; jvar < vars.size(); ++jvar) {
+          if (checkDims) {
+            // Check the number of vertical levels
+            checkDimensionSize(ncid, "nz_" + vars[jvar], variableSizes[jvar]);
+          }
+
+          // Get variables
           if ((retval = nc_inq_varid(ncid, vars[jvar].c_str(), &var_id[jvar]))) {
             ERR(retval, vars[jvar]);
           }
@@ -1117,7 +1156,8 @@ void readRank3FieldSet(const atlas::FunctionSpace & fspace,
                        const std::vector<size_t> & variableSizes,
                        const std::vector<std::string> & vars,
                        atlas::FieldSet & fset,
-                       const std::string & ncfilepath) {
+                       const std::string & ncfilepath,
+                       const bool & checkDims) {
   // Initialize NetCDF return value and IDs
   int retval, ncid, dimid, varid[vars.size()];
   size_t rank3Size;
@@ -1126,6 +1166,11 @@ void readRank3FieldSet(const atlas::FunctionSpace & fspace,
   if ((retval = nc_open(ncfilepath.c_str(), NC_NOWRITE, &ncid))) ERR(retval, ncfilepath);
 
   for (size_t jvar = 0; jvar < vars.size(); ++jvar) {
+    if (checkDims) {
+      // Check number of vertical levels
+      checkDimensionSize(ncid, "nz_" + vars[jvar], variableSizes[jvar]);
+    }
+
     // Get size of vector dimension
     const std::string nvName = "nv_" + vars[jvar];
     if ((retval = nc_inq_dimid(ncid, nvName.c_str(), &dimid))) ERR(retval, nvName);
@@ -1241,7 +1286,8 @@ void writeFieldSet(const eckit::mpi::Comm & comm,
     // Definition mode
 
     // Create NetCDF file
-    if ((retval = nc_create(ncfilepath.c_str(), NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
+    if ((retval = nc_create(ncfilepath.c_str(),
+                            NC_64BIT_OFFSET | NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
 
     // Create horizontal dimension
     if ((retval = nc_def_dim(ncid, "nb_nodes", nb_nodes, &nb_nodes_id))) ERR(retval, "nb_nodes");
@@ -1375,7 +1421,8 @@ void writeFieldSet(const eckit::mpi::Comm & comm,
         // Definition mode
 
         // Create NetCDF file
-        if ((retval = nc_create(ncfilepath.c_str(), NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
+        if ((retval = nc_create(ncfilepath.c_str(),
+                                NC_64BIT_OFFSET | NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
 
         // Create dimensions
         if ((retval = nc_def_dim(ncid, "nx", nx, &nx_id))) ERR(retval, "nx");
@@ -1488,7 +1535,8 @@ void writeFieldSet(const eckit::mpi::Comm & comm,
         // Definition mode
 
         // Create NetCDF file
-        if ((retval = nc_create(ncfilepath.c_str(), NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
+        if ((retval = nc_create(ncfilepath.c_str(),
+                                NC_64BIT_OFFSET | NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
 
         // Create dimensions
         if ((retval = nc_def_dim(ncid, "nb_nodes", nb_nodes, &nb_nodes_id))) {
@@ -1591,7 +1639,8 @@ void writeRank3FieldSet(const atlas::FieldSet & fset,
 
   // Begin definition mode
   oops::Log::info() << "Info     : Writing file: " << ncfilepath << std::endl;
-  if ((retval = nc_create(ncfilepath.c_str(), NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
+  if ((retval = nc_create(ncfilepath.c_str(),
+                          NC_64BIT_OFFSET | NC_CLOBBER, &ncid))) ERR(retval, ncfilepath);
 
   // Create horizontal dimension, assign to dimension arrays
   if ((retval = nc_def_dim(ncid, "nb_nodes", nb_nodes, &nb_nodes_id))) ERR(retval, "nb_nodes");

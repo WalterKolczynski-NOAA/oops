@@ -61,6 +61,7 @@ class TlmQG: public oops::interface::LinearModelBase<QgTraits>,
 
 /// Other utilities
   const util::Duration & timeResolution() const override {return tstep_;}
+  const util::Duration & stepTrajectory() const override {return steptraj_;}
   const GeometryQG & resolution() const {return resol_;}
 
  private:
@@ -73,6 +74,7 @@ class TlmQG: public oops::interface::LinearModelBase<QgTraits>,
   util::Duration tstep_;
   const GeometryQG resol_;
   std::map< util::DateTime, F90flds> traj_;
+  const util::Duration steptraj_;
   const ModelQG lrmodel_;
 };
 // -----------------------------------------------------------------------------

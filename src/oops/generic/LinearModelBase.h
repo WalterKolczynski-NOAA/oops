@@ -70,6 +70,7 @@ class LinearModelBase : public util::Printable,
   /// \brief Time step for running LinearModel's forecast in oops (frequency with which the
   /// increment will be updated)
   virtual const util::Duration & timeResolution() const = 0;
+  virtual const util::Duration & stepTrajectory() const = 0;
 
  private:
   /// \brief Print; used for logging

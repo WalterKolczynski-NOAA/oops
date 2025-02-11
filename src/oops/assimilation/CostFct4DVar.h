@@ -14,6 +14,7 @@
 #define OOPS_ASSIMILATION_COSTFCT4DVAR_H_
 
 #include <memory>
+#include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
 #include "eckit/mpi/Comm.h"
@@ -55,6 +56,9 @@ template<typename MODEL, typename OBS> class CostFct4DVar : public CostFunction<
   typedef State<MODEL>                    State_;
   typedef Model<MODEL>                    Model_;
   typedef LinearModel<MODEL>              LinearModel_;
+  typedef CostJbTotal<MODEL, OBS>         JbTotal_;
+  typedef CostJo<MODEL, OBS>              CostJo_;
+  typedef CostTermBase<MODEL, OBS>        CostBase_;
 
  public:
   CostFct4DVar(const eckit::Configuration &, const eckit::mpi::Comm &);
@@ -70,6 +74,8 @@ template<typename MODEL, typename OBS> class CostFct4DVar : public CostFunction<
 
   void runNL(CtrlVar_ &, PostProcessor<State_>&) const override;
 
+  void applyContDaUpdate(const eckit::Configuration & cdaConfig) override;
+
  protected:
   const Geometry_ & geometry() const override {return resol_;}
 
@@ -83,7 +89,7 @@ template<typename MODEL, typename OBS> class CostFct4DVar : public CostFunction<
                    PostProcessor<State_> &, PostProcessorTLAD<MODEL> &) override;
 
   const eckit::mpi::Comm & comm_;
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   const Geometry_ resol_;
   Model_ model_;
   const Variables ctlvars_;
@@ -133,8 +139,7 @@ CostTermBase<MODEL, OBS> * CostFct4DVar<MODEL, OBS>::newJc(const eckit::Configur
                                                            const Geometry_ & resol) const {
   Log::trace() << "CostFct4DVar::newJc start" << std::endl;
   const eckit::LocalConfiguration jcdfi(jcConf, "jcdfi");
-  const util::DateTime vt(timeWindow_.midpoint());
-  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, vt, timeWindow_.length());
+  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, timeWindow_);
 }
 
 // -----------------------------------------------------------------------------
@@ -223,6 +228,35 @@ void CostFct4DVar<MODEL, OBS>::addIncr(CtrlVar_ & xx, const CtrlInc_ & dx,
   ASSERT(dx.states().is_3d());
   xx.state() += dx.state();
   Log::trace() << "CostFct4DVar::addIncr done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostFct4DVar<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig) {
+  Log::trace() << "CostFct4DVar::applyContDaUpdate start" << std::endl;
+  // update for jo, must update jo before other cost terms
+  this->getNonConstJo()->applyContDaUpdate(cdaConfig);
+
+  if (cdaConfig.has("time window")) {
+    util::TimeWindow newWindow(cdaConfig.getSubConfiguration("time window"));
+    timeWindow_ = newWindow;
+  }
+
+  // for VarBC, update for jb needs to be called even if window is not shifted
+  // note if timeWindow is not changed times remains unchanged
+  std::vector<util::DateTime> startTime(1);
+  startTime[0] = timeWindow_.start();
+  this->getNonConstJb()->applyContDaUpdate(cdaConfig, startTime);
+
+  std::vector<std::shared_ptr<CostBase_>> & jterms = this->getJTerms();
+  // update for constraint terms
+  if (jterms.size() > 1) {
+    for (size_t jj = 1; jj < jterms.size(); ++jj) {
+      jterms[jj]->applyContDaUpdate(cdaConfig);
+    }
+  }
+  Log::trace() << "CostFct4DVar::applyContDaUpdate done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

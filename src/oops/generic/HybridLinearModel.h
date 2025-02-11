@@ -57,6 +57,8 @@ class HybridLinearModel : public LinearModelBase<MODEL> {
   void setTrajectory(const State_ &, State_ &, const ModelAuxCtl_ &) override;
 
   const util::Duration & timeResolution() const override {return updateTstep_;}
+  const util::Duration & stepTrajectory() const override
+    {return simpleLinearModel_->stepTrajectory();}
 
  private:
   void print(std::ostream &) const override {}
@@ -89,6 +91,10 @@ HybridLinearModel<MODEL>::HybridLinearModel(const Geometry_ & updateGeometry,
   if (updateTstep_ % simpleLinearModel_->timeResolution() != 0) {
     ABORT("HybridLinearModel<MODEL>::HybridLinearModel: "
           "update tstep is not a multiple of simple linear model tstep");
+  }
+  if (updateTstep_ % simpleLinearModel_->stepTrajectory() != 0) {
+    ABORT("HybridLinearModel<MODEL>::HybridLinearModel: "
+          "update tstep is not a multiple of simple linear model trajectory step");
   }
   // Obtain coefficients from file or by generating them
   coeffs_.obtain(*simpleLinearModel_, vars_);

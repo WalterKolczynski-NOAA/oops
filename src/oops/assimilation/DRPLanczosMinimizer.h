@@ -169,9 +169,10 @@ double DRPLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & dx, CtrlInc_ & dxh, Ctr
   Log::info() << std::endl;
   for (int jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << "DRPLanczos Starting Iteration " << jiter+1 << std::endl;
-    util::printRunStats("DRPLanczos iteration " + std::to_string(jiter+1));
+
     if (jiter < 5 || (jiter + 1) % 5 == 0 || jiter + 1 == maxiter) {
       util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("DRPLanczos iteration " + std::to_string(jiter+1));
     }
 
     // v_{i+1} = ( pr_{i} + H^T R^{-1} H z_{i} ) - beta * v_{i-1}

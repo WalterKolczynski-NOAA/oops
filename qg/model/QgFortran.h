@@ -214,6 +214,7 @@ extern "C" {
                              const eckit::Configuration &, const util::DateTime &,
                              const util::Duration &, const int &, int &);
   void qg_obsdb_nobs_f90(const F90odb &, const int &, const char *, int &);
+  void qg_obsdb_has_f90(const F90odb &, const int &, const char *, int &);
 
 // -----------------------------------------------------------------------------
 //  Observation vector

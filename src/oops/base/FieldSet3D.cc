@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <string>
 #include <unordered_map>
 
@@ -265,11 +267,65 @@ void FieldSet3D::write(const eckit::LocalConfiguration & conf) const {
 // -----------------------------------------------------------------------------
 
 void FieldSet3D::print(std::ostream & os) const {
-  os << std::endl << "Valid time: " << validTime() << std::endl;
+  os << std::endl << "Valid time: " << validTime();
+  const size_t nflds = fset_.size();
+  const size_t ntasks = comm_.size();
+  std::vector<double> stats(4 * nflds);
+  std::streamsize ss = os.precision();
+  os << std::scientific << std::setprecision(6);
+
+// Local stats
+  size_t jj = 0;
   for (const auto & field : fset_) {
-    os << " Field " << field.name()
-       << " norm: " << util::normField(field, comm_) << std::endl;
+    size_t npts = 0;
+    double zrms = 0.0;
+    double zmin = std::numeric_limits<double>::max();
+    double zmax = std::numeric_limits<double>::lowest();
+    const auto view = atlas::array::make_view<double, 2>(field);
+    for (int jnode = 0; jnode < field.shape(0); ++jnode) {
+      for (int jlevel = 0; jlevel < field.shape(1); ++jlevel) {
+        ++npts;
+        zrms += view(jnode, jlevel) * view(jnode, jlevel);
+        zmin = std::min(view(jnode, jlevel), zmin);
+        zmax = std::max(view(jnode, jlevel), zmax);
+      }
+    }
+    stats[jj] = static_cast<double>(npts);
+    stats[jj+1] = zrms;
+    stats[jj+2] = zmin;
+    stats[jj+3] = zmax;
+    jj += 4;
   }
+
+// Gather info
+  std::vector<double> allstats(4 * nflds * ntasks);
+  comm_.gather(stats, allstats, 0);
+
+// Global stats
+  jj = 0;
+  for (const auto & field : fset_) {
+    double zpts = 0.0;
+    double zrms = 0.0;
+    double zmin = std::numeric_limits<double>::max();
+    double zmax = std::numeric_limits<double>::lowest();
+    size_t joff = jj;
+    for (size_t jp = 0; jp < comm_.size(); ++jp) {
+      zpts += allstats[joff];
+      zrms += allstats[joff + 1];
+      zmin = std::min(allstats[joff + 2], zmin);
+      zmax = std::max(allstats[joff + 3], zmax);
+      joff += 4 * nflds;
+    }
+    jj += 4;
+    ASSERT(zpts > 0.0);
+    zrms /= zpts;
+
+    os << std::endl << std::left << std::setw(42) << field.name() << std::right
+       << std::setw(0) << ": Min=" << std::setw(13) << zmin
+       << std::setw(0) << ", Max=" << std::setw(13) << zmax
+       << std::setw(0) << ", RMS=" << std::setw(13) << std::sqrt(zrms);
+  }
+  os << std::setprecision(ss) << std::setw(0) << std::defaultfloat;
 }
 
 // -----------------------------------------------------------------------------

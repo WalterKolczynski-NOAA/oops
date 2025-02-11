@@ -31,6 +31,7 @@
 #include "oops/util/dot_product.h"
 #include "oops/util/formats.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -99,6 +100,7 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
                                                    const CtrlInc_ & gradJb,
                                                    const double costJ0Jb, const double costJ0JoJc,
                                                    const int maxiter, const double tolerance) {
+  util::printRunStats("DRPBlockLanczos start");
   eigenvec_ zerov = Eigen::VectorXd::Zero(members_);
   eigenmat_ zeromm = Eigen::MatrixXd::Zero(members_, members_);
 
@@ -127,7 +129,7 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
   eigenmat_ ss;  // contains the solution
   eigenvec_ ss_loc = zerov;
 
-  double norm_iiter = 0;
+  double norm_jiter = 0;
   double norm0 = 0;
   double normReduction = 1;
   double normReductionIter = 1;
@@ -163,10 +165,14 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
   Vbase.emplace_back(std::unique_ptr<CtrlInc_>(new CtrlInc_(vv)));
   Zbase.emplace_back(std::unique_ptr<CtrlInc_>(new CtrlInc_(zz)));
 
-  for (int iiter = 0; iiter < maxiter && normReductionIter > tolerance; ++iiter) {
-    Log::info() << "BlockBLanczos starting iteration " << iiter+1 << " for rank: " << mymember_
+  for (int jiter = 0; jiter < maxiter && normReductionIter > tolerance; ++jiter) {
+    Log::info() << "DRPBlockLanczos starting iteration " << jiter+1 << " for rank: " << mymember_
                 << std::endl;
-    if (iiter < 5 || (iiter + 1) % 5 == 0) util::update_workflow_meter("iteration", iiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::printRunStats("DRPBlockLanczos iteration " + std::to_string(jiter+1));
+      util::update_workflow_meter("iteration", jiter+1);
+    }
 
     // Hessian application: w_i = v_i + HtRinvH * B*v_i = v_i + HtRinvH * z_i
     // --> new search directions
@@ -176,9 +182,9 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
     ww += vv;
 
     // Orthogonalize ww against previous base vectors
-    for (int jiter = 0; jiter < iiter + 1; ++jiter) {
-      get_proj(ww, *Zbase[jiter], alpha, gestag, CommGeo, temp1);
-      apply_proj(ww, *Vbase[jiter], alpha, gestag, CommGeo, temp1);
+    for (int iiter = 0; iiter < jiter + 1; ++iiter) {
+      get_proj(ww, *Zbase[iiter], alpha, gestag, CommGeo, temp1);
+      apply_proj(ww, *Vbase[iiter], alpha, gestag, CommGeo, temp1);
     }
 
     B.multiply(ww, zz);
@@ -195,11 +201,11 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
     // solve T ss = beta0 * e1
     blockTriDiagSolve(ALPHAS, BETAS, beta0, ss, complexValues, members_);
 
-    eigenvec_ ss_loc = (ss.block(iiter*members_, 0, members_, members_)).col(mymember_);
+    eigenvec_ ss_loc = (ss.block(jiter*members_, 0, members_, members_)).col(mymember_);
 
     eigenvec_ temp = projsol * ss_loc;
-    norm_iiter = sqrt(temp.dot(ss_loc));
-    normReduction = norm_iiter / norm0;
+    norm_jiter = sqrt(temp.dot(ss_loc));
+    normReduction = norm_jiter / norm0;
 
     const double costJ0 = costJ0Jb + costJ0JoJc;
     double costJ = costJ0;
@@ -208,7 +214,7 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
     // Compute the quadratic cost function
     // J[du_{i}] = J[0] - 0.5 s_{i}^T Z_{i}^T r_{0}
     // Jb[du_{i}] = Jb[0] + {gradJb}^T Z_{i} s_{i} + 0.5 s_{i}^T V_{i}^T Z_{i} s_{i}
-    for (int ll = 0; ll < iiter+1; ++ll) {
+    for (int ll = 0; ll < jiter+1; ++ll) {
       SSLK = - (ss.block(ll*members_, 0, members_, members_));
       temp2.zero();
       apply_proj(temp2, *Zbase[ll], SSLK, gestag, CommGeo, temp1);
@@ -218,19 +224,19 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
 
     double costJoJc = costJ - costJb;
 
-    Log::info() << "BlockBLanczos end of iteration " << iiter+1 << std::endl;
-    printNormReduction(iiter+1, norm_iiter, normReduction);
-    printQuadraticCostFunction(iiter+1, costJ, costJb, costJoJc);
+    Log::info() << "DRPBlockLanczos end of iteration " << jiter+1 << std::endl;
+    printNormReduction(jiter+1, norm_jiter, normReduction);
+    printQuadraticCostFunction(jiter+1, costJ, costJb, costJoJc);
 
-    norm_red_loc[iiter] = normReduction;
-    costj_loc[iiter] = costJ;
+    norm_red_loc[jiter] = normReduction;
+    costj_loc[jiter] = costJ;
 
     oops::mpi::world().allReduce(normReduction, normReductionIter, eckit::mpi::max());
     if (normReductionIter < tolerance) {
       Log::info() << "DRPBlockLanczos: Achieved required reduction in residual norm." << std::endl;
-      iterTotal = iiter+1;
+      iterTotal = jiter+1;
     }
-  }  // main loop iiter
+  }  // main loop jiter
 
   oops::mpi::allGather(CommGeo, norm_red_loc, norm_red_all);
   oops::mpi::allGather(CommGeo, costj_loc, costj_all);
@@ -263,6 +269,8 @@ double DRPBlockLanczosMinimizer<MODEL, OBS>::solve(CtrlInc_ & xx, CtrlInc_ & xh,
 
   eckit::mpi::deleteComm(CommGeoName);
   ++outerLoop_;
+
+  util::printRunStats("DRPBlockLanczos end");
   return normReduction;
 }
 

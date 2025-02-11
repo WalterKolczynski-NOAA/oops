@@ -49,7 +49,7 @@ class GenHybridLinearModelCoeffs : public Application {
 
   virtual ~GenHybridLinearModelCoeffs() = default;
 
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     eckit::LocalConfiguration htlmConf(fullConfig, "hybrid linear model");
     eckit::LocalConfiguration geomConf(fullConfig, "update geometry");
     const Geometry_ updateGeometry(geomConf, this->getComm());
@@ -70,16 +70,6 @@ class GenHybridLinearModelCoeffs : public Application {
     }
 
     return 0;
-  }
-
-  void outputSchema(const std::string & outputPath) const override {
-    Parameters_ params;
-    params.outputSchema(outputPath);
-  }
-
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    Parameters_ params;
-    params.validate(fullConfig);
   }
 
  private:

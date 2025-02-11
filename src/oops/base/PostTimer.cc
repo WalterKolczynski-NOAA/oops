@@ -45,10 +45,6 @@ PostTimer::PostTimer(const eckit::Configuration & config)
   }
 }
 // -----------------------------------------------------------------------------
-PostTimer::PostTimer(const PostTimerParameters & parameters)
-  : PostTimer(parameters.toConfiguration())
-{}
-// -----------------------------------------------------------------------------
 PostTimer::PostTimer(const util::DateTime & start, const util::DateTime & finish,
                      const util::Duration & freq)
   : bgn_(), end_(),

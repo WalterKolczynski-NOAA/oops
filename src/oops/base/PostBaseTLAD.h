@@ -92,6 +92,10 @@ class PostBaseTLAD : private boost::noncopyable {
     this->doLastAD(dx);
   }
 
+  bool itIsTime(const util::DateTime & tt) {
+    return timer_.itIsTime(tt);
+  }
+
  private:
   PostTimer timer_;
   virtual void doInitializeTraj(const State_ &,

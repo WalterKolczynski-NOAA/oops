@@ -181,38 +181,6 @@ template <typename MODEL> void testErrorCovarianceSym() {
   EXPECT(oops::is_close(zz1, zz2, tol));
 }
 
-// -----------------------------------------------------------------------------
-
-template <typename MODEL> void testCovarianceParametersWrapperValidName() {
-  eckit::LocalConfiguration config(TestEnvironment::config(), "background error");
-  oops::ModelSpaceCovarianceParametersWrapper<MODEL> parameters;
-  EXPECT_NO_THROW(parameters.validateAndDeserialize(config));
-}
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL> void testCovarianceParametersWrapperInvalidName() {
-  eckit::LocalConfiguration config;
-  config.set("covariance model", "###INVALID###");
-  oops::ModelSpaceCovarianceParametersWrapper<MODEL> parameters;
-  if (oops::Parameters::isValidationSupported())
-    EXPECT_THROWS_MSG(parameters.validate(config), "unrecognized enum value");
-  EXPECT_THROWS_MSG(parameters.deserialize(config),
-                    "does not exist in CovarianceFactory");
-}
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL> void testCovarianceFactoryGetMakerNames() {
-  eckit::LocalConfiguration config(TestEnvironment::config(), "background error");
-  const std::string validName = config.getString("covariance model");
-  const std::vector<std::string> registeredNames =
-      oops::CovarianceFactory<MODEL>::getMakerNames();
-  const bool found = std::find(registeredNames.begin(), registeredNames.end(), validName) !=
-      registeredNames.end();
-  EXPECT(found);
-}
-
 // =============================================================================
 
 template <typename MODEL>
@@ -233,12 +201,6 @@ class ErrorCovariance : public oops::Test  {
       { testErrorCovarianceInverse<MODEL>(); });
     ts.emplace_back(CASE("interface/ErrorCovariance/testErrorCovarianceSym")
       { testErrorCovarianceSym<MODEL>(); });
-    ts.emplace_back(CASE("interface/ErrorCovariance/testCovarianceParametersWrapperValidName")
-      { testCovarianceParametersWrapperValidName<MODEL>(); });
-    ts.emplace_back(CASE("interface/ErrorCovariance/testCovarianceParametersWrapperInvalidName")
-      { testCovarianceParametersWrapperInvalidName<MODEL>(); });
-    ts.emplace_back(CASE("interface/ErrorCovariance/testCovarianceFactoryGetMakerNames")
-      { testCovarianceFactoryGetMakerNames<MODEL>(); });
   }
 
   void clear() const override {}

@@ -3,7 +3,7 @@
  * (C) Copyright 2017-2019 UCAR.
  *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
  * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
@@ -51,6 +51,8 @@ class ObsVecQG : public util::Printable,
 
   /// set all values to zero
   void zero();
+  /// Zero values appended from ObsSpace
+  void zeroAppended();
   /// set \p i-th value to missing value
   void setToMissing(int i);
   /// set all values to one
@@ -61,6 +63,7 @@ class ObsVecQG : public util::Printable,
   double dot_product_with(const ObsVecQG &) const;
   double rms() const;
   void mask(const ObsVecQG &);
+  void readAppended(const std::string &);
   ObsVecQG & operator=(const ObsDataQG<float> &);
 
   unsigned int nobs() const;
@@ -70,6 +73,9 @@ class ObsVecQG : public util::Printable,
 // I/O
   void save(const std::string &) const;
   void read(const std::string &);
+
+  std::string info(const std::string &) const;
+  std::string info(const std::string &, const ObsDataQG<int> &) const;
 
  private:
   void print(std::ostream &) const;

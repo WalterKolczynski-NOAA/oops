@@ -43,9 +43,7 @@ template <typename MODEL> class StateToStructuredGridParameters : public Applica
   typedef Geometry<MODEL>                Geometry_;
 
  public:
-  typedef typename Geometry_::Parameters_   GeometryParameters_;
-
-  RequiredParameter<GeometryParameters_>       stateGeometry{"state geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> stateGeometry{"state geometry", this};
   RequiredParameter<eckit::LocalConfiguration> state{"state", this};
   RequiredParameter<eckit::LocalConfiguration> structuredGridInterp
                    {"structured grid interpolation", this};
@@ -57,13 +55,10 @@ template <typename MODEL> class IncToStructuredGridParameters : public Applicati
   typedef Geometry<MODEL>                Geometry_;
 
  public:
-  typedef typename Increment_::ReadParameters_      IncrementParameters_;
-  typedef typename Geometry_::Parameters_           GeometryParameters_;
-
-  RequiredParameter<GeometryParameters_>        incGeometry{"increment geometry", this};
+  RequiredParameter<eckit::LocalConfiguration>  incGeometry{"increment geometry", this};
   RequiredParameter<Variables>                  vars{"variables", this};
   RequiredParameter<util::DateTime>             date{"date", this};
-  RequiredParameter<IncrementParameters_>       increment{"increment", this};
+  RequiredParameter<eckit::LocalConfiguration>  increment{"increment", this};
   RequiredParameter<eckit::LocalConfiguration>  structuredGridInterp
                    {"structured grid interpolation", this};
 };
@@ -74,9 +69,7 @@ template <typename MODEL> class StateEnsToStructuredGridParameters : public Appl
   typedef Geometry<MODEL>                Geometry_;
 
  public:
-  typedef typename Geometry_::Parameters_ GeometryParameters_;
-
-  RequiredParameter<GeometryParameters_>       stateGeometry{"state geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> stateGeometry{"state geometry", this};
   RequiredParameter<StateEnsembleParameters_>  stateEnsemble{"states", this};
   RequiredParameter<eckit::LocalConfiguration> structuredGridInterp
                    {"structured grid interpolation", this};
@@ -88,9 +81,7 @@ template <typename MODEL> class IncEnsToStructuredGridParameters : public Applic
   typedef Geometry<MODEL>                Geometry_;
 
  public:
-  typedef typename Geometry_::Parameters_ GeometryParameters_;
-
-  RequiredParameter<GeometryParameters_>          incrementGeometry{"increment geometry", this};
+  RequiredParameter<eckit::LocalConfiguration>    incrementGeometry{"increment geometry", this};
   RequiredParameter<IncrementEnsembleParameters_> incrementEnsemble{"increments", this};
   RequiredParameter<Variables>                    incrementVariables{"increment variables", this};
   RequiredParameter<eckit::LocalConfiguration>    structuredGridInterp
@@ -133,10 +124,9 @@ template <typename MODEL> class ConvertToStructuredGrid : public Application {
 // -----------------------------------------------------------------------------
   virtual ~ConvertToStructuredGrid() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     ConvertToStructuredGridParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 // -----------------------------------------------------------------------------
@@ -218,16 +208,6 @@ template <typename MODEL> class ConvertToStructuredGrid : public Application {
     return 0;
   }
 // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    ConvertToStructuredGridParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    ConvertToStructuredGridParameters_ params;
-    params.validate(fullConfig);
-  }
-// -------------------------------------------------------------------------------------------------
  private:
   std::string appname() const override {
     return "oops::ConvertToStructuredGrid<" + MODEL::name() + ">";

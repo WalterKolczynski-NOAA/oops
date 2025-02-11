@@ -129,8 +129,8 @@ ControlVariable<MODEL, OBS>::~ControlVariable() {
 
 template <typename MODEL, typename OBS>
 void ControlVariable<MODEL, OBS>::print(std::ostream & outs) const {
-  outs << *state_ << std::endl;
-  outs << *modbias_ << std::endl;
+  outs << *state_;
+  outs << *modbias_;
   outs << *obsbias_;
 }
 

@@ -95,4 +95,32 @@ void TimeWindow::print(std::ostream & os) const {
   os << std::endl;
 }
 
+TimeWindow & TimeWindow::operator=(TimeWindow&& rhs) {
+  winbgn_ = rhs.winbgn_;
+  winend_ = rhs.winend_;
+  epoch_ = rhs.epoch_;
+  incBound_ = rhs.incBound_;
+  return *this;
+}
+
+TimeWindow & TimeWindow::operator=(const TimeWindow& rhs) {
+  winbgn_ = rhs.winbgn_;
+  winend_ = rhs.winend_;
+  epoch_ = rhs.epoch_;
+  incBound_ = rhs.incBound_;
+  return *this;
+}
+
+TimeWindow::TimeWindow(const TimeWindow & other)
+  : winbgn_(other.winbgn_), winend_(other.winend_),
+     epoch_(other.epoch_), incBound_(other.incBound_) {
+}
+
+TimeWindow::TimeWindow(TimeWindow && other)
+  : winbgn_(other.winbgn_), winend_(other.winend_),
+     epoch_(other.epoch_), incBound_(other.incBound_) {
+}
+
+TimeWindow::~TimeWindow() {}
+
 }  // namespace util

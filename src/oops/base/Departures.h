@@ -16,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -42,8 +43,7 @@ template <typename OBS>
 class Departures : public GeneralizedDepartures {
   typedef ObsSpaces<OBS>           ObsSpaces_;
   typedef ObsVector<OBS>           ObsVector_;
-  template <typename DATA> using ObsData_ = ObsDataVector<OBS, DATA>;
-  template <typename DATA> using ObsDataVec_ = std::vector<std::shared_ptr<ObsData_<DATA>>>;
+  template <typename DATA> using ObsDataVec_ = std::vector<ObsDataVector<OBS, DATA>>;
 
  public:
 /// \brief create Departures for all obs (read from ObsSpace if \p name is specified)
@@ -82,6 +82,9 @@ class Departures : public GeneralizedDepartures {
 
 /// Save departures values
   void save(const std::string &) const;
+
+  std::string info(const std::string & grep = "") const;
+  std::string info(const ObsDataVec_<int> &, const std::string & grep = "") const;
 
  private:
   void print(std::ostream &) const;
@@ -253,8 +256,27 @@ void Departures<OBS>::save(const std::string & name) const {
 template <typename OBS>
 void Departures<OBS>::print(std::ostream & os) const {
   for (size_t jj = 0; jj < dep_.size(); ++jj) {
-    os << dep_[jj] << std::endl;
+    os << std::endl << dep_[jj];
   }
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
+std::string Departures<OBS>::info(const std::string & grep) const {
+  std::stringstream ss;
+  for (size_t jj = 0; jj < dep_.size(); ++jj) {
+    ss << dep_[jj].info(grep);
+  }
+  return ss.str();
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
+std::string Departures<OBS>::info(const ObsDataVec_<int> & qcflags,
+                                  const std::string & grep) const {
+  std::stringstream ss;
+  for (size_t jj = 0; jj < dep_.size(); ++jj) {
+    ss << dep_[jj].info(grep, qcflags[jj]);
+  }
+  return ss.str();
 }
 // -----------------------------------------------------------------------------
 }  // namespace oops

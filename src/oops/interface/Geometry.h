@@ -23,9 +23,6 @@
 #include "oops/interface/GeometryIterator.h"
 #include "oops/util/Logger.h"
 #include "oops/util/ObjectCounter.h"
-#include "oops/util/parameters/GenericParameters.h"
-#include "oops/util/parameters/HasParameters_.h"
-#include "oops/util/parameters/ParametersOrConfiguration.h"
 #include "oops/util/Printable.h"
 #include "oops/util/Timer.h"
 
@@ -40,19 +37,6 @@ namespace interface {
 ///
 /// \details Can contain information about model resolution, gridpoints, MPI distribution
 ///
-/// Note: implementations of this interface can opt to extract their settings either from
-/// a Configuration object or from a subclass of Parameters.
-///
-/// In the former case, they should provide a constructor with the following signature:
-///
-///    Geometry(const eckit::LocalConfiguration &, const eckit::mpi::Comm &);
-///
-/// In the latter case, the implementer should first define a subclass of Parameters
-/// holding the settings of the geometry in question. The implementation of the Geometry interface
-/// should then typedef `Parameters_` to the name of that subclass and provide a constructor with
-/// the following signature:
-///
-///    Geometry(const Parameters_ &, const eckit::mpi::Comm &);
 template <typename MODEL>
 class Geometry : public util::Printable,
                  private util::ObjectCounter<Geometry<MODEL> > {
@@ -60,14 +44,9 @@ class Geometry : public util::Printable,
   typedef GeometryIterator<MODEL>               GeometryIterator_;
 
  public:
-  /// Set to Geometry_::Parameters_ if Geometry_ provides a type called Parameters_
-  /// and to GenericParameters (a thin wrapper of an eckit::LocalConfiguration object) if not.
-  typedef TParameters_IfAvailableElseFallbackType_t<Geometry_, GenericParameters> Parameters_;
-
   static const std::string classname() {return "oops::Geometry";}
 
-  /// Constructors from yaml (and mpi communicator), implement one (using Parameters preferred)
-  Geometry(const Parameters_ &, const eckit::mpi::Comm &);
+  /// Constructors from yaml (and mpi communicator)
   Geometry(const eckit::Configuration &, const eckit::mpi::Comm &);
   /// Constructor from pointer to the MODEL::Geometry (used in 1DVar filter)
   explicit Geometry(std::shared_ptr<const Geometry_>);
@@ -122,14 +101,6 @@ Geometry<MODEL>::Geometry(const eckit::Configuration & config,
   geom_.reset(new Geometry_(config, comm));
   Log::trace() << "Geometry<MODEL>::Geometry done" << std::endl;
 }
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL>
-Geometry<MODEL>::Geometry(const Parameters_ & parameters,
-                          const eckit::mpi::Comm & comm)
-  : Geometry(parameters.toConfiguration(), comm)
-{}
 
 // -----------------------------------------------------------------------------
 

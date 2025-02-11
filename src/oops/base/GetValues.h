@@ -217,6 +217,9 @@ class GetValues : private util::ObjectCounter<GetValues<MODEL, OBS> > {
   const Variables & requiredVariables() const {return geovars_;}
   const bool & useMethodsTL() const {return geovalsTL_;}
 
+/// Continuous DA update
+  void updateGetVals(const eckit::Configuration &);
+
  private:
 /// time-interpolation helper: adds contribution from this time to running total
   void incInterpValues(const util::DateTime &, const std::vector<bool> &,
@@ -224,7 +227,7 @@ class GetValues : private util::ObjectCounter<GetValues<MODEL, OBS> > {
 
 
   util::Duration hslot_;    /// Half time slot
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
 
   const Variables geovars_;  /// Variables needed from model
   size_t varsizes_;          /// Sizes (e.g. number of vertical levels)
@@ -347,7 +350,7 @@ void GetValues<MODEL, OBS>::initialize(const util::Duration & tstep) {
   }
   doLinearTimeInterpolation_ = useLinearTimeInterpolation_;
   // no need to do time interpolation if there is only one subwindow
-  if (tstep == timeWindow_.length()) doLinearTimeInterpolation_ = false;
+  if (tstep >= timeWindow_.length()) doLinearTimeInterpolation_ = false;
   hslot_ = doLinearTimeInterpolation_ ? tstep : tstep/2;
 
   Log::trace() << "GetValues::initialize done" << std::endl;
@@ -778,6 +781,15 @@ void GetValues<MODEL, OBS>::fillGeoVaLsAD(const GeoVaLs_ & geovals) {
 #endif
 
   Log::trace() << "GetValues::fillGeoVaLsAD" << std::endl;
+}
+// -----------------------------------------------------------------------------
+
+template <typename MODEL, typename OBS>
+void GetValues<MODEL, OBS>::updateGetVals(const eckit::Configuration & cdaConfig) {
+  if (cdaConfig.has("time window")) {
+      util::TimeWindow newWindow(cdaConfig.getSubConfiguration("time window"));
+      timeWindow_ = newWindow;
+  }
 }
 
 // -----------------------------------------------------------------------------

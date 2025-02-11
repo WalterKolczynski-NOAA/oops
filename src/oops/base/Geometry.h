@@ -56,12 +56,6 @@ class Geometry : public interface::Geometry<MODEL> {
   typedef typename MODEL::Geometry              Geometry_;
 
  public:
-  typedef typename interface::Geometry<MODEL>::Parameters_ Parameters_;
-
-  /// Constructor from Parameters and mpi communicators: \p geometry for spatial distribution
-  /// (handled by the implementation) and \p time for distribution in time (handled by oops)
-  Geometry(const Parameters_ &, const eckit::mpi::Comm & geometry,
-           const eckit::mpi::Comm & time = oops::mpi::myself());
   /// Constructor from Configuration and mpi communicators: \p geometry for spatial distribution
   /// (handled by the implementation) and \p time for distribution in time (handled by oops)
   Geometry(const eckit::Configuration &, const eckit::mpi::Comm & geometry,
@@ -108,16 +102,6 @@ template <typename MODEL>
 Geometry<MODEL>::Geometry(const eckit::Configuration & config,
                           const eckit::mpi::Comm & geometry, const eckit::mpi::Comm & time):
   interface::Geometry<MODEL>(config, geometry),
-  timeComm_(&time),
-  gdata_(this->geom_->functionSpace(), this->geom_->fields(),
-         this->geom_->levelsAreTopDown(), geometry) {}
-
-// -----------------------------------------------------------------------------
-
-template <typename MODEL>
-Geometry<MODEL>::Geometry(const Parameters_ & parameters,
-                          const eckit::mpi::Comm & geometry, const eckit::mpi::Comm & time):
-  interface::Geometry<MODEL>(parameters, geometry),
   timeComm_(&time),
   gdata_(this->geom_->functionSpace(), this->geom_->fields(),
          this->geom_->levelsAreTopDown(), geometry) {}

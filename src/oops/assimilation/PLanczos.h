@@ -1,10 +1,10 @@
 /*
  * (C) Copyright 2009-2016 ECMWF.
  * (C) Crown Copyright 2024, the Met Office.
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
- * In applying this licence, ECMWF does not waive the privileges and immunities 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
  */
@@ -19,6 +19,7 @@
 #include "oops/assimilation/TriDiagSolve.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -64,6 +65,7 @@ template <typename VECTOR, typename AMATRIX, typename PMATRIX>
 double PLanczos(VECTOR & xx, const VECTOR & bb,
                  const AMATRIX & A, const PMATRIX & precond,
                  const int maxiter, const double tolerance) {
+  util::printRunStats("PLanczos start");
   VECTOR zz(xx);
   VECTOR ww(xx);
 
@@ -106,7 +108,11 @@ double PLanczos(VECTOR & xx, const VECTOR & bb,
   Log::info() << std::endl;
   while (jiter < maxiter) {
     Log::info() << " PLanczos Starting Iteration " << jiter+1 << std::endl;
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("PLanczos iteration " + std::to_string(jiter+1));
+    }
 
     // w = A z - beta * vold
     A.multiply(zz, ww);     // w = A z
@@ -169,6 +175,7 @@ double PLanczos(VECTOR & xx, const VECTOR & bb,
 
   Log::info() << "PLanczos: end" << std::endl;
 
+  util::printRunStats("PLanczos end");
   return normReduction;
 }
 

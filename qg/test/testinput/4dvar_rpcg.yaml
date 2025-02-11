@@ -61,6 +61,7 @@ variational:
       trajectory:
         tstep: PT1H
       tstep: PT1H
+      trajectory step: PT3H
       variable change: Identity
       name: QgTLM
     ninner: 10

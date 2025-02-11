@@ -81,6 +81,9 @@ template<typename MODEL, typename OBS> class CostJbState : private boost::noncop
 /// Randomize
   virtual void randomize(CtrlInc_ &) const = 0;
 
+/// CDA update for jb state terms
+  virtual void updateTimes(const std::vector<util::DateTime> &) = 0;
+
 /// Accessors to data for constructing a new increment.
   virtual const Geometry_ & geometry() const = 0;
   virtual const Variables & variables() const = 0;

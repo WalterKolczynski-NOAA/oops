@@ -35,6 +35,7 @@
 #include "oops/mpi/mpi.h"
 #include "oops/runs/Application.h"
 #include "oops/runs/Forecast.h"
+#include "oops/util/ConfigHelpers.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
@@ -162,9 +163,6 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
   typedef Increment<MODEL> Increment_;
 
  public:
-  typedef typename Geometry_::Parameters_       GeometryParameters_;
-  typedef typename Increment_::WriteParameters_ IncrementWriteParameters_;
-
   /// Options describing the assimilation time window.
   RequiredParameter<eckit::LocalConfiguration> timeWindow{"time window", this};
 
@@ -173,7 +171,7 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
   /// now.
   RequiredParameter<eckit::LocalConfiguration> observations{"observations", this};
 
-  RequiredParameter<GeometryParameters_> geometry{"geometry",
+  RequiredParameter<eckit::LocalConfiguration> geometry{"geometry",
           "geometry used for all of the ensemble members and increments", this};
 
   Parameter<LocalEnsembleDADriverParameters> driver{"driver",
@@ -189,6 +187,9 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
 
   OptionalParameter<Variables> incvars{"increment variables",
           "analysis increment variables", this};
+
+  OptionalParameter<eckit::LocalConfiguration> inlineVars{"inline parameters",
+          "parameters for running inline forecasts", this};
 
   Parameter<bool> runInline{"Run Inline",
           "Inline", false, this};
@@ -210,19 +211,19 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
          "parameters for prior mean output", this};
 
   /// Note: these Parameters have to be present if driver.savePostMeanInc is true.
-  OptionalParameter<IncrementWriteParameters_> outputPostMeanInc{"output increment",
+  OptionalParameter<eckit::LocalConfiguration> outputPostMeanInc{"output increment",
          "parameters for posterior mean increment output", this};
 
   /// Note: these Parameters have to be present if driver.savePostEnsInc is true.
-  OptionalParameter<IncrementWriteParameters_> outputPostEnsInc{"output ensemble increments",
+  OptionalParameter<eckit::LocalConfiguration> outputPostEnsInc{"output ensemble increments",
          "parameters for posterior ensemble increments output", this};
 
   /// Note: these Parameters have to be present if driver.savePriorVar is true.
-  OptionalParameter<IncrementWriteParameters_> outputPriorVar{"output variance prior",
+  OptionalParameter<eckit::LocalConfiguration> outputPriorVar{"output variance prior",
          "parameters for prior variance output", this};
 
   /// Note: these Parameters have to be present if driver.savePostVar is true.
-  OptionalParameter<IncrementWriteParameters_> outputPostVar{"output variance posterior",
+  OptionalParameter<eckit::LocalConfiguration> outputPostVar{"output variance posterior",
          "parameters for posterior variance output", this};
 };
 
@@ -245,7 +246,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef StateSet<MODEL>                  StateSet_;
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
-  typedef typename Increment<MODEL>::WriteParameters_ IncrementWriteParameters_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
   typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
   typedef LocalEnsembleForecastVars<MODEL> LocalEnsembleForecastVars_;
@@ -263,10 +263,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 // -----------------------------------------------------------------------------
 
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     // Deserialize parameters
     LocalEnsembleDAParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
     std::unique_ptr<Geometry_> geometry;
@@ -442,9 +441,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
           "`save posterior ensemble increment` is set to true, but `output ensemble increments` "
           "configuration not found.");
       }
-      IncrementWriteParameters_ output = *params.outputPostEnsInc.value();
+      eckit::LocalConfiguration output = *params.outputPostEnsInc.value();
       for (size_t jj = 0; jj < nens; ++jj) {
-        output.setMember(jj+1);
+        util::setMember(output, jj+1);
         for (size_t itime = 0; itime < ana_pert[0].size(); ++itime) {
           Increment_ ana_increment(ana_pert[jj][itime], true);
           ana_increment -= bkg_pert[jj][itime];
@@ -499,8 +498,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         throw eckit::BadValue("`save posterior mean increment` is set to true, but "
                               "`output increment` configuration not found.");
       }
-      IncrementWriteParameters_ output = *params.outputPostMeanInc.value();
-      output.setMember(0);
+      eckit::LocalConfiguration output = *params.outputPostMeanInc.value();
+      util::setMember(output, 0);
       for (size_t itime = 0; itime < ana_mean.size(); ++itime) {
         Increment_ ana_increment(ana_pert[0][itime], false);
         ana_increment.diff(ana_mean[itime], FCVars.bkgMean()[itime]);
@@ -517,8 +516,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         throw eckit::BadValue("`save prior variance` is set to true, but `output variance prior` "
                               "configuration not found.");
       }
-      IncrementWriteParameters_ output = *params.outputPriorVar.value();
-      output.setMember(0);
+      eckit::LocalConfiguration output = *params.outputPriorVar.value();
+      util::setMember(output, 0);
       std::string strOut("Forecast variance :");
       saveVariance(output, bkg_pert, do_test_prints, strOut);
     }
@@ -529,8 +528,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         throw eckit::BadValue("`save posterior variance` is set to true, but "
                               "`output variance posterior` configuration not found.");
       }
-      IncrementWriteParameters_ output = *params.outputPostVar.value();
-      output.setMember(0);
+      eckit::LocalConfiguration output = *params.outputPostVar.value();
+      util::setMember(output, 0);
       std::string strOut("Analysis variance :");
       saveVariance(output, ana_pert, do_test_prints, strOut);
     }
@@ -570,6 +569,120 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     return 0;
   }
 
+
+// -----------------------------------------------------------------------------
+
+  std::vector<StateSet_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
+          LocalEnsembleDAParameters_ & params,
+          std::unique_ptr<Geometry_> & DAgeometry) const {
+  // This function creates a DA geometry that has the same resolution as the forecast geometry, but
+  // is decomposed into patches that are N times smaller than the forecast geometry, where N is the
+  // number of ensemble members. Note that the DAgeometry layout must be evenly divisible by the
+  // forecast layout. (e.g. DA layout = 4,4, FC layout = 2,2, N = 4)
+  // Also note that DA layout nx * ny = FC layout nx * ny * N
+  // Next, this will run a set of ensemble forecasts (or read in previously computed forecasts)
+  // then "localize" the State variables and return a StateEnsemble4D object with all of the state
+  // variables on the local ensemble of the StateSet held by the StateEnsemble4D variable returned
+  // Note that there is considerable duplication between StateSet and StateEnsemble4D classes, but
+  // the functionality is not simply transferred from one to another. As a result, the data from
+  // the forecasts is converted into a StateEnsemble4D variable for compatibility with previous
+  // LocalEnsembleSolver functionality.
+
+    // Get the MPI partition
+
+    eckit::LocalConfiguration inlineParams = fullConfig.getSubConfiguration("inline parameters");
+    const bool HofXOnly = inlineParams.getBool("Compute HofX Only");
+    const std::vector<std::string> &files = inlineParams.getStringVector("Forecast configuration");
+    const int batchSize = inlineParams.getInt("forecast batch size");
+    const int zpad = inlineParams.getInt("zero padding");
+    const std::string pattern = inlineParams.getString("output file pattern");
+
+    const int nmembers = files.size();
+    const int ntasks = this->getComm().size();
+    const int mytask = this->getComm().rank();  // global rank
+    const int tasks_per_member = ntasks / nmembers;
+    // divide by blocks of tasks_per_member
+    int mymember = mytask / tasks_per_member + 1;
+
+    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
+    // the layout here needs to be nmembers * the layout for the forecast geometry
+    DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
+
+    Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
+                << ntasks << " total MPI tasks and "
+                << tasks_per_member << " MPI tasks per member." << std::endl;
+
+    ASSERT(ntasks%nmembers == 0);
+
+    //  Create the communicator for each ensemble member, named comm_member_{i}:
+    std::string commNameStr = "comm_member_" + std::to_string(mymember);
+    char const *commName = commNameStr.c_str();
+    eckit::mpi::Comm & commMember = this->getComm().split(mymember, commName);
+    const int subrank = commMember.rank();
+
+    //  Create the communicator for each decomposed patch of geometry
+    std::string patchNameStr = "patch_member_" + std::to_string(subrank);
+    char const *patchName = patchNameStr.c_str();
+    eckit::mpi::Comm & patchMember = this->getComm().split(subrank, patchName);
+    const int subpatch = patchMember.rank();
+
+    Log::info() << "size of patchMember/ENS comm is " << patchMember.size() << std::endl;
+    //  Each member uses a different configuration:
+    eckit::PathName confPath = files[mymember-1];
+    eckit::YAMLConfiguration memberConf(confPath);
+    eckit::LocalConfiguration fcstparams = eckit::LocalConfiguration(memberConf);
+
+    const Geometry_ FCgeometry(fcstparams.getSubConfiguration("geometry"), commMember);
+    Log::info() << "done with geometry" << std::endl;
+
+    //  Setup times
+    Log::info() << "setting up times" << std::endl;
+    eckit::LocalConfiguration model = fcstparams.getSubConfiguration("model");
+    const util::Duration tstep(model.getString("tstep"));
+    eckit::LocalConfiguration ic = fcstparams.getSubConfiguration("initial condition");
+    const util::DateTime bgndate(ic.getString("datetime"));
+    const util::Duration fclength(fcstparams.getString("forecast length"));
+    const util::DateTime enddate(bgndate + fclength);
+    std::vector<util::DateTime> times;
+    const Variables vars(ic, "state variables");
+
+    // Don't save the initial state
+    oops::mpi::world().barrier();
+    for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
+       Log::info() << "pushing back time " << ii << std::endl;
+       times.push_back(ii);
+    }
+    oops::mpi::world().barrier();
+    std::vector<int> ens;  // vector of ensemble numbers
+    for (int m = 1; m <=nmembers; m++) { ens.push_back(m); }
+    oops::mpi::world().barrier();
+
+    std::unique_ptr<StateSet_> ens_SS;
+    PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
+    StateSetSaver<MODEL> *saver_ =
+        new StateSetSaver<MODEL>(memberConf, FCgeometry, times, oops::mpi::myself(),
+                    ens, patchMember);
+    post.enrollProcessor(saver_);
+  //  Each member uses a different configuration:
+    for (int m = 1; m <=nmembers; m++) {
+      if ( m == mymember ) {
+         Log::info() << "running on mymember = " << mymember  << " " << mytask << std::endl;
+         executeForecast(FCgeometry, memberConf, post);
+         Log::info() << "Done with ens execute\n";
+       }
+       if ( batchSize > 0 ) {  // don't divide by zero
+         if (m % batchSize == 0) oops::mpi::world().barrier();
+       }
+     }
+     oops::mpi::world().barrier();
+     ens_SS = std::move(saver_->getStateSet());
+
+    // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
+    // Pull the values from the local FCgeometry and put them into DAgeom
+    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
+       mymember);
+    return(localVec);
+  }
 
 // -----------------------------------------------------------------------------
 
@@ -866,7 +979,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     }
   }
 
-  void saveVariance(const IncrementWriteParameters_ & params, const IncrementEnsemble4D_ & perts,
+  void saveVariance(const eckit::LocalConfiguration & params, const IncrementEnsemble4D_ & perts,
                     const bool do_test_prints, const std::string & strOut) const {
     // save and optionaly print varaince of an IncrementEnsemble4D_ object
     size_t nens = perts.size();
@@ -989,7 +1102,30 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     params.validate(fullConfig);
   }
 
-// -----------------------------------------------------------------------------
+  void executeForecast(const Geometry_ & geometry,
+      const eckit::Configuration & fullConfig,
+      PostProcessor<State_> & post) const {
+//  Setup Model
+    Log::info() << "Forecast:setting up model" << std::endl;
+    const Model_ model(geometry, eckit::LocalConfiguration(fullConfig, "model"));
+
+//  Setup initial state
+    State_ xx(geometry, fullConfig.getSubConfiguration("initial condition"));
+
+//  Setup augmented state
+    const ModelAux_ moderr(geometry, fullConfig.getSubConfiguration("model aux control"));
+
+    const util::Duration fclength(fullConfig.getString("forecast length"));
+    const util::DateTime bgndate(xx.validTime());
+    const util::DateTime enddate(bgndate + fclength);
+
+    Log::info() << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
+    post.initialize(xx, bgndate, fclength);
+//  Run forecast
+    Log::info() << "Forecast:running forecast" << std::endl;
+    model.forecast(xx, moderr, fclength, post);
+    Log::info() << "Forecast:done running forecast" << std::endl;
+  }
 };
 
 }  // namespace oops

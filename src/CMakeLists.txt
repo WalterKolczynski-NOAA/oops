@@ -105,7 +105,6 @@ oops/base/FieldSet4D.cc
 oops/base/FieldSet4D.h
 oops/base/FieldSets.cc
 oops/base/FieldSets.h
-oops/base/ForecastParameters.h
 oops/base/GeneralizedDepartures.h
 oops/base/Geometry.h
 oops/base/GeometryData.cc
@@ -129,11 +128,9 @@ oops/base/InflationBase.h
 oops/base/instantiateCovarFactory.h
 oops/base/instantiateInflationFactory.h
 oops/base/LinearModel.h
-oops/base/LinearVariableChangeParametersBase.h
 oops/base/Localization.h
 oops/base/Model.h
 oops/base/ModelSpaceCovarianceBase.h
-oops/base/ModelSpaceCovarianceParametersBase.h
 oops/base/MultiplicativeInflation.h
 oops/base/NormBase.h
 oops/base/ObsAuxControls.h
@@ -171,7 +168,6 @@ oops/base/PostProcessor.h
 oops/base/PostProcessorTLAD.h
 oops/base/PostTimer.cc
 oops/base/PostTimer.h
-oops/base/PostTimerParameters.h
 oops/base/RTPP.h
 oops/base/RTPS.h
 oops/base/SamplingMethodSelector.h
@@ -188,9 +184,6 @@ oops/base/StructuredGridPostProcessor.h
 oops/base/StructuredGridWriter.h
 oops/base/TrajectorySaver.h
 oops/base/TrivialSamplingMethodSelector.h
-oops/base/WriteParametersBase.cc
-oops/base/WriteParametersBase.h
-oops/base/VariableChangeParametersBase.h
 oops/base/variables_f.cc
 oops/base/variables_f.h
 oops/base/variables_mod.F90
@@ -314,7 +307,6 @@ oops/mpi/mpi.h
 oops/runs/AddIncrement.h
 oops/runs/RescaleEnsPerts.h
 oops/runs/AdjointForecast.h
-oops/runs/Application.cc
 oops/runs/Application.h
 oops/runs/ControlPert.h
 oops/runs/ConvertIncrement.h
@@ -453,14 +445,13 @@ oops/util/workflow.h
 oops/util/workflow.cc
 oops/util/WorkflowUpdater.h
 
+oops/util/parameters/ArrayConstraints.h
 oops/util/parameters/ConfigurationParameter.cc
 oops/util/parameters/ConfigurationParameter.h
 oops/util/parameters/EmptyParameters.h
 oops/util/parameters/GenericParameters.h
 oops/util/parameters/HasDiracParameters_.h
 oops/util/parameters/HasParameters_.h
-oops/util/parameters/HasReadParameters_.h
-oops/util/parameters/HasWriteParameters_.h
 oops/util/parameters/IgnoreOtherParameters.cc
 oops/util/parameters/IgnoreOtherParameters.h
 oops/util/parameters/NumericConstraints.h
@@ -512,7 +503,6 @@ test/interface/ErrorCovariance.h
 test/interface/FieldSet4D.h
 test/interface/Geometry.h
 test/interface/GeometryIterator.h
-test/interface/GeometryFixture.h
 test/interface/GeoVaLs.h
 test/interface/GetValues.h
 test/interface/GlobalInterpolator.h
@@ -640,6 +630,9 @@ target_link_libraries( ${PROJECT_NAME} PUBLIC Eigen3::Eigen )
 target_link_libraries( ${PROJECT_NAME} PUBLIC eckit )
 target_link_libraries( ${PROJECT_NAME} PUBLIC fckit )
 target_link_libraries( ${PROJECT_NAME} PUBLIC atlas_f )
+if( atlas_VERSION VERSION_GREATER_EQUAL "0.39.0" )
+  target_link_libraries( ${PROJECT_NAME} PUBLIC hic )
+endif()
 target_link_libraries( ${PROJECT_NAME} PUBLIC Boost::boost )
 if ( GPTL_FOUND )
   target_link_libraries( ${PROJECT_NAME} PUBLIC GPTL::GPTL )
@@ -709,73 +702,11 @@ set_tests_properties(test_oops_base_dummy_run_one PROPERTIES
 )
 
 ecbuild_add_test(
-  TARGET  test_oops_base_dummy_run_no_validate
-  COMMAND test_oops_base_dummy_run
-  ARGS    "--no-validate" "test/testinput/hello.yaml"
-  DEPENDS test_oops_base_dummy_run
-)
-set_tests_properties(test_oops_base_dummy_run_one PROPERTIES
-  PASS_REGULAR_EXPRESSION "hello earth"
-)
-
-ecbuild_add_test(
-  TARGET  test_oops_base_dummy_run_validate_zero
-  COMMAND test_oops_base_dummy_run
-  ARGS    "--validate-only" "test/testinput/hello.yaml"
-  DEPENDS test_oops_base_dummy_run
-)
-set_tests_properties(test_oops_base_dummy_run_validate_zero PROPERTIES
-  PASS_REGULAR_EXPRESSION "Configuration OK"
-)
-
-if (${nlohmann_json_FOUND} AND ${nlohmann_json_schema_validator_FOUND})
-  ecbuild_add_test(
-    TARGET  test_oops_base_dummy_run_validate_one
-    COMMAND test_oops_base_dummy_run
-    ARGS    "--validate-only" "test/testinput/empty.yaml"
-    DEPENDS test_oops_base_dummy_run
-  )
-  set_tests_properties(test_oops_base_dummy_run_validate_one PROPERTIES
-    WILL_FAIL true
-  )
-endif()
-
-ecbuild_add_test(
   TARGET  test_oops_base_dummy_run_bad_arg_zero
   COMMAND test_oops_base_dummy_run
   DEPENDS test_oops_base_dummy_run
 )
 set_tests_properties(test_oops_base_dummy_run_bad_arg_zero PROPERTIES
-  WILL_FAIL true
-)
-
-ecbuild_add_test(
-  TARGET  test_oops_base_dummy_run_bad_arg_one
-  COMMAND test_oops_base_dummy_run
-                  ARGS    "--validate-only"
-  DEPENDS test_oops_base_dummy_run
-)
-set_tests_properties(test_oops_base_dummy_run_bad_arg_one PROPERTIES
-  WILL_FAIL true
-)
-
-ecbuild_add_test(
-  TARGET  test_oops_base_dummy_run_bad_arg_two
-  COMMAND test_oops_base_dummy_run
-  ARGS    "--output-json-schema=x" "test/testinput/hello.yaml"
-  DEPENDS test_oops_base_dummy_run
-)
-set_tests_properties(test_oops_base_dummy_run_bad_arg_two PROPERTIES
-  WILL_FAIL true
-)
-
-ecbuild_add_test(
-  TARGET  test_oops_base_dummy_run_bad_arg_three
-  COMMAND test_oops_base_dummy_run
-  ARGS    "--validate-only" "test/testinput/hello.yaml" "out"
-  DEPENDS test_oops_base_dummy_run
-)
-set_tests_properties(test_oops_base_dummy_run_bad_arg_three PROPERTIES
   WILL_FAIL true
 )
 
@@ -848,6 +779,7 @@ ecbuild_add_test( TARGET  test_util_pushstringvector
 ecbuild_add_test( TARGET  test_util_parameters
                   SOURCES test/base/Parameters.cc
                   ARGS    "test/testinput/parameters.yaml"
+                  ENVIRONMENT VALIDATE_PARAMETERS=1
                   LIBS    oops )
 
 ecbuild_add_executable(
@@ -855,35 +787,53 @@ ecbuild_add_executable(
   SOURCES test/generic/LocalInterpolator.cc
   LIBS oops
 )
-ecbuild_add_test( TARGET  test_generic_atlas_interpolator
-                  COMMAND test_oops_generic_local_interpolator
-                  ARGS    "test/testinput/atlas_interpolator.yaml"
-                  LIBS    oops eckit )
-ecbuild_add_test( TARGET  test_generic_unstructured_interpolator
-                  COMMAND test_oops_generic_local_interpolator
-                  ARGS    "test/testinput/unstructured_interpolator.yaml"
-                  LIBS    oops eckit )
 
 ecbuild_add_executable(
   TARGET  test_oops_generic_global_interpolator
   SOURCES test/generic/GlobalInterpolator.cc
   LIBS oops
 )
+
+# Atlas interpolation tests require a newer version of Atlas than the rest of OOPS.
+if((atlas_VERSION VERSION_GREATER 0.38.0) OR (atlas_VERSION VERSION_EQUAL 0.38.0))
+
+ecbuild_add_test( TARGET  test_generic_atlas_interpolator
+                  COMMAND test_oops_generic_local_interpolator
+                  ARGS    "test/testinput/atlas_interpolator.yaml"
+                  LIBS    oops eckit )
+
 ecbuild_add_test( TARGET  test_generic_atlas_global_interpolator
                   COMMAND test_oops_generic_global_interpolator
                   ARGS    "test/testinput/atlas_global_interpolator.yaml"
                   LIBS    oops eckit )
-# TODO: fix hang in AtlasInterpolator on multiple MPI ranks
-#       see https://github.com/JCSDA-internal/oops/issues/2664
-#ecbuild_add_test( TARGET  test_generic_atlas_global_interpolator_parallel
-#                  COMMAND test_oops_generic_global_interpolator
-#                  MPI     4
-#                  ARGS    "test/testinput/atlas_global_interpolator.yaml"
-#                  LIBS    oops eckit )
+
+ecbuild_add_test( TARGET  test_generic_atlas_global_interpolator_parallel
+                  COMMAND test_oops_generic_global_interpolator
+                  MPI     4
+                  ARGS    "test/testinput/atlas_global_interpolator.yaml"
+                  LIBS    oops eckit )
+
+else()
+set(disabled_tests
+"test_generic_atlas_global_interpolator"
+"test_generic_atlas_global_interpolator_parallel"
+)
+message(WARNING "Atlas version is ${atlas_VERSION}. "
+                "Some interpolation features are not supported. "
+                "Use 0.38.0 or greater to enable these features and the following tests: "
+                "${disabled_tests}")
+endif()
+
+ecbuild_add_test( TARGET  test_generic_unstructured_interpolator
+                  COMMAND test_oops_generic_local_interpolator
+                  ARGS    "test/testinput/unstructured_interpolator.yaml"
+                  LIBS    oops eckit )
+
 ecbuild_add_test( TARGET  test_generic_unstructured_global_interpolator
                   COMMAND test_oops_generic_global_interpolator
                   ARGS    "test/testinput/unstructured_global_interpolator.yaml"
                   LIBS    oops eckit )
+
 ecbuild_add_test( TARGET  test_generic_unstructured_global_interpolator_parallel
                   COMMAND test_oops_generic_global_interpolator
                   MPI     4

@@ -93,6 +93,9 @@ void printDiagValues(const eckit::mpi::Comm &,
                      const atlas::FunctionSpace &,
                      const atlas::FieldSet &,
                      const atlas::FieldSet &);
+void checkDimensionSize(const int &,
+                        const std::string,
+                        const size_t &);
 void readFieldSet(const eckit::mpi::Comm &,
                   const atlas::FunctionSpace &,
                   const std::vector<size_t> &,
@@ -104,7 +107,8 @@ void readRank3FieldSet(const atlas::FunctionSpace &,
                        const std::vector<size_t> &,
                        const std::vector<std::string> &,
                        atlas::FieldSet &,
-                       const std::string &);
+                       const std::string &,
+                       const bool &);
 
 void writeFieldSet(const eckit::mpi::Comm &,
                    const eckit::Configuration &,

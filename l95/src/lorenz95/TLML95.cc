@@ -35,6 +35,7 @@ static oops::interface::LinearModelMaker<L95Traits, TLML95> makerTLML95_("L95TLM
 // -----------------------------------------------------------------------------
 TLML95::TLML95(const Resolution & resol, const eckit::Configuration & tlConf)
   : resol_(resol), tstep_(util::Duration(tlConf.getString("tstep"))),
+    steptraj_(util::Duration(tlConf.getString("trajectory step", tstep_.toString()))),
     dt_(tstep_.toSeconds()/432000.0), traj_(),
     lrmodel_(resol_, eckit::LocalConfiguration(tlConf, "trajectory"))
 {
@@ -49,21 +50,18 @@ TLML95::~TLML95() {
   oops::Log::trace() << "TLML95::~TLML95 destructed" << std::endl;
 }
 // -----------------------------------------------------------------------------
-void TLML95::setTrajectory(const StateL95 & xx, StateL95 &, const ModelBias & bias) {
+void TLML95::setTrajectory(const StateL95 & xx, StateL95 & xlr, const ModelBias & bias) {
   ASSERT(traj_.find(xx.validTime()) == traj_.end());
   ModelTrajectory * traj = new ModelTrajectory();
-// Interpolate xx to xlr here
-  FieldL95 zz(xx.getField());
+  FieldL95 zz(xlr.getField());
   lrmodel_.stepRK(zz, bias, *traj);
   traj_[xx.validTime()] = traj;
 }
 // -----------------------------------------------------------------------------
 const ModelTrajectory * TLML95::getTrajectory(const util::DateTime & tt) const {
-  trajICst itra = traj_.find(tt);
-  if (itra == traj_.end()) {
-    oops::Log::error() << "TLML95: trajectory not available at time " << tt << std::endl;
-    ABORT("TLML95: trajectory not available");
-  }
+  ASSERT(traj_.begin()->first <= tt);
+  ASSERT(traj_.rbegin()->first >= tt);
+  trajICst itra = traj_.lower_bound(tt);
   return itra->second;
 }
 // -----------------------------------------------------------------------------

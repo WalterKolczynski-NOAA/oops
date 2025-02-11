@@ -25,7 +25,6 @@
 #include "oops/mpi/mpi.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
-#include "oops/util/Printable.h"
 
 namespace oops {
 
@@ -54,9 +53,9 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   StateSet ens_mean() const;
   // Collect distributed states and return a local subset
   std::vector<StateSet> transpose(const eckit::mpi::Comm & global,
-           const Geometry_ & DAgeometry, const int & mytask, const int & ensNum) const;
+           const Geometry_ & DAgeometry, const int & ensNum) const;
   State_ Rtranspose(const eckit::mpi::Comm & global,
-           const Geometry_ & DAgeometry, const int & mytask, const int & ensNum,
+           const Geometry_ & DAgeometry, const int & ensNum,
            const int transNum) const;
   /// Zero
   void zero();
@@ -79,7 +78,6 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol,
                           const eckit::mpi::Comm & commEns)
   : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
 {
-  util::DateTime localtime = times[0];
   for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
     for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
       this->dataset().emplace_back(new State_(resol, vars, times[jt]));
@@ -202,6 +200,41 @@ State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
   State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(), (*this)(0, 0).state().validTime());
   FCState.Rtranspose((*this)(0, 0).state(), global, mytask, ensNum, transNum);
   return(FCState);
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm & global,
+           const Geometry_ & DAgeometry, const int ensNum) const
+{
+/* This method collects parts of the distributed StateSet and places all ensemble
+   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet 
+   held in the local_ensemble. It is essentially a transpose of a distributed StateSet
+   to a locally held vector of StateSets. The std::vector of StateSets is used here because
+   the LocalEnsemble infrastructure still expects that rather than a normal, single StateSet 
+   variable. If that infrastructure changes, the localize call below will support the new 
+   approach and this should be deprecated. The DAgeometry should be have a decomposition 
+   that is spread across N (number of ensemble members) times the number of MPI tasks that 
+   the forecast geometry decomposition. In other words, if the forecast geometry has a 
+   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a 
+   layout that multiplies to 4*4*9 or something like 12,12. Note that the resolution
+   of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
+   is different between the geometries.
+*/
+  std::vector<StateSet<MODEL> > local;
+  std::vector<int> local_ens;
+  local_ens.push_back(1);
+
+
+  /* transpose stateSet to get all ensemble members on a 1/N size patch of geometry */
+  for (size_t jm = 0; jm < this->ens_size(); ++jm) {
+    local.emplace_back(StateSet(DAgeometry, this->variables(),
+       this->times(), this->commTime(), local_ens, oops::mpi::myself()));
+    local[jm](0, 0).transpose((*this)(0, 0).state(), global, ensNum, jm);
+    local[jm].sync_times();
+  }
+  return(local);
 }
 
 // -----------------------------------------------------------------------------

@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
-#include "oops/base/ForecastParameters.h"
 #include "oops/base/Model.h"
 #include "oops/base/PostProcessor.h"
 #include "oops/base/PostProcessorTLAD.h"
@@ -33,37 +32,8 @@
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
-#include "oops/util/parameters/Parameters.h"
-#include "oops/util/parameters/RequiredParameter.h"
 
 namespace oops {
-
-// -----------------------------------------------------------------------------
-
-/// \brief Top-level options taken by the AdjointForecast application.
-template <typename MODEL>
-class AdjointForecastParameters : public ApplicationParameters {
-  OOPS_CONCRETE_PARAMETERS(AdjointForecastParameters, ApplicationParameters)
-
- public:
-  typedef typename Geometry<MODEL>::Parameters_ GeometryParameters_;
-  typedef ForecastParameters<MODEL> ForecastParameters_;
-  typedef ForecastAspectParameters<MODEL> ForecastAspectParameters_;
-  typedef ForecastTLParameters<MODEL> ForecastTLParameters_;
-  typedef ForecastADParameters<MODEL> ForecastADParameters_;
-
-  /// Forecast parameters.
-  RequiredParameter<ForecastParameters_> fcstConf{"forecast", this};
-
-  /// Forecast aspect parameters.
-  RequiredParameter<ForecastAspectParameters_> fcstAspectConf{"forecast aspect", this};
-
-  /// Linear forecast parameters.
-  RequiredParameter<ForecastTLParameters_> linearFcstConf{"linear forecast", this};
-
-  /// Adjoint forecast parameters.
-  RequiredParameter<ForecastADParameters_> adjointForecast{"adjoint forecast", this};
-};
 
 // -----------------------------------------------------------------------------
 
@@ -76,7 +46,6 @@ template <typename MODEL> class AdjointForecast : public Application {
   typedef NormGradient<MODEL>              NormGradient_;
   typedef State<MODEL>                     State_;
   typedef oops::LinearModel<MODEL>         LinearModel_;
-  typedef AdjointForecastParameters<MODEL> AdjointForecastParameters_;
 
  public:
 // -----------------------------------------------------------------------------
@@ -85,14 +54,13 @@ template <typename MODEL> class AdjointForecast : public Application {
 // -----------------------------------------------------------------------------
   virtual ~AdjointForecast() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
-    // Deserialize parameters
-    AdjointForecastParameters_ params;
-    if (validate) params.validate(fullConfig);
-    params.deserialize(fullConfig);
+  int execute(const eckit::Configuration & fullConfig) const override {
+    eckit::LocalConfiguration tlConf(fullConfig, "linear forecast");
+    eckit::LocalConfiguration adConf(fullConfig, "adjoint forecast");
+    eckit::LocalConfiguration aspectConf(fullConfig, "forecast aspect");
 
     // Create the linear model
-    const Geometry_ geomAD(params.linearFcstConf.value().geometry, this->getComm());
+    const Geometry_ geomAD(eckit::LocalConfiguration(tlConf, "geometry"), this->getComm());
     oops::instantiateLinearModelFactory<MODEL>();
     oops::PostProcessor<State_> post;
 
@@ -106,20 +74,19 @@ template <typename MODEL> class AdjointForecast : public Application {
 
     oops::PostProcessorTLAD<MODEL> pptraj;
     std::shared_ptr<LinearModel_> linearmodel_;
-    linearmodel_.reset(new LinearModel_(geomAD, params.linearFcstConf.value().model));
+    linearmodel_.reset(new LinearModel_(geomAD, eckit::LocalConfiguration(tlConf, "linear model")));
 
     // Generate the model trajectory
     // -----------------------------
 
     // Setup resolution
-    const Geometry_ geomNL(params.fcstConf.value().geometry, this->getComm());
+    const Geometry_ geomNL(eckit::LocalConfiguration(fcConf, "geometry"), this->getComm());
 
     // Setup Model
-    eckit::LocalConfiguration fconf(fullConfig, "forecast");
-    const Model_ model(geomNL, eckit::LocalConfiguration(fconf, "model"));
+    const Model_ model(geomNL, eckit::LocalConfiguration(fcConf, "model"));
 
     // Setup initial state
-    State_ xxf(geomNL, params.fcstConf.value().initialCondition);
+    State_ xxf(geomNL, eckit::LocalConfiguration(fcConf, "initial condition"));
     Log::test() << "Initial state: " << xxf << std::endl;
 
     // Setup augmented state
@@ -131,7 +98,7 @@ template <typename MODEL> class AdjointForecast : public Application {
 
     // Run forecast to get the trajectory
     post.enrollProcessor(new oops::TrajectorySaver<MODEL>
-      (params.linearFcstConf.value().model, geomAD, moderr, linearmodel_, pptraj));
+      (eckit::LocalConfiguration(tlConf, "linear model"), geomAD, moderr, linearmodel_, pptraj));
     model.forecast(xxf, moderr, fclength, post);
     Log::test() << "Forecast state: " << xxf << std::endl;
 
@@ -139,11 +106,11 @@ template <typename MODEL> class AdjointForecast : public Application {
     // -------------------
 
     // Setup verification resolution
-    const Geometry_ verificationGeom(params.fcstAspectConf.value().verificationResolution,
-      this->getComm());
+    const Geometry_ verifGeom(eckit::LocalConfiguration(aspectConf, "verification resolution"),
+                              this->getComm());
 
     // Setup verification state
-    State_ xxv(verificationGeom, params.fcstAspectConf.value().verificationConfig);
+    State_ xxv(verifGeom, eckit::LocalConfiguration(aspectConf, "verification state"));
     Log::test() << "Verifying state: " << xxv << std::endl;
 
     // Set datetime for the increment
@@ -153,42 +120,31 @@ template <typename MODEL> class AdjointForecast : public Application {
     const Variables vars(xxv.variables());
 
     // Create increment and diff two states for the increment
-    Increment_ dx(verificationGeom, vars, incdate);
+    Increment_ dx(verifGeom, vars, incdate);
     dx.diff(xxf, xxv);
     Log::test() << "Created perturbation from states diff: " << dx << std::endl;
 
     // Initialization type for increment
-    NormGradient_ normgrad(xxf.geometry(), xxf,
-      params.fcstAspectConf.value().normConfig);
+    NormGradient_ normgrad(xxf.geometry(), xxf, eckit::LocalConfiguration(aspectConf, "norm"));
     normgrad.apply(dx);
 
     // Write ADM initial conditions
-    if (params.adjointForecast.value().adjointInitialConditionOutput.value() != boost::none) {
-      dx.write(params.adjointForecast.value().adjointInitialConditionOutput.value().value());
+    if (adConf.has("adjoint initial condition output")) {
+      dx.write(eckit::LocalConfiguration(adConf, "adjoint initial condition output"));
     }
 
     // Setup augmented state for TLAD
-    ModelAuxIncr_ admaux(verificationGeom, auxConf);
+    ModelAuxIncr_ admaux(verifGeom, auxConf);
 
     // Run ADM forecast
     linearmodel_->forecastAD(dx, admaux, fclength);
 
     // Write ADM final conditions
-    dx.write(params.adjointForecast.value().adjointForecastOutput);
+    dx.write(eckit::LocalConfiguration(adConf, "adjoint forecast output"));
 
     Log::test() << "Final increment state: " << dx << std::endl;
 
     return 0;
-  }
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    AdjointForecastParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    AdjointForecastParameters_ params;
-    params.validate(fullConfig);
   }
 // -----------------------------------------------------------------------------
  private:

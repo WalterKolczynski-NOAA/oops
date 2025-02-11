@@ -342,8 +342,8 @@ void ObsTable::otWrite(const std::string & filename) const {
 
 // -----------------------------------------------------------------------------
 
-void ObsTable::append(const std::string & appendDir) {
-  throw eckit::NotImplemented("ObsTable::append() is not implemented.", Here());
+void ObsTable::updateObsSpace(const eckit::Configuration & appendConfig) {
+  throw eckit::NotImplemented("ObsTable::updateObsSpace() is not implemented.", Here());
 }
 
 // -----------------------------------------------------------------------------

@@ -30,7 +30,8 @@ implicit none
 private
 public :: qg_obsdb
 public :: qg_obsdb_registry
-public :: qg_obsdb_setup,qg_obsdb_delete,qg_obsdb_save,qg_obsdb_get,qg_obsdb_put,qg_obsdb_locations,qg_obsdb_generate,qg_obsdb_nobs
+public :: qg_obsdb_setup,qg_obsdb_delete,qg_obsdb_save,qg_obsdb_get,qg_obsdb_put, &
+          qg_obsdb_locations,qg_obsdb_generate,qg_obsdb_nobs,qg_obsdb_has
 ! ------------------------------------------------------------------------------
 integer,parameter :: rseed = 1 !< Random seed (for reproducibility)
 
@@ -404,6 +405,30 @@ else
 endif
 
 end subroutine qg_obsdb_nobs
+! ------------------------------------------------------------------------------
+subroutine qg_obsdb_has(self,grp,khas)
+
+implicit none
+
+! Passed variables
+type(qg_obsdb),intent(in) :: self  !< Observation data
+character(len=*),intent(in) :: grp !< Group
+integer,intent(inout) :: khas      !< 1 or 0 if has group or not
+
+! Local variables
+type(group_data),pointer :: jgrp
+
+! Find group
+call qg_obsdb_find_group(self,grp,jgrp)
+
+! Get observation data size
+if (associated(jgrp)) then
+  khas = 1
+else
+  khas = 0
+endif
+
+end subroutine qg_obsdb_has
 ! ------------------------------------------------------------------------------
 !  Private
 ! ------------------------------------------------------------------------------

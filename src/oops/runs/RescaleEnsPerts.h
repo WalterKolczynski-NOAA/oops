@@ -20,6 +20,7 @@
 #include "oops/base/ParameterTraitsVariables.h"
 #include "oops/mpi/mpi.h"
 #include "oops/runs/Application.h"
+#include "oops/util/ConfigHelpers.h"
 #include "oops/util/FieldSetOperations.h"
 #include "oops/util/Logger.h"
 #include "oops/util/parameters/OptionalParameter.h"
@@ -36,18 +37,14 @@ template <typename MODEL> class RescaleEnsPertsParameters : public ApplicationPa
   typedef Increment<MODEL> Increment_;
 
  public:
-  typedef typename Geometry<MODEL>::Parameters_ GeometryParameters_;
-  typedef typename Increment_::ReadParameters_ IncrementReadParameters_;
-  typedef typename Increment_::WriteParameters_ IncrementWriteParameters_;
-
-  RequiredParameter<GeometryParameters_> geometry{
+  RequiredParameter<eckit::LocalConfiguration> geometry{
       "geometry", "Geometry parameters", this};
-  RequiredParameter<std::vector<IncrementReadParameters_>> sample{
+  RequiredParameter<std::vector<eckit::LocalConfiguration>> sample{
       "sample increments", "Sample of archived analysis increments", this};
   RequiredParameter<std::vector<util::DateTime>> sampleDates{
       "sample dates", "vector of dates corresponding to each increment in the sample", this};
   RequiredParameter<Variables> variables{"variables", this};
-  RequiredParameter<IncrementWriteParameters_> output{
+  RequiredParameter<eckit::LocalConfiguration> output{
       "output", "analysis mean and ensemble members output", this};
   RequiredParameter<util::DateTime> validTime{"valid time", this};
   RequiredParameter<double> factor{"factor", this};
@@ -75,9 +72,6 @@ template <typename MODEL> class RescaleEnsPerts : public Application {
   typedef Increment<MODEL>               Increment_;
   typedef IncrementSet<MODEL>            IncrementSet_;
 
-  typedef typename Increment_::ReadParameters_ IncrementReadParameters_;
-  typedef typename Increment_::WriteParameters_ IncrementWriteParameters_;
-
  public:
 // -----------------------------------------------------------------------------
 
@@ -89,11 +83,10 @@ template <typename MODEL> class RescaleEnsPerts : public Application {
   virtual ~RescaleEnsPerts() {}
 
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     Log::trace() << "RescaleEnsPerts: execute start" << std::endl;
 
     RescaleEnsPertsParameters<MODEL> params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
     // Setup geometry
@@ -126,24 +119,13 @@ template <typename MODEL> class RescaleEnsPerts : public Application {
 
     Log::test() << "Rescaled Perturbation Member 1: " << increments[0] << std::endl;
     for (int jj = 0; jj < rank; ++jj) {
-      IncrementWriteParameters_ writeParams = params.output;
-      writeParams.setMember(jj);
+      eckit::LocalConfiguration writeParams = params.output;
+      util::setMember(writeParams, jj);
       increments[jj].write(writeParams);
     }
 
   return 0;
 }
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    RescaleEnsPertsParameters<MODEL> params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    RescaleEnsPertsParameters<MODEL> params;
-    params.validate(fullConfig);
-  }
-
 // -----------------------------------------------------------------------------
  private:
   std::string appname() const override {

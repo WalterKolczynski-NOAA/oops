@@ -15,6 +15,7 @@
 #include <math.h>
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -98,9 +99,14 @@ class ObsVector : public util::Printable,
   void save(const std::string &) const;
   /// Fill ObsVector with data with group \p name from the associated ObsSpace
   void read(const std::string &);
+  /// Append new data to with group \p name ObsVector from the associated ObsSpace
+  void readAppended(const std::string &);
 
   /// Number of non-masked out observations (across all MPI tasks)
   unsigned int nobs() const;
+
+  std::string info(const std::string &) const;
+  std::string info(const std::string &, const ObsDataVector<OBS, int> &) const;
 
  private:
   void print(std::ostream &) const;
@@ -313,6 +319,21 @@ void ObsVector<OBS>::print(std::ostream & os) const {
 }
 // -----------------------------------------------------------------------------
 template <typename OBS>
+std::string ObsVector<OBS>::info(const std::string & grep) const {
+  Log::trace() << "ObsVector<OBS>::info starting" << std::endl;
+  util::Timer timer(classname(), "info");
+  return data_->info(grep);
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
+std::string ObsVector<OBS>::info(const std::string & grep,
+                                 const ObsDataVector<OBS, int> & flags) const {
+  Log::trace() << "ObsVector<OBS>::info starting" << std::endl;
+  util::Timer timer(classname(), "info");
+  return data_->info(grep, flags.obsdatavector());
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
 void ObsVector<OBS>::save(const std::string & name) const {
   Log::trace() << "ObsVector<OBS>::save starting " << name << std::endl;
   util::Timer timer(classname(), "save");
@@ -352,6 +373,16 @@ void ObsVector<OBS>::read(const std::string & name) {
   data_->read(name);
 
   Log::trace() << "ObsVector<OBS>::read done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
+void ObsVector<OBS>::readAppended(const std::string & name) {
+  Log::trace() << "ObsVector<OBS>::readAppended starting " << name << std::endl;
+  util::Timer timer(classname(), "readAppended");
+
+  data_->readAppended(name);
+
+  Log::trace() << "ObsVector<OBS>::readAppended done" << std::endl;
 }
 // -----------------------------------------------------------------------------
 

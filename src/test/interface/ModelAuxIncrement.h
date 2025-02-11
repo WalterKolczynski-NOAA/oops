@@ -46,10 +46,8 @@ class TestParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(TestParameters, Parameters)
 
  public:
-  typedef typename oops::Geometry<MODEL>::Parameters_ GeometryParameters_;
-
   /// \brief Group of parameters controlling the tested model's geometry.
-  oops::RequiredParameter<GeometryParameters_> geometry{"geometry", this};
+  oops::RequiredParameter<eckit::LocalConfiguration> geometry{"geometry", this};
   /// \brief Group of parameters controlling the tested implementation of the ModelAuxIncrement
   /// interface.
   oops::RequiredParameter<eckit::LocalConfiguration> modelAuxError{"model aux error", this};

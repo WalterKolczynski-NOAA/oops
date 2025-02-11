@@ -32,6 +32,7 @@
 #include "oops/util/Duration.h"
 #include "oops/util/Expect.h"
 #include "oops/util/Logger.h"
+#include "oops/util/parameters/ArrayConstraints.h"
 #include "oops/util/parameters/ConfigurationParameter.h"
 #include "oops/util/parameters/HasParameters_.h"
 #include "oops/util/parameters/IgnoreOtherParameters.h"
@@ -299,6 +300,7 @@ class MyParametersWithDefaultValues : public oops::Parameters {
 
 class ConstrainedParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(ConstrainedParameters, Parameters)
+
  public:
   oops::Parameter<int> intWithMin{
     "int_with_min", 10, this, {oops::minConstraint(5)}};
@@ -316,10 +318,17 @@ class ConstrainedParameters : public oops::Parameters {
     "float_with_max", 0.f, this, {oops::maxConstraint(5.5f)}};
   oops::Parameter<float> floatWithExclusiveMax{
     "float_with_exclusive_max", 0.f, this, {oops::exclusiveMaxConstraint(5.5f)}};
+  oops::Parameter<std::vector<int>> nonEmptyVector{
+    "nonempty_vector", {11}, this, {oops::nonEmptyConstraint<std::vector<int>>()}};
+  oops::Parameter<std::vector<int>> vectorWithMinItems{
+    "vector_with_min_items", {11, 12}, this, {oops::minItemsConstraint<std::vector<int>>(2)}};
+  oops::Parameter<std::vector<int>> vectorWithMaxItems{
+    "vector_with_max_items", {11, 12, 13}, this, {oops::maxItemsConstraint<std::vector<int>>(3)}};
 };
 
 class ConstrainedRequiredParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(ConstrainedRequiredParameters, Parameters)
+
  public:
   oops::RequiredParameter<int> intWithMin{
     "int_with_min", this, {oops::minConstraint(5)}};
@@ -337,10 +346,17 @@ class ConstrainedRequiredParameters : public oops::Parameters {
     "float_with_max", this, {oops::maxConstraint(5.5f)}};
   oops::RequiredParameter<float> floatWithExclusiveMax{
     "float_with_exclusive_max", this, {oops::exclusiveMaxConstraint(5.5f)}};
+  oops::RequiredParameter<std::vector<int>> nonEmptyVector{
+    "nonempty_vector", this, {oops::nonEmptyConstraint<std::vector<int>>()}};
+  oops::RequiredParameter<std::vector<int>> vectorWithMinItems{
+    "vector_with_min_items", this, {oops::minItemsConstraint<std::vector<int>>(2)}};
+  oops::RequiredParameter<std::vector<int>> vectorWithMaxItems{
+    "vector_with_max_items", this, {oops::maxItemsConstraint<std::vector<int>>(3)}};
 };
 
 class ConstrainedOptionalParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(ConstrainedOptionalParameters, Parameters)
+
  public:
   oops::OptionalParameter<int> intWithMin{
     "int_with_min", this, {oops::minConstraint(5)}};
@@ -358,6 +374,12 @@ class ConstrainedOptionalParameters : public oops::Parameters {
     "float_with_max", this, {oops::maxConstraint(5.5f)}};
   oops::OptionalParameter<float> floatWithExclusiveMax{
     "float_with_exclusive_max", this, {oops::exclusiveMaxConstraint(5.5f)}};
+  oops::OptionalParameter<std::vector<int>> nonEmptyVector{
+    "nonempty_vector", this, {oops::nonEmptyConstraint<std::vector<int>>()}};
+  oops::OptionalParameter<std::vector<int>> vectorWithMinItems{
+    "vector_with_min_items", this, {oops::minItemsConstraint<std::vector<int>>(2)}};
+  oops::OptionalParameter<std::vector<int>> vectorWithMaxItems{
+    "vector_with_max_items", this, {oops::maxItemsConstraint<std::vector<int>>(3)}};
 };
 
 // Classes used to test the ConfigurationParameter class
@@ -1636,6 +1658,49 @@ void doTestExclusiveMaxConstraint() {
   }
 }
 
+template <typename ParametersType>
+void doTestMinItemsConstraint() {
+  const eckit::LocalConfiguration conf(TestEnvironment::config());
+  {
+    const eckit::LocalConfiguration validConf(conf, "constraints_met");
+    ParametersType params;
+    EXPECT_NO_THROW(params.validate(validConf));
+    EXPECT_NO_THROW(params.deserialize(validConf));
+  }
+  {
+    const eckit::LocalConfiguration invalidConf(conf, "min_items_constraint_not_met");
+    ParametersType params;
+    if (validationSupported)
+      EXPECT_THROWS_MSG(params.validate(invalidConf), "array has too few items");
+    EXPECT_THROWS(params.deserialize(invalidConf));
+  }
+  {
+    const eckit::LocalConfiguration invalidConf(conf, "nonempty_constraint_not_met");
+    ParametersType params;
+    if (validationSupported)
+      EXPECT_THROWS_MSG(params.validate(invalidConf), "array has too few items");
+    EXPECT_THROWS(params.deserialize(invalidConf));
+  }
+}
+
+template <typename ParametersType>
+void doTestMaxItemsConstraint() {
+  const eckit::LocalConfiguration conf(TestEnvironment::config());
+  {
+    const eckit::LocalConfiguration validConf(conf, "constraints_met");
+    ParametersType params;
+    EXPECT_NO_THROW(params.validate(validConf));
+    EXPECT_NO_THROW(params.deserialize(validConf));
+  }
+  {
+    const eckit::LocalConfiguration invalidConf(conf, "max_items_constraint_not_met");
+    ParametersType params;
+    if (validationSupported)
+      EXPECT_THROWS_MSG(params.validate(invalidConf), "array has too many items");
+    EXPECT_THROWS(params.deserialize(invalidConf));
+  }
+}
+
 // - Minimum constraints
 
 void testParametersWithMinConstraint() {
@@ -1690,6 +1755,34 @@ void testRequiredParametersWithExclusiveMaxConstraint() {
 
 void testOptionalParametersWithExclusiveMaxConstraint() {
   doTestExclusiveMaxConstraint<ConstrainedOptionalParameters>();
+}
+
+// - Min items constraints
+
+void testParametersWithMinItemsConstraint() {
+  doTestMinItemsConstraint<ConstrainedParameters>();
+}
+
+void testRequiredParametersWithMinItemsConstraint() {
+  doTestMinItemsConstraint<ConstrainedRequiredParameters>();
+}
+
+void testOptionalParametersWithMinItemsConstraint() {
+  doTestMinItemsConstraint<ConstrainedOptionalParameters>();
+}
+
+// - Max items constraints
+
+void testParametersWithMaxItemsConstraint() {
+  doTestMaxItemsConstraint<ConstrainedParameters>();
+}
+
+void testRequiredParametersWithMaxItemsConstraint() {
+  doTestMaxItemsConstraint<ConstrainedRequiredParameters>();
+}
+
+void testOptionalParametersWithMaxItemsConstraint() {
+  doTestMaxItemsConstraint<ConstrainedOptionalParameters>();
 }
 
 // ConfigurationParameter
@@ -2000,6 +2093,26 @@ class Parameters : public oops::Test {
                     });
     ts.emplace_back(CASE("util/Parameters/testOptionalParametersWithExclusiveMaxConstraint") {
                       testOptionalParametersWithExclusiveMaxConstraint();
+                    });
+
+    ts.emplace_back(CASE("util/Parameters/testParametersWithMinItemsConstraint") {
+                      testParametersWithMinItemsConstraint();
+                    });
+    ts.emplace_back(CASE("util/Parameters/testRequiredParametersWithMinItemsConstraint") {
+                      testRequiredParametersWithMinItemsConstraint();
+                    });
+    ts.emplace_back(CASE("util/Parameters/testOptionalParametersWithMinItemsConstraint") {
+                      testOptionalParametersWithMinItemsConstraint();
+                    });
+
+    ts.emplace_back(CASE("util/Parameters/testParametersWithMaxItemsConstraint") {
+                      testParametersWithMaxItemsConstraint();
+                    });
+    ts.emplace_back(CASE("util/Parameters/testRequiredParametersWithMaxItemsConstraint") {
+                      testRequiredParametersWithMaxItemsConstraint();
+                    });
+    ts.emplace_back(CASE("util/Parameters/testOptionalParametersWithMaxItemsConstraint") {
+                      testOptionalParametersWithMaxItemsConstraint();
                     });
 
     ts.emplace_back(CASE("util/Parameters/testConfigurationParameter") {

@@ -24,6 +24,7 @@
 #include "oops/base/IdentityMatrix.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -91,6 +92,8 @@ double RPCGMinimizer<MODEL, OBS>::solve(Dual_ & vv, double & vvp, Dual_ & rr,
                                    const double costJ0Jb, const double costJ0JoJc,
                                    const int & maxiter, const double & tolerance,
                                    Dual_ & dy, const double & sigma) {
+  util::printRunStats("RPCG start");
+
   IdentityMatrix<Dual_> precond;
   IdentityMatrix<Dual_> precondt;
 
@@ -165,7 +168,11 @@ double RPCGMinimizer<MODEL, OBS>::solve(Dual_ & vv, double & vvp, Dual_ & rr,
   Log::info() << std::endl;
   for (int jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << "RPCG Starting Iteration " << jiter+1 << std::endl;
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("RPCG iteration " + std::to_string(jiter+1));
+    }
 
     if (jiter > 0) {
       double beta = dotwr/dotwr_old;
@@ -245,6 +252,8 @@ double RPCGMinimizer<MODEL, OBS>::solve(Dual_ & vv, double & vvp, Dual_ & rr,
       break;
     }
   }
+
+  util::printRunStats("RPCG end");
   return normReduction;
 }
 

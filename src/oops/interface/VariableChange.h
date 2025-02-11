@@ -23,11 +23,6 @@ namespace oops {
 // -----------------------------------------------------------------------------
 /// \brief Nonlinear variable change
 ///
-/// Note: each implementation should typedef `Parameters_` to the name of a subclass
-/// of oops::VariableChangeParametersBase holding its configuration settings and provide a
-/// constructor with the following signature:
-///
-///     VariableChange(const Parameters_ &, const Geometry_);
 template <typename MODEL>
 class VariableChange : public util::Printable,
                        private util::ObjectCounter<VariableChange<MODEL> >  {
@@ -36,13 +31,9 @@ class VariableChange : public util::Printable,
   typedef State<MODEL>                   State_;
 
  public:
-  typedef TParameters_IfAvailableElseFallbackType_t<VariableChange_, GenericParameters>
-    Parameters_;
-
   static const std::string classname() {return "oops::VariableChange";}
 
   VariableChange(const eckit::Configuration &, const Geometry_ &);
-  VariableChange(const Parameters_ &, const Geometry_ &);
   virtual ~VariableChange();
   VariableChange(const VariableChange &) = delete;
   VariableChange(VariableChange &&) = default;
@@ -71,13 +62,6 @@ VariableChange<MODEL>::VariableChange(const eckit::Configuration & conf, const G
   chvar_.reset(new VariableChange_(conf, geometry.geometry()));
   Log::trace() << "VariableChange<MODEL>::VariableChange done" << std::endl;
 }
-
-// -----------------------------------------------------------------------------
-
-template<typename MODEL>
-VariableChange<MODEL>::VariableChange(const Parameters_ & parameters, const Geometry_ & geometry)
-  : VariableChange(parameters.toConfiguration(), geometry)
-{}
 
 // -----------------------------------------------------------------------------
 

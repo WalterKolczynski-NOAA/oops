@@ -22,7 +22,6 @@
 #include "eckit/testing/Test.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/State.h"
-#include "oops/base/VariableChangeParametersBase.h"
 #include "oops/interface/VariableChange.h"
 #include "oops/mpi/mpi.h"
 #include "oops/runs/Test.h"
@@ -148,18 +147,6 @@ template <typename MODEL> void testVariableChange() {
 
 // -------------------------------------------------------------------------------------------------
 
-template <typename MODEL> void testVariableChangeParametersValidName() {
-  typedef VariableChangeFixture<MODEL> Test_;
-  typedef oops::VariableChange<MODEL>  VariableChange_;
-  typedef typename VariableChange_::Parameters_ Parameters_;
-  for (const eckit::Configuration &config : Test_::confs()) {
-    Parameters_ parameters;
-    const eckit::LocalConfiguration changeVarConfig(config, "variable change");
-    EXPECT_NO_THROW(parameters.validateAndDeserialize(changeVarConfig));
-  }
-}
-
-// -------------------------------------------------------------------------------------------------
 template <typename MODEL> class VariableChange : public oops::Test {
  public:
   using oops::Test::Test;
@@ -179,8 +166,6 @@ template <typename MODEL> class VariableChange : public oops::Test {
     //   { testVariableChangeInverse<MODEL>(); });
     ts.emplace_back(CASE("interface/VariableChange/testVariableChange")
       { testVariableChange<MODEL>(); });
-    ts.emplace_back(CASE("interface/VariableChange/testVariableChangeParametersValidName")
-      { testVariableChangeParametersValidName<MODEL>(); });
   }
 
   void clear() const override {}

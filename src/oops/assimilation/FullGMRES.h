@@ -1,10 +1,10 @@
 /*
  * (C) Copyright 2009-2016 ECMWF.
  * (C) Crown Copyright 2024, the Met Office.
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
- * In applying this licence, ECMWF does not waive the privileges and immunities 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
  */
@@ -21,6 +21,7 @@
 #include "oops/assimilation/UpTriSolve.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 
 namespace oops {
 
@@ -69,6 +70,7 @@ double FullGMRES(VECTOR & xx, const VECTOR & bb, const AMATRIX & A,
                  const PMATRIX & precond, const int maxiter,
                  const double tolerance, std::vector<VECTOR> & pqVEC,
                  std::vector<VECTOR> & xyVEC) {
+  util::printRunStats("FullGMRES start");
   std::vector<VECTOR> VV;
   // reserve space to avoid extra copies
   VV.reserve(maxiter+1);
@@ -117,6 +119,10 @@ double FullGMRES(VECTOR & xx, const VECTOR & bb, const AMATRIX & A,
   Log::info() << std::endl;
   for (jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << " FullGMRES Starting Iteration " << jiter+1 << std::endl;
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::printRunStats("FullGMRES iteration " + std::to_string(jiter+1));
+    }
 
     A.multiply(VV[jiter], zz);
     precond.multiply(zz, ww);
@@ -190,6 +196,7 @@ double FullGMRES(VECTOR & xx, const VECTOR & bb, const AMATRIX & A,
     xx.axpy(yy[jj], VV[jj]);
   }
 
+  util::printRunStats("FullGMRES end");
   return normReduction;
 }
 

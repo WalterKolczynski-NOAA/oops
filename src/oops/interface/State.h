@@ -63,9 +63,9 @@ class State : public util::Printable,
   /// Assignment operator
   State & operator =(const State &);
 
-  void transpose(const State_ & FCState, const eckit::mpi::Comm & global, const int & mytask,
+  void transpose(const State_ & FCState, const eckit::mpi::Comm & global,
        const int & ensNum, const int & transNum);
-  void Rtranspose(const State_ & DAState, const eckit::mpi::Comm & global, const int & mytask,
+  void Rtranspose(const State_ & DAState, const eckit::mpi::Comm & global,
        const int & ensNum, const int & transNum);
 
   /// Accessor
@@ -199,24 +199,25 @@ State<MODEL>::~State() {
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-void State<MODEL>::transpose(const State_ & FCState, const eckit::mpi::Comm & global,
-       const int & mytask, const int & ensNum, const int & transNum) {
-  // The FCState has a distributed set of states. Transpose returns a vector of local
-  // states on a smaller patch of geometry
+void State<MODEL>::transpose(const State_ & DistState, const eckit::mpi::Comm & global,
+       const int ensNum, const int transNum) {
+  // The DistState has a distributed set of states. Transpose returns the local
+  // state from ensemble number ensNum on a smaller patch of geometry of the
+  // DAState or GlobalState
   Log::trace() << "State<MODEL>::transpose interface starting" << std::endl;
-  state_->transpose(FCState, global, mytask, ensNum, transNum);
+  state_->transpose(DistState, global, ensNum, transNum);
   Log::trace() << "State<MODEL>::transpose interface done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-void State<MODEL>::Rtranspose(const State_ & DAState, const eckit::mpi::Comm & global,
-       const int & mytask, const int & ensNum, const int & transNum) {
+void State<MODEL>::Rtranspose(const State_ & DistState, const eckit::mpi::Comm & global,
+       const int & ensNum, const int & transNum) {
   // The FCState has a distributed set of states. Transpose returns a vector of local
   // states on a smaller patch of geometry
   Log::trace() << "State<MODEL>::Rtranspose interface starting" << std::endl;
-  state_->Rtranspose(DAState, global, mytask, ensNum, transNum);
+  state_->Rtranspose(DistState, global, mytask, ensNum, transNum);
   Log::trace() << "State<MODEL>::Rtranspose interface done" << std::endl;
 }
 

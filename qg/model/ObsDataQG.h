@@ -1,8 +1,8 @@
 /*
  * (C) Copyright 2019  UCAR
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
  */
 
 #ifndef QG_MODEL_OBSDATAQG_H_
@@ -50,6 +50,8 @@ class ObsDataQG : public util::Printable,
 // I/O
   void read(const std::string &);
   void save(const std::string &) const;
+  void readAppended(const std::string &);
+  void zeroAppended();
 
   const int & toFortran() const {return data_.toFortran();}
   const ObsVecQG & vect() const {return data_;}
@@ -106,6 +108,16 @@ void ObsDataQG<DATATYPE>::save(const std::string & name) const {
 template<typename DATATYPE>
 void ObsDataQG<DATATYPE>::print(std::ostream & os) const {
   os << data_;
+}
+// -----------------------------------------------------------------------------
+template<typename DATATYPE>
+void ObsDataQG<DATATYPE>::readAppended(const std::string & name) {
+  throw eckit::NotImplemented("ObsDataQG::readAppended() is not implemented.", Here());
+}
+// -----------------------------------------------------------------------------
+template<typename DATATYPE>
+void ObsDataQG<DATATYPE>::zeroAppended() {
+  throw eckit::NotImplemented("ObsDataQG::zeroAppended() is not implemented.", Here());
 }
 // -----------------------------------------------------------------------------
 }  // namespace qg

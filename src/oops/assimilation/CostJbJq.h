@@ -87,6 +87,9 @@ template<typename MODEL, typename OBS> class CostJbJq : public CostJbState<MODEL
 /// Randomize
   void randomize(CtrlInc_ &) const override;
 
+/// Update time_ for continuous DA changing window
+  void updateTimes(const std::vector<util::DateTime> &)  override;
+
 /// Accessors to data for constructing a new increment.
   const Geometry_ & geometry() const override {return *resol_;}
   const Variables & variables() const override {return ctlvars_;}
@@ -263,6 +266,13 @@ void CostJbJq<MODEL, OBS>::randomize(CtrlInc_ & dx) const {
   Log::trace() << "CostJbJq::randomize start" << std::endl;
   B_->randomize(dx.states());
   Log::trace() << "CostJbJq::randomize done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostJbJq<MODEL, OBS>::updateTimes(const std::vector<util::DateTime> & newtimes) {
+  times_ = newtimes;
 }
 
 // -----------------------------------------------------------------------------

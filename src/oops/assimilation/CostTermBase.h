@@ -86,6 +86,9 @@ template<typename MODEL, typename OBS> class CostTermBase {
 
 /// Reset trajectory.
   virtual void resetLinearization() = 0;
+
+/// Continuous DA update function
+  virtual void applyContDaUpdate(const eckit::Configuration & cdaConfig) = 0;
 };
 
 // -----------------------------------------------------------------------------

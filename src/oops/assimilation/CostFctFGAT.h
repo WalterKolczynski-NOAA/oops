@@ -46,6 +46,9 @@ template<typename MODEL, typename OBS> class CostFctFGAT : public CostFunction<M
   typedef State<MODEL>                    State_;
   typedef Model<MODEL>                    Model_;
   typedef VariableChange<MODEL>           VarCha_;
+  typedef CostJbTotal<MODEL, OBS>         JbTotal_;
+  typedef CostJo<MODEL, OBS>              CostJo_;
+  typedef CostTermBase<MODEL, OBS>        CostBase_;
 
  public:
   CostFctFGAT(const eckit::Configuration &, const eckit::mpi::Comm &);
@@ -58,6 +61,8 @@ template<typename MODEL, typename OBS> class CostFctFGAT : public CostFunction<M
   void zeroAD(CtrlInc_ &) const override;
 
   void runNL(CtrlVar_ &, PostProcessor<State_>&) const override;
+
+  void applyContDaUpdate(const eckit::Configuration & cdaConfig) override;
 
  protected:
   const Geometry_ & geometry() const override {return resol_;}
@@ -73,7 +78,7 @@ template<typename MODEL, typename OBS> class CostFctFGAT : public CostFunction<M
   void finishLinearize() override;
 
   const eckit::mpi::Comm & comm_;
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   const Geometry_ resol_;
   Model_ model_;
   const Variables ctlvars_;
@@ -268,6 +273,29 @@ void CostFctFGAT<MODEL, OBS>::addIncr(CtrlVar_ & xx, const CtrlInc_ & dx,
   ASSERT(dx.state().validTime() == timeWindow_.midpoint());
   xx.state() += dx.state();
   Log::trace() << "CostFctFGAT::addIncr done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostFctFGAT<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig) {
+  Log::trace() << "CostFctFGAT::applyContDaUpdate start" << std::endl;
+  // update for jo, must update jo before other cost terms
+  this->getNonConstJo()->applyContDaUpdate(cdaConfig);
+  if (cdaConfig.has("time window")) {
+    throw eckit::NotImplemented("oops::CostFctFGAT: continuous DA, "
+                    "window shift not implemented for FGAT. ", Here());
+  }
+
+  // for VarBC, update for jb needs to be called even if window is not shifted
+  // note if timeWindow is not changed times remains unchanged
+  std::vector<util::DateTime> startTime(1);
+  startTime[0] = timeWindow_.start();
+  this->getNonConstJb()->applyContDaUpdate(cdaConfig, startTime);
+
+  // update for Jc terms
+  // currently no Jc terms work with FGAT
+  Log::trace() << "CostFctFGAT::applyContDaUpdate done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

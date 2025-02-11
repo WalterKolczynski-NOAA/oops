@@ -94,21 +94,9 @@ Run::Run(int argc, char** argv) : eckit::Main(argc, argv, "OOPS_HOME"), config_(
       std::cout << "Usages:" << std::endl;
       std::cout << "  # run main application:" << std::endl;
       std::cout << "  " << argv0 << " input-file [output-file]" << std::endl;
-      std::cout << "  # run main application without validating YAML file:" << std::endl;
-      std::cout << "  " << argv0 << " --no-validate input-file" << std::endl;
-      std::cout << "  # check input YAML file against its schema:" << std::endl;
-      std::cout << "  " << argv0 << " --validate-only input-file" << std::endl;
-      std::cout << "  # write input file schema to given file name:" << std::endl;
-      std::cout << "  " << argv0 << " --output-json-schema=file-name" << std::endl;
       std::cout << "  # print this help and exit:" << std::endl;
       std::cout << "  " << argv0 << " --help" << std::endl;
       is_print_help_only_ = true;
-    } else if (item == "--validate-only") {
-      is_validate_only_ = true;
-    } else if (item == "--no-validate") {
-      validate_ = false;
-    } else if (item.rfind("--output-json-schema=", 0) == 0) {
-      output_json_schema_path_ = item.substr(item.find("=") + 1);
     } else if (infilename.empty()) {
       infilename = item;
     } else if (outfilename.empty()) {
@@ -119,30 +107,24 @@ Run::Run(int argc, char** argv) : eckit::Main(argc, argv, "OOPS_HOME"), config_(
   }
 
   if (infilename.empty()) {
-    if (!is_print_help_only_ && output_json_schema_path_.empty()) {
+    if (!is_print_help_only_) {
       ABORT("Positional argument 1 must be the file name of a YAML configuration file");
     }
-  } else if (!output_json_schema_path_.empty()) {
-    ABORT("Cannot specify config file name (positional argument 1) with --output-json-schema=...");
-  } else if (is_validate_only_ && !outfilename.empty()) {
-    ABORT("Cannot specify output file name (positional argument 2) with --validate-only");
   } else {
     // Read configuration
     eckit::PathName infilepathname = infilename;
     config_.reset(new eckit::YAMLConfiguration(infilepathname));
 
-    if (!is_validate_only_) {
-      // Get configuration file and optional output file from command line
-      LibOOPS::instance().initialise();
+    // Get configuration file and optional output file from command line
+    LibOOPS::instance().initialise();
 
-      // Configure TestReference with "test:" sub-config
-      if (config_->has("test"))
-        LibOOPS::instance().testReferenceInitialise(config_->getSubConfiguration("test"));
+    // Configure TestReference with "test:" sub-config
+    if (config_->has("test"))
+      LibOOPS::instance().testReferenceInitialise(config_->getSubConfiguration("test"));
 
-      if (!outfilename.empty()) {
-        eckit::PathName outfilepathname = outfilename;
-        LibOOPS::instance().teeOutput(outfilepathname);
-      }
+    if (!outfilename.empty()) {
+      eckit::PathName outfilepathname = outfilename;
+      LibOOPS::instance().teeOutput(outfilepathname);
     }
 
     Log::info() << "Configuration input file is: " << infilepathname << std::endl;
@@ -153,7 +135,7 @@ Run::Run(int argc, char** argv) : eckit::Main(argc, argv, "OOPS_HOME"), config_(
 // -----------------------------------------------------------------------------
 
 Run::~Run() {
-  if (!is_print_help_only_ && !is_validate_only_ && output_json_schema_path_.empty()) {
+  if (!is_print_help_only_) {
     LibOOPS::instance().finalise();  // Finalize MPI and logs
   }
 }
@@ -166,31 +148,21 @@ int Run::execute(const Application & app, const eckit::mpi::Comm & comm) {
   }
   int status = 1;
   try {
-    if (!output_json_schema_path_.empty()) {
-      app.outputSchema(output_json_schema_path_);
-      Log::info() << "Output JSON Schema file: " << output_json_schema_path_ << std::endl;
-      status = 0;
-    } else if (is_validate_only_) {
-      app.validateConfig(*config_);
-      Log::info() << "Configuration OK" << std::endl;
-      status = 0;
-    } else {
-      // Start measuring performance
-      util::TimerHelper::setComm(comm);
-      util::TimerHelper::start();
-      util::ObjectCountHelper::start();
-      util::printRunStats("Run start", true, comm);
-      if (config_->getBool("ecflow", false)) util::use_ecflow();
-      // Run application
-      Log::info() << "Run: Starting " << app << std::endl;
-      status = app.execute(*config_, validate_);
-      Log::info() << std::endl << "Run: Finishing " << app << std::endl;
-      // Performance diagnostics
-      util::ObjectCountHelper::stop();
-      util::TimerHelper::stop();
-      util::printRunStats("Run end", true, comm);
-      Log::info() << "Run: Finishing " << app << " with status = " << status << std::endl;
-    }
+    // Start measuring performance
+    util::TimerHelper::setComm(comm);
+    util::TimerHelper::start();
+    util::ObjectCountHelper::start();
+    util::printRunStats("Run start", true, comm);
+    if (config_->getBool("ecflow", false)) util::use_ecflow();
+    // Run application
+    Log::info() << "Run: Starting " << app << std::endl;
+    status = app.execute(*config_);
+    Log::info() << std::endl << "Run: Finishing " << app << std::endl;
+    // Performance diagnostics
+    util::ObjectCountHelper::stop();
+    util::TimerHelper::stop();
+    util::printRunStats("Run end", true, comm);
+    Log::info() << "Run: Finishing " << app << " with status = " << status << std::endl;
   }
   catch(const eckit::Exception & e) {
     status = 1;

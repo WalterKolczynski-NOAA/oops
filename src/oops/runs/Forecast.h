@@ -15,7 +15,6 @@
 #include <string>
 
 #include "eckit/config/LocalConfiguration.h"
-#include "oops/base/ForecastParameters.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/Model.h"
 #include "oops/base/PostProcessor.h"
@@ -29,23 +28,9 @@
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
-#include "oops/util/parameters/Parameter.h"
-#include "oops/util/parameters/Parameters.h"
-#include "oops/util/parameters/RequiredParameter.h"
 #include "oops/util/WorkflowUpdater.h"
 
 namespace oops {
-
-/// Options taken by the Forecast application.
-template <typename MODEL> class ForecastAppParameters : public ApplicationParameters {
-  OOPS_CONCRETE_PARAMETERS(ForecastAppParameters, ApplicationParameters);
-
- public:
-  typedef ForecastParameters<MODEL> ForecastParameters_;
-
-  /// Forecast parameters.
-  ForecastParameters_ fcstConf{this};
-};
 
 // -----------------------------------------------------------------------------
 
@@ -55,7 +40,6 @@ template <typename MODEL> class Forecast : public Application {
   typedef Model<MODEL>                 Model_;
   typedef ModelAuxControl<MODEL>       ModelAux_;
   typedef State<MODEL>                 State_;
-  typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
 
  public:
 // -----------------------------------------------------------------------------
@@ -63,14 +47,9 @@ template <typename MODEL> class Forecast : public Application {
 // -----------------------------------------------------------------------------
   virtual ~Forecast() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
-//  Deserialize parameters
-    ForecastAppParameters_ params;
-    if (validate) params.validate(fullConfig);
-    params.deserialize(fullConfig);
-
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Setup resolution
-    const Geometry_ resol(params.fcstConf.geometry, this->getComm());
+    const Geometry_ resol(eckit::LocalConfiguration(fullConfig, "geometry"), this->getComm());
 
 //  Setup Model
     const Model_ model(resol, eckit::LocalConfiguration(fullConfig, "model"));
@@ -99,8 +78,8 @@ template <typename MODEL> class Forecast : public Application {
     outConfig.set("date", bgndate.toString());
     post.enrollProcessor(new StateWriter<State_>(outConfig));
 
-    if (params.fcstConf.structuredGridOutput.value() != boost::none) {
-      eckit::LocalConfiguration structConfig = params.fcstConf.structuredGridOutput.value().value();
+    if (fullConfig.has("forecast to structured grid")) {
+      eckit::LocalConfiguration structConfig(fullConfig, "forecast to structured grid");
       structConfig.set("date", bgndate.toString());
       post.enrollProcessor(new StructuredGridPostProcessor<MODEL, State_>(structConfig, resol));
     }
@@ -115,16 +94,6 @@ template <typename MODEL> class Forecast : public Application {
     Log::test() << "Final state: " << xx << std::endl;
 
     return 0;
-  }
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    ForecastAppParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    ForecastAppParameters_ params;
-    params.validate(fullConfig);
   }
 // -----------------------------------------------------------------------------
  private:

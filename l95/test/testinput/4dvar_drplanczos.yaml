@@ -32,7 +32,7 @@ cost function:
   - jcdfi:
       filtered variables: [x]
       alpha: 100.0
-      cutoff: PT3H
+      cutoff: PT6H
 variational:
   minimizer:
     algorithm: DRPLanczos
@@ -50,10 +50,10 @@ variational:
       resol: 40
     linear model:
       name: L95TLM
-      tstep: PT1H30M
+      tstep: PT3H
       trajectory:
         f: 8.0
-        tstep: PT1H30M
+        tstep: PT3H
       variable change: Identity
   - ninner: 10
     gradient norm reduction: 1.0e-10
@@ -68,7 +68,7 @@ variational:
       variable change: Identity
 final:
   prints:
-    frequency: PT1H30M
+    frequency: PT3H
 output:
   datadir: Data
   exp: 4dvar_drplanczos
@@ -78,3 +78,4 @@ output:
 
 test:
   reference filename: testoutput/4dvar_drplanczos.test
+  test output filename: testoutput/4dvar_drplanczos.out

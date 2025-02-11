@@ -84,12 +84,11 @@ class TestParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(TestParameters, Parameters)
 
   typedef oops::Geometry<MODEL>           Geometry_;
-  typedef typename Geometry_::Parameters_ GeometryParameters_;
   typedef StateTestParameters<MODEL>      StateTestParameters_;
 
  public:
   oops::RequiredParameter<StateTestParameters_> stateTest{"state test", this};
-  oops::RequiredParameter<GeometryParameters_> geometry{"geometry", this};
+  oops::RequiredParameter<eckit::LocalConfiguration> geometry{"geometry", this};
   // The YAML file may also contain options used by other tests; don't treat them as errors.
   oops::IgnoreOtherParameters ignore{this};
 };

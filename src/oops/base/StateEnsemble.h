@@ -20,6 +20,7 @@
 #include "oops/util/ConfigFunctions.h"
 #include "oops/util/FieldSetOperations.h"
 #include "oops/util/Logger.h"
+#include "oops/util/parameters/OptionalParameter.h"
 #include "oops/util/parameters/Parameter.h"
 #include "oops/util/parameters/Parameters.h"
 #include "oops/util/parameters/RequiredParameter.h"

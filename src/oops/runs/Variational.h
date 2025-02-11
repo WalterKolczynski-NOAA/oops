@@ -38,7 +38,6 @@
 #include "oops/runs/Application.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
-#include "oops/util/parameters/Parameters.h"
 #include "oops/util/printRunStats.h"
 
 namespace oops {
@@ -62,7 +61,7 @@ template <typename MODEL, typename OBS> class Variational : public Application {
 // -----------------------------------------------------------------------------
   virtual ~Variational() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     Log::trace() << "Variational: execute start" << std::endl;
     util::printRunStats("Variational start");
 /// The background is constructed inside the cost function because its valid
@@ -185,11 +184,6 @@ template <typename MODEL, typename OBS> class Variational : public Application {
     util::printRunStats("Variational end");
     Log::trace() << "Variational: execute done" << std::endl;
     return 0;
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    // Note: Variational app doesn't have application level Parameters yet;
-    // not validating anything.
   }
 // -----------------------------------------------------------------------------
  private:

@@ -11,7 +11,7 @@
 # OOPS
 ################################################################################
 
-cmake_minimum_required( VERSION 3.12 )
+cmake_minimum_required( VERSION 3.23 )
 project( oops VERSION 1.10.0 LANGUAGES CXX Fortran )
 
 option(OPENMP "Build oops with OpenMP support" ON)
@@ -64,6 +64,10 @@ if(OpenMP_FOUND)
     find_package( atlas 0.35.0 REQUIRED COMPONENTS OMP OMP_Fortran )
 else()
     find_package( atlas 0.35.0 REQUIRED )
+endif()
+
+if( atlas_VERSION VERSION_GREATER_EQUAL "0.39.0" )
+  find_package( hic REQUIRED )
 endif()
 
 #Optional Dependencies

@@ -241,4 +241,27 @@ call qg_obsdb_nobs(self,grp,kobs)
 
 end subroutine qg_obsdb_nobs_c
 ! ------------------------------------------------------------------------------
+subroutine qg_obsdb_has_c(c_key_self,lgrp,c_grp,khas) bind(c,name='qg_obsdb_has_f90')
+
+implicit none
+
+! Passed variables
+integer(c_int),intent(in) :: c_key_self                  !< Observation data
+integer(c_int),intent(in) :: lgrp                        !< Group size
+character(kind=c_char,len=1),intent(in) :: c_grp(lgrp+1) !< Group name
+integer(c_int),intent(inout) :: khas                     !< Number of observations
+
+! Local variables
+type(qg_obsdb),pointer :: self
+character(len=lgrp) :: grp
+
+! Interface
+call qg_obsdb_registry%get(c_key_self,self)
+call c_f_string(c_grp,grp)
+
+! Call Fortran
+call qg_obsdb_has(self,grp,khas)
+
+end subroutine qg_obsdb_has_c
+! ------------------------------------------------------------------------------
 end module qg_obsdb_interface

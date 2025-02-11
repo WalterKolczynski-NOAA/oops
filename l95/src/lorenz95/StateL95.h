@@ -94,11 +94,11 @@ class StateL95 : public util::Printable,
   size_t serialSize() const;
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
-  void transpose(const StateL95 & FCState, const eckit::mpi::Comm & global, const int & mytask,
+  void transpose(const StateL95 & FCState, const eckit::mpi::Comm & global,
      const int & ensNum, const int & transNum) {
      throw eckit::NotImplemented("StateL95::transpose not implemented", Here());
   }
-  void Rtranspose(const StateL95 & DAState, const eckit::mpi::Comm & global, const int & mytask,
+  void Rtranspose(const StateL95 & DAState, const eckit::mpi::Comm & global,
      const int & ensNum, const int & transNum) {
      throw eckit::NotImplemented("StateL95::Rtranspose not implemented", Here());
   }

@@ -35,6 +35,7 @@ static oops::interface::LinearModelMaker<QgTraits, TlmQG> makerQGTLM_("QgTLM");
 // -----------------------------------------------------------------------------
 TlmQG::TlmQG(const GeometryQG & resol, const eckit::Configuration & tlConf)
   : keyConfig_(0), tstep_(util::Duration(tlConf.getString("tstep"))), resol_(resol), traj_(),
+    steptraj_(util::Duration(tlConf.getString("trajectory step", tstep_.toString()))),
     lrmodel_(resol_, eckit::LocalConfiguration(tlConf, "trajectory"))
 {
   qg_model_setup_f90(keyConfig_, tlConf);
@@ -51,8 +52,6 @@ TlmQG::~TlmQG() {
 }
 // -----------------------------------------------------------------------------
 void TlmQG::setTrajectory(const StateQG & xx, StateQG & xlr, const ModelBias & bias) {
-// StateQG xlr(resol_, xx);
-  xlr.changeResolution(xx);
   int ftraj = lrmodel_.saveTrajectory(xlr, bias);
   traj_[xx.validTime()] = ftraj;
 }
@@ -62,11 +61,9 @@ void TlmQG::initializeTL(IncrementQG & dx) const {
 }
 // -----------------------------------------------------------------------------
 void TlmQG::stepTL(IncrementQG & dx, const ModelBiasIncrement &) const {
-  trajICst itra = traj_.find(dx.validTime());
-  if (itra == traj_.end()) {
-    oops::Log::error() << "TlmQG: trajectory not available at time " << dx.validTime() << std::endl;
-    ABORT("TlmQG: trajectory not available");
-  }
+  ASSERT(traj_.begin()->first <= dx.validTime());
+  ASSERT(traj_.rbegin()->first >= dx.validTime());
+  trajICst itra = traj_.lower_bound(dx.validTime());
   ASSERT(dx.fields().isForModel(false));
   qg_model_propagate_tl_f90(keyConfig_, itra->second, dx.fields().toFortran());
   dx.validTime() += tstep_;
@@ -80,11 +77,9 @@ void TlmQG::initializeAD(IncrementQG & dx) const {
 // -----------------------------------------------------------------------------
 void TlmQG::stepAD(IncrementQG & dx, ModelBiasIncrement &) const {
   dx.validTime() -= tstep_;
-  trajICst itra = traj_.find(dx.validTime());
-  if (itra == traj_.end()) {
-    oops::Log::error() << "TlmQG: trajectory not available at time " << dx.validTime() << std::endl;
-    ABORT("TlmQG: trajectory not available");
-  }
+  ASSERT(traj_.begin()->first <= dx.validTime());
+  ASSERT(traj_.rbegin()->first >= dx.validTime());
+  trajICst itra = traj_.lower_bound(dx.validTime());
   ASSERT(dx.fields().isForModel(false));
   qg_model_propagate_ad_f90(keyConfig_, itra->second, dx.fields().toFortran());
 }

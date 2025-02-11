@@ -54,7 +54,7 @@ ModelBias & ModelBias::operator+=(const ModelBiasCorrection & dx) {
 }
 // -----------------------------------------------------------------------------
 void ModelBias::print(std::ostream & os) const {
-  if (active_) {os << "ModelBias = " << bias_;}
+  if (active_) {os << std::endl << "ModelBias = " << bias_;}
 }
 // -----------------------------------------------------------------------------
 }  // namespace lorenz95

@@ -83,8 +83,7 @@ template<typename MODEL, typename OBS> class CostFunction : private boost::nonco
 /// Compute cost function gradient at first guess (without Jb).
   void computeGradientFG(CtrlInc_ &) const;
 
-/// Append function to call appendObs from jo
-  void appendObs(const eckit::Configuration & appendConfig);
+  virtual void applyContDaUpdate(const eckit::Configuration & cdaConfig) = 0;
 
 /// Access \f$ J_b\f$
   const JbTotal_ & jb() const {return *jb_;}
@@ -335,16 +334,7 @@ void CostFunction<MODEL, OBS>::resetLinearization() {
   Log::trace() << "CostFunction::resetLinearization done" << std::endl;
 }
 
-// -----------------------------------------------------------------------------
-
-template<typename MODEL, typename OBS>
-void CostFunction<MODEL, OBS>::appendObs(const eckit::Configuration & appendConfig) {
-  Log::trace() << "CostFunction::appendObs start" << std::endl;
-  jo_->appendObs(appendConfig);
-  Log::trace() << "CostFunction::appendObs done" << std::endl;
-}
-
-// -----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 }  // namespace oops
 

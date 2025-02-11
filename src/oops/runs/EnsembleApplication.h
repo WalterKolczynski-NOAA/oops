@@ -48,10 +48,9 @@ class EnsembleApplication : public Application {
 // -----------------------------------------------------------------------------
   virtual ~EnsembleApplication() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     EnsembleApplicationParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Get the list of YAML files
@@ -82,25 +81,7 @@ class EnsembleApplication : public Application {
     eckit::YAMLConfiguration memberConf(confPath);
 
     APP ensapp(commMember);
-    return ensapp.execute(memberConf, validate);
-  }
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    EnsembleApplicationParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    EnsembleApplicationParameters_ params;
-    params.validate(fullConfig);
-    // For ensemble applications also need to validate individual yamls
-    APP ensapp(oops::mpi::world());
-    params.deserialize(fullConfig);
-    for (size_t jj = 0; jj < params.files.value().size(); ++jj) {
-      const eckit::PathName confPath(params.files.value()[jj]);
-      const eckit::YAMLConfiguration memberConf(confPath);
-      ensapp.validateConfig(memberConf);
-    }
+    return ensapp.execute(memberConf);
   }
 // -----------------------------------------------------------------------------
  private:

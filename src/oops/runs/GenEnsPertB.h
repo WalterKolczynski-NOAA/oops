@@ -43,13 +43,11 @@ template <typename MODEL> class GenEnsPertBParameters : public ApplicationParame
   OOPS_CONCRETE_PARAMETERS(GenEnsPertBParameters, ApplicationParameters)
 
  public:
-  typedef ModelSpaceCovarianceParametersWrapper<MODEL> CovarianceParameters_;
-  typedef typename Geometry<MODEL>::Parameters_        GeometryParameters_;
   typedef State<MODEL>                                 State_;
   typedef ModelAuxControl<MODEL>                       ModelAux_;
 
   /// Geometry parameters.
-  RequiredParameter<GeometryParameters_> geometry{"geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> geometry{"geometry", this};
 
   /// Model parameters.
   RequiredParameter<eckit::LocalConfiguration> model{"model", this};
@@ -68,7 +66,7 @@ template <typename MODEL> class GenEnsPertBParameters : public ApplicationParame
   RequiredParameter<Variables> perturbedVariables{"perturbed variables", this};
 
   /// Background error covariance model.
-  RequiredParameter<CovarianceParameters_> backgroundError{"background error", this};
+  RequiredParameter<eckit::LocalConfiguration> backgroundError{"background error", this};
 
   /// Size of the perturbed ensemble to generate.
   RequiredParameter<int> members{"members", this};
@@ -85,7 +83,6 @@ template <typename MODEL> class GenEnsPertBParameters : public ApplicationParame
 template <typename MODEL> class GenEnsPertB : public Application {
   typedef ModelSpaceCovarianceBase<MODEL>           CovarianceBase_;
   typedef CovarianceFactory<MODEL>                  CovarianceFactory_;
-  typedef ModelSpaceCovarianceParametersBase<MODEL> CovarianceParametersBase_;
   typedef Geometry<MODEL>                           Geometry_;
   typedef Model<MODEL>                              Model_;
   typedef ModelAuxControl<MODEL>                    ModelAux_;
@@ -104,10 +101,9 @@ template <typename MODEL> class GenEnsPertB : public Application {
 // -----------------------------------------------------------------------------
   virtual ~GenEnsPertB() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     GenEnsPertBParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Setup resolution
@@ -134,10 +130,9 @@ template <typename MODEL> class GenEnsPertB : public Application {
     const Variables vars(fullConfig, "perturbed variables");
 
 //  Setup B matrix
-    const CovarianceParametersBase_ &covarParams =
-        params.backgroundError.value().covarianceParameters;
+    const eckit::LocalConfiguration covConf(fullConfig, "background error");
     std::unique_ptr<CovarianceBase_> Bmat(CovarianceFactory_::create(
-                                            resol, vars, covarParams, xx, xx));
+                                            resol, vars, covConf, xx, xx));
 
     if (fullConfig.getBool("include control", false)) {
 //    Save control as ensemble member 0
@@ -183,16 +178,6 @@ template <typename MODEL> class GenEnsPertB : public Application {
     }
 
     return 0;
-  }
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    GenEnsPertBParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    GenEnsPertBParameters_ params;
-    params.validate(fullConfig);
   }
 // -----------------------------------------------------------------------------
  private:

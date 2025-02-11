@@ -15,6 +15,7 @@
 
 #include <limits>
 #include <memory>
+#include <vector>
 
 #include "oops/assimilation/ControlIncrement.h"
 #include "oops/assimilation/ControlVariable.h"
@@ -103,21 +104,24 @@ template<typename MODEL, typename OBS> class CostJbTotal {
   const Geometry_ & resolution() const;
   const JbState_ & jbState() const {return *jb_;}
   const JbModelAux_ & jbModBias() const {return jbModBias_;}
-  const JbObsAux_ & jbObsBias() const {return jbObsBias_;}
+  const JbObsAux_ & jbObsBias() const {return *jbObsBias_;}
   const util::DateTime & windowBegin() const {return timeWindow_.start();}
   const util::DateTime & windowEnd()   const {return timeWindow_.end();}
+/// continuous DA update
+  void applyContDaUpdate(const eckit::Configuration &, std::vector<util::DateTime> &);
 
  private:
   double evaluate(const CtrlInc_ &) const;
-
+  const ObsSpaces_ & odb_;
+  const eckit::LocalConfiguration conf_;
   std::unique_ptr<JbState_> jb_;
   JbModelAux_ jbModBias_;
-  JbObsAux_  jbObsBias_;
+  std::unique_ptr<JbObsAux_> jbObsBias_;
   CtrlVar_ xb_;
 
 /// Inner loop resolution
   const Geometry_ * resol_;
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   eckit::LocalConfiguration innerConf_;
 
 /// First guess increment \f$x_0-x_b\f$ or more generally \f$ x_i-M(x_{i-1})\f$.
@@ -137,9 +141,10 @@ template<typename MODEL, typename OBS>
 CostJbTotal<MODEL, OBS>::CostJbTotal(JbState_ * jb,
                                      const eckit::Configuration & conf,
                                      const Geometry_ & resol, const ObsSpaces_ & odb)
-  : jb_(jb), jbModBias_(conf, resol),
-    jbObsBias_(odb, conf.getSubConfiguration("observations.observers")),
-    xb_(jb_->background(), jbModBias_.background(), jbObsBias_.background()),
+  : odb_(odb), conf_(conf), jb_(jb), jbModBias_(conf, resol),
+    jbObsBias_(std::make_unique<JbObsAux_>(odb,
+                              conf.getSubConfiguration("observations.observers"))),
+    xb_(jb_->background(), jbModBias_.background(), jbObsBias_->background()),
     resol_(nullptr), timeWindow_(eckit::LocalConfiguration(conf, "time window")),
     innerConf_(), dxFG_(), xx_(), traj_(), jqtraj_()
 {
@@ -153,7 +158,7 @@ CostJbTotal<MODEL, OBS>::CostJbTotal(JbState_ * jb,
 template<typename MODEL, typename OBS>
 CostJbTotal<MODEL, OBS>::~CostJbTotal() {
   Log::trace() << "CostJbTotal::~CostJbTotal start" << std::endl;
-  jbObsBias_.covariance().write(jbObsBias_.covariance().config());
+  jbObsBias_->covariance().write(jbObsBias_->covariance().config());
   Log::trace() << "CostJbTotal::~CostJbTotal done" << std::endl;
 }
 
@@ -221,7 +226,7 @@ void CostJbTotal<MODEL, OBS>::setPostProcTraj(const CtrlVar_ & fg,
   jqtraj_.reset(jb_->initializeJqTLAD());
   pptraj.enrollProcessor(jqtraj_);
   jbModBias_.setPostProcTraj(*traj_, innerConf_, *resol_, pptraj);
-  jbObsBias_.setPostProcTraj(*traj_, innerConf_, *resol_, pptraj);
+  jbObsBias_->setPostProcTraj(*traj_, innerConf_, *resol_, pptraj);
   Log::trace() << "CostJbTotal::setPostProcTraj done" << std::endl;
 }
 
@@ -238,7 +243,7 @@ void CostJbTotal<MODEL, OBS>::computeCostTraj() {
   jbModBias_.computeCostTraj();
 
 // Linearize obs bias term
-  jbObsBias_.computeCostTraj();
+  jbObsBias_->computeCostTraj();
 
 // Compute and save first guess increment.
   dxFG_.reset(new CtrlInc_(*this));
@@ -361,7 +366,7 @@ void CostJbTotal<MODEL, OBS>::multiplyB(const CtrlInc_ & dxin, CtrlInc_ & dxout)
   Log::trace() << "CostJbTotal::multiplyB start" << std::endl;
   jb_->Bmult(dxin, dxout);
   jbModBias_.multiplyCovar(dxin, dxout);
-  jbObsBias_.multiplyCovar(dxin, dxout);
+  jbObsBias_->multiplyCovar(dxin, dxout);
   Log::trace() << "CostJbTotal::multiplyB done" << std::endl;
 }
 
@@ -372,7 +377,7 @@ void CostJbTotal<MODEL, OBS>::multiplyBinv(const CtrlInc_ & dxin, CtrlInc_ & dxo
   Log::trace() << "CostJbTotal::multiplyBinv start" << std::endl;
   jb_->Bminv(dxin, dxout);
   jbModBias_.multiplyCoInv(dxin, dxout);
-  jbObsBias_.multiplyCoInv(dxin, dxout);
+  jbObsBias_->multiplyCoInv(dxin, dxout);
   Log::trace() << "CostJbTotal::multiplyBinv done" << std::endl;
 }
 
@@ -383,11 +388,27 @@ void CostJbTotal<MODEL, OBS>::randomize(CtrlInc_ & dx) const {
   Log::trace() << "CostJbTotal::randomize start" << std::endl;
   jb_->randomize(dx);
   jbModBias_.randomize(dx);
-  jbObsBias_.randomize(dx);
+  jbObsBias_->randomize(dx);
   Log::trace() << "CostJbTotal::randomize done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostJbTotal<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig,
+                                               std::vector<util::DateTime> & newtimes) {
+  Log::trace() << "CostJbTotal::applyContDaUpdate start" << std::endl;
+  if (cdaConfig.has("time window")) {
+    util::TimeWindow newWindow(cdaConfig.getSubConfiguration("time window"));
+    timeWindow_ = newWindow;
+    jb_->updateTimes(newtimes);
+  }
+  jbObsBias_.reset(new JbObsAux_(odb_, conf_.getSubConfiguration("observations.observers")));
+  Log::trace() << "CostJbTotal::applyContDaUpdate done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
 
 }  // namespace oops
 

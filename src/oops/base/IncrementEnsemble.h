@@ -42,10 +42,9 @@ template <typename MODEL> class GeometryIterator;
 template <typename MODEL>
 class IncrementMemberTemplateParameters : public Parameters {
   OOPS_CONCRETE_PARAMETERS(IncrementMemberTemplateParameters, Parameters)
-
-  typedef typename Increment<MODEL>::ReadParameters_ Parameters_;
  public:
-  RequiredParameter<Parameters_> increment{"template", "template to define a generic member", this};
+  RequiredParameter<eckit::LocalConfiguration> increment{"template",
+                                                   "template to define a generic member", this};
   RequiredParameter<std::string> pattern{"pattern", "pattern to be replaced for members", this};
   RequiredParameter<size_t> nmembers{"nmembers", "number of members", this};
   Parameter<size_t> start{"start", "starting member index", 1, this};
@@ -60,11 +59,10 @@ template <typename MODEL>
 class IncrementEnsembleParameters : public Parameters {
   OOPS_CONCRETE_PARAMETERS(IncrementEnsembleParameters, Parameters)
 
-  typedef typename Increment<MODEL>::ReadParameters_ Parameters_;
   typedef IncrementMemberTemplateParameters<MODEL> IncrementMemberTemplateParameters_;
  public:
   RequiredParameter<util::DateTime> date{"date", "increment date", this};
-  OptionalParameter<std::vector<Parameters_>> increments{"members",
+  OptionalParameter<std::vector<eckit::LocalConfiguration>> increments{"members",
                    "members of the increment ensemble", this};
   OptionalParameter<IncrementMemberTemplateParameters_> increments_template{"members from template",
                    "template to define members of the increment ensemble", this};
@@ -77,7 +75,7 @@ class IncrementEnsembleParameters : public Parameters {
   size_t size() const;
 
   /// Get Increment parameters for a given ensemble index
-  Parameters_ getIncrementParameters(const size_t &) const;
+  eckit::LocalConfiguration getIncrementParameters(const size_t &) const;
 };
 
 // -----------------------------------------------------------------------------
@@ -117,7 +115,7 @@ size_t IncrementEnsembleParameters<MODEL>::size() const
 // -----------------------------------------------------------------------------
 
 template <typename MODEL>
-typename Increment<MODEL>::ReadParameters_
+eckit::LocalConfiguration
   IncrementEnsembleParameters<MODEL>::getIncrementParameters(const size_t & ie) const
 {
   // Check ensemble size
@@ -132,8 +130,7 @@ typename Increment<MODEL>::ReadParameters_
     // Members template
 
     // Template configuration
-    eckit::LocalConfiguration incrementConf;
-    increments_template.value()->increment.value().serialize(incrementConf);
+    eckit::LocalConfiguration incrementConf(increments_template.value()->increment.value());
 
     // Get correct index
     size_t count = increments_template.value()->start;
@@ -155,10 +152,7 @@ typename Increment<MODEL>::ReadParameters_
     util::seekAndReplace(memberConf, increments_template.value()->pattern,
       count, increments_template.value()->zpad);
 
-    // Get member parameters
-    Parameters_ params;
-    params.validateAndDeserialize(memberConf);
-    return params;
+    return memberConf;
   }
 }
 

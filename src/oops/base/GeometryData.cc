@@ -74,6 +74,9 @@ GeometryData::GeometryData(const atlas::FunctionSpace & fspace, const atlas::Fie
   firstTriangulationOfQuadsIsDelaunay_(),
   earth_(atlas::util::Earth::radius()), globalNodeTree_(earth_), localCellCenterTree_(earth_)
 {
+  // Set default communicator name
+  eckit::mpi::setCommDefault(comm_.name().c_str());
+
   // Exit constructor early if receiving an uninitialized or mesh-less FunctionSpace, because
   // the mesh and trees for the oops::UnstructuredInterpolator can't be built in this case.
   if (!fspace_) {
@@ -409,6 +412,9 @@ void GeometryData::setMeshAndTriangulation() {
       atlas::mesh::actions::build_periodic_boundaries(mesh_);
     }
     atlas::mesh::actions::build_halo(mesh_, 1);
+
+    // Reset default communicator name
+    eckit::mpi::setCommDefault(comm_.name().c_str());
   } else {
     ABORT(fspace_.type() + " function space not supported yet");
   }

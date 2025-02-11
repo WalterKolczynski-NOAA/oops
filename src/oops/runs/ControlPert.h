@@ -89,14 +89,13 @@ template <typename MODEL, typename OBS> class ControlPert : public Application {
 // -----------------------------------------------------------------------------
   virtual ~ControlPert() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     Log::trace() << "ControlPert: execute start" << std::endl;
     util::printRunStats("ControlPert start");
 
 //  Deserialize parameters
     ControlPertTemplateParameters params;
     eckit::LocalConfiguration templateConf(fullConfig, "template");
-    if (validate) params.validate(templateConf);
     params.deserialize(templateConf);
 
 //  Retrieve control member configuration (for linearization)
@@ -390,12 +389,6 @@ template <typename MODEL, typename OBS> class ControlPert : public Application {
     util::printRunStats("ControlPert end");
     Log::trace() << "ControlPert: execute done" << std::endl;
     return 0;
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    ControlPertTemplateParameters params;
-    eckit::LocalConfiguration templateConf(fullConfig, "template");
-    params.validate(templateConf);
   }
 // -----------------------------------------------------------------------------
  private:

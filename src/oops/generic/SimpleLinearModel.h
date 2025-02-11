@@ -39,6 +39,7 @@ class SimpleLinearModel {
   virtual void setUpTrajectorySaver(PostProcessor<State_> &, const ModelAuxCtl_ &);
   virtual void setTrajectory(const State_ &, State_ &, const ModelAuxCtl_ &);
   const util::Duration & timeResolution() const {return linearModel_->timeResolution();}
+  const util::Duration & stepTrajectory() const {return linearModel_->stepTrajectory();}
   const oops::Variables & variables() const {return linearModel_->variables();}
 
  protected:

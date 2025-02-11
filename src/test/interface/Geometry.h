@@ -24,7 +24,6 @@
 #include "oops/runs/Test.h"
 #include "oops/util/FieldSetHelpers.h"
 #include "oops/util/Logger.h"
-#include "test/interface/GeometryFixture.h"
 #include "test/TestEnvironment.h"
 
 namespace test {
@@ -34,7 +33,8 @@ namespace test {
 template <typename MODEL> void testConstructor() {
   typedef oops::Geometry<MODEL>        Geometry_;
 
-  std::unique_ptr<Geometry_> geom(new Geometry_(GeometryFixture<MODEL>::getParameters(),
+  const eckit::LocalConfiguration conf(TestEnvironment::config(), "geometry");
+  std::unique_ptr<Geometry_> geom(new Geometry_(conf,
                                                 oops::mpi::world(), oops::mpi::myself()));
   EXPECT(geom.get());
   oops::Log::test() << "Testing geometry: " << *geom << std::endl;
@@ -50,7 +50,8 @@ template <typename MODEL> void testAtlasInterface() {
   const bool testAtlas = TestEnvironment::config().getBool("test atlas interface", true);
   if (!testAtlas) { return; }
 
-  std::unique_ptr<Geometry_> geom(new Geometry_(GeometryFixture<MODEL>::getParameters(),
+  const eckit::LocalConfiguration conf(TestEnvironment::config(), "geometry");
+  std::unique_ptr<Geometry_> geom(new Geometry_(conf,
                                                 oops::mpi::world(), oops::mpi::myself()));
 
   // Test FunctionSpace

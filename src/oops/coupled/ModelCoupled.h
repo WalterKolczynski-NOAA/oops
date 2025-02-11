@@ -74,7 +74,6 @@ ModelCoupled<MODEL1, MODEL2>::ModelCoupled(const GeometryCoupled_ & geom,
   : tstep_(), geom_(new GeometryCoupled_(geom)), model1_(), model2_(),
     parallel_(geom.isParallel()) {
   Log::trace() << "ModelCoupled::ModelCoupled starting" << std::endl;
-  Log::debug() << "ModelCoupled::ModelCoupled config " << config << std::endl;
   const eckit::LocalConfiguration conf1(config, MODEL1::name());
   const eckit::LocalConfiguration conf2(config, MODEL2::name());
   if (parallel_) {

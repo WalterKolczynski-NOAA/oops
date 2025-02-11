@@ -53,6 +53,8 @@ class ObsVec1D : public util::Printable,
   double & operator[](const std::size_t ii) {return data_.at(ii);}
 
   void zero();
+  /// zero values appended form ObsSpace
+  void zeroAppended();
   /// set all values to ones (for tests)
   void ones();
 
@@ -62,6 +64,7 @@ class ObsVec1D : public util::Printable,
   double dot_product_with(const ObsVec1D &) const;
   double rms() const;
   void mask(const ObsVec1D &);
+  void readAppended(const std::string &);
   ObsVec1D & operator= (const ObsData1D<float> &);
 
   unsigned int nobs() const;
@@ -72,6 +75,9 @@ class ObsVec1D : public util::Printable,
   void read(const std::string &);
 
   const double & missing() const {return missing_;}
+
+  std::string info(const std::string &) const;
+  std::string info(const std::string &, const ObsData1D<int> &) const;
 
  private:
   void print(std::ostream &) const;

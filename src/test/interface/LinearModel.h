@@ -390,7 +390,7 @@ class LinearModel : public oops::Test {
   // calling getInstance() with the MPI commuicator required on the first call.
   // This requires that the TestEnvironment is set up beforehand.
   // Then, continue with the base-class method.
-  int execute(const eckit::Configuration & globalConf, bool validate) const override {
+  int execute(const eckit::Configuration & globalConf) const override {
     typedef LinearModelFixture<MODEL> Test_;
 
     TestEnvironment::getInstance().setup(globalConf);
@@ -398,7 +398,7 @@ class LinearModel : public oops::Test {
     // Initialise the LinearModelFixture singleton with the communicator.
     Test_::getInstance(&getComm());
 
-    return oops::Test::execute(globalConf, validate);
+    return oops::Test::execute(globalConf);
   }
 
   void register_tests() const override {

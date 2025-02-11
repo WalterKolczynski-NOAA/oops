@@ -56,6 +56,9 @@ template<typename MODEL, typename OBS> class CostFct4DEnsVar : public CostFuncti
   typedef CostFunction<MODEL, OBS>        CostFct_;
   typedef Geometry<MODEL>                 Geometry_;
   typedef State<MODEL>                    State_;
+  typedef CostJbTotal<MODEL, OBS>         JbTotal_;
+  typedef CostJo<MODEL, OBS>              CostJo_;
+  typedef CostTermBase<MODEL, OBS>        CostBase_;
 
  public:
   CostFct4DEnsVar(const eckit::Configuration &, const eckit::mpi::Comm &);
@@ -68,6 +71,8 @@ template<typename MODEL, typename OBS> class CostFct4DEnsVar : public CostFuncti
   void zeroAD(CtrlInc_ &) const override;
 
   void runNL(CtrlVar_ &, PostProcessor<State_>&) const override;
+
+  void applyContDaUpdate(const eckit::Configuration & cdaConfig) override;
 
  protected:
   const Geometry_ & geometry() const override {return *resol_;}
@@ -84,7 +89,7 @@ template<typename MODEL, typename OBS> class CostFct4DEnsVar : public CostFuncti
   size_t nsubwin_;
   size_t nsublocal_;
   size_t last_;
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   util::Duration subWinLength_;
   std::vector<util::DateTime> subWinTime_;
   std::vector<util::DateTime> subWinBgn_;
@@ -193,8 +198,7 @@ CostTermBase<MODEL, OBS> * CostFct4DEnsVar<MODEL, OBS>::newJc(const eckit::Confi
     throw eckit::NotImplemented("CostFct4DEnsVar::newJc: no parallel Jc", Here());
   }
   const eckit::LocalConfiguration jcdfi(jcConf, "jcdfi");
-  const util::DateTime vt(timeWindow_.start() + timeWindow_.length()/2);
-  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, vt, timeWindow_.length(), subWinLength_);
+  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, timeWindow_, subWinLength_);
 }
 
 // -----------------------------------------------------------------------------
@@ -311,6 +315,37 @@ void CostFct4DEnsVar<MODEL, OBS>::addIncr(CtrlVar_ & xx, const CtrlInc_ & dx,
   }
   xx.states() += dx.states();
   Log::trace() << "CostFct4DEnsVar::addIncr done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostFct4DEnsVar<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig) {
+  Log::trace() << "CostFct4dEnsVar::applyContDaUpdate start" << std::endl;
+  // update for jo, must update jo before other cost terms
+  this->getNonConstJo()->applyContDaUpdate(cdaConfig);
+  if (cdaConfig.has("time window")) {
+    throw eckit::NotImplemented("oops::CostFct4dEnsVar: continuous DA, "
+                                "window shift not implemented for FGAT. ",
+                                Here());
+  }
+
+  // for VarBC, update for jb needs to be called even if window is not shifted
+  // note if timeWindow is not changed times remains unchanged
+  std::vector<util::DateTime> times;
+  for (util::DateTime jj = timeWindow_.start(); jj <= timeWindow_.end(); jj += subWinLength_) {
+    times.push_back(jj);
+  }
+  this->getNonConstJb()->applyContDaUpdate(cdaConfig, times);
+
+  std::vector<std::shared_ptr<CostBase_>> & jterms = this->getJTerms();
+  // update for constraint terms
+  if (jterms.size() > 1) {
+    for (size_t jj = 1; jj < jterms.size(); ++jj) {
+      jterms[jj]->applyContDaUpdate(cdaConfig);
+    }
+  }
+  Log::trace() << "CostFct4dEnsVar::applyContDaUpdate done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

@@ -39,22 +39,20 @@ class EnsMeanAndVarianceParameters : public ApplicationParameters {
   OOPS_CONCRETE_PARAMETERS(EnsMeanAndVarianceParameters, ApplicationParameters)
 
  public:
-  typedef typename Geometry<MODEL>::Parameters_           GeometryParameters_;
-  typedef typename Increment<MODEL>::WriteParameters_     IncrementWriteParameters_;
   typedef StateEnsembleParameters<MODEL>                  StateEnsembleParameters_;
 
   /// Geometry parameters.
-  RequiredParameter<GeometryParameters_> resolConfig{"geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> resolConfig{"geometry", this};
 
   /// Ensemble parameters.
   RequiredParameter<StateEnsembleParameters_> ensembleConfig{"ensemble", this};
 
   /// Output increment parameters for variance.
-  OptionalParameter<IncrementWriteParameters_> outputStdDevConfig{"standard deviation output",
+  OptionalParameter<eckit::LocalConfiguration> outputStdDevConfig{"standard deviation output",
                                                  this};
   OptionalParameter<eckit::LocalConfiguration> outputStdDevConfigLL
                   {"standard deviation to structured grid", this};
-  OptionalParameter<IncrementWriteParameters_> outputVarConfig{"variance output", this};
+  OptionalParameter<eckit::LocalConfiguration> outputVarConfig{"variance output", this};
   OptionalParameter<eckit::LocalConfiguration> outputVarConfigLL
                   {"ensvariance to structured grid", this};
 
@@ -80,10 +78,9 @@ template <typename MODEL> class EnsMeanAndVariance : public Application {
   // -----------------------------------------------------------------------------
   virtual ~EnsMeanAndVariance() {}
   // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     EnsMeanAndVarianceParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Setup Geometry
@@ -136,22 +133,12 @@ template <typename MODEL> class EnsMeanAndVariance : public Application {
 
     return 0;
   }
-  // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    EnsMeanAndVarianceParameters_ params;
-    params.outputSchema(outputPath);
-  }
 // -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    EnsMeanAndVarianceParameters_ params;
-    params.validate(fullConfig);
-  }
-  // -----------------------------------------------------------------------------
  private:
   std::string appname() const override {
     return "oops::EnsMeanAndVariance<" + MODEL::name() + ">";
   }
-  // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 };
 
 }  // namespace oops

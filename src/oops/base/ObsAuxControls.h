@@ -183,7 +183,7 @@ ObsAuxControls<OBS> & ObsAuxControls<OBS>::operator=(const ObsAuxControls & rhs)
 template<typename OBS>
 void ObsAuxControls<OBS>::print(std::ostream & os) const {
   for (const auto & aux : auxs_) {
-    os << *aux << std::endl;
+    os << *aux;
   }
 }
 

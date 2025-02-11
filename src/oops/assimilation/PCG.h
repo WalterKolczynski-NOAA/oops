@@ -1,10 +1,10 @@
 /*
  * (C) Copyright 2009-2016 ECMWF.
  * (C) Crown Copyright 2024, the Met Office.
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
- * In applying this licence, ECMWF does not waive the privileges and immunities 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
  */
@@ -18,6 +18,7 @@
 #include "oops/assimilation/MinimizerUtils.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -65,6 +66,7 @@ template <typename VECTOR, typename AMATRIX, typename PMATRIX>
 double PCG(VECTOR & x, const VECTOR & b,
             const AMATRIX & A, const PMATRIX & precond,
             const int maxiter, const double tolerance ) {
+  util::printRunStats("PCG start");
   VECTOR ap(x);
   VECTOR p(x);
   VECTOR r(x);
@@ -107,7 +109,11 @@ double PCG(VECTOR & x, const VECTOR & b,
   Log::info() << std::endl;
   for (int jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << " PCG Starting Iteration " << jiter+1 << std::endl;
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("PCG iteration " + std::to_string(jiter+1));
+    }
 
     if (jiter == 0) {
       p  = s;
@@ -157,6 +163,7 @@ double PCG(VECTOR & x, const VECTOR & b,
 
   Log::info() << "PCG: end" << std::endl;
 
+  util::printRunStats("PCG end");
   return normReduction;
 }
 

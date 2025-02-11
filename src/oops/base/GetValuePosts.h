@@ -21,17 +21,16 @@
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
+#include "oops/util/parameters/Parameter.h"
 
 namespace oops {
 
 template <typename MODEL>
 class GetValuesParameters : public oops::Parameters {
   OOPS_CONCRETE_PARAMETERS(GetValuesParameters, Parameters)
-
-  typedef typename VariableChange<MODEL>::Parameters_ VarChangeParameters_;
-
  public:
-  Parameter<VarChangeParameters_> variableChange{"variable change", {}, this};
+  Parameter<eckit::LocalConfiguration> variableChange{"variable change",
+                                                      eckit::LocalConfiguration(), this};
 };
 
 /// \brief Fills GeoVaLs with requested variables at requested locations during model run
@@ -56,7 +55,7 @@ class GetValuePosts : public PostBase<State<MODEL>> {
   void doFinalize(const State_ &) override;
 
 // Data
-  const GetValuesParameters<MODEL> params_;
+  const eckit::LocalConfiguration cvConf_;
   std::vector<GetValuePtr_> getvals_;
   Variables geovars_;
 };
@@ -65,7 +64,7 @@ class GetValuePosts : public PostBase<State<MODEL>> {
 
 template <typename MODEL, typename OBS>
 GetValuePosts<MODEL, OBS>::GetValuePosts(const GetValuesParameters<MODEL>& params)
-  : PostBase<State_>(), params_(params), getvals_(), geovars_() {
+  : PostBase<State_>(), cvConf_(params.variableChange.value()), getvals_(), geovars_() {
   Log::trace() << "GetValuePosts::GetValuePosts" << std::endl;
 }
 
@@ -104,7 +103,7 @@ template <typename MODEL, typename OBS>
 void GetValuePosts<MODEL, OBS>::doProcessing(const State_ & xx) {
   Log::trace() << "GetValuePosts::doProcessing start" << std::endl;
 
-  VariableChange_ chvar(params_.variableChange.value(), xx.geometry());
+  VariableChange_ chvar(cvConf_, xx.geometry());
 
   State_ zz(xx);
   chvar.changeVar(zz, geovars_);

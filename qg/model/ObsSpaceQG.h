@@ -76,11 +76,12 @@ class ObsSpaceQG : public oops::ObsSpaceBase {
   ObsIteratorQG end() const;
 
   /// Append new obs
-  void append(const std::string & appendDir);
-
+  void updateObsSpace(const eckit::Configuration &);
 
   /// interface with Fortran
   const F90odb & toFortran() const {return key_;}
+
+  bool has(const std::string &) const;
 
  private:
   void print(std::ostream &) const;

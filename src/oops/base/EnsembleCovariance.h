@@ -35,28 +35,6 @@
 
 namespace oops {
 
-/// Parameters describing generic ensemble covariances.
-template <typename MODEL>
-class EnsembleCovarianceParameters : public ModelSpaceCovarianceParametersBase<MODEL> {
-  OOPS_CONCRETE_PARAMETERS(EnsembleCovarianceParameters,
-                           ModelSpaceCovarianceParametersBase<MODEL>)
-
-  typedef typename Increment<MODEL>::ReadParameters_ IncrementReadParameters_;
-  typedef typename LinearVariableChange<MODEL>::Parameters_ LinearVarChangeParameters_;
- public:
-  /// Parameters for ensemble of increments used in the covariances.
-  IncrementEnsembleFromStatesParameters<MODEL> ensemble{this};
-  OptionalParameter<IncrementReadParameters_> inflationField{"inflation field",
-                   "inflation field (local)", this};
-  Parameter<double> inflationValue{"inflation value", "inflation value (global)", 1.0, this};
-  OptionalParameter<LinearVarChangeParameters_> ensTrans{"ensemble transform",
-                   "ensemble transform: inverse is applied to ensemble members, "
-                   "and forward/adjoint around the localized covariance matrix: "
-                   "T in the covariance matrix T ( (Tinv X) (Tinv X)t o L ) Tt ", this};
-  oops::OptionalParameter<eckit::LocalConfiguration> localization{"localization",
-                         "localization applied to ensemble covariances", this};
-};
-
 /// Generic ensemble based model space error covariance.
 
 // -----------------------------------------------------------------------------
@@ -71,12 +49,10 @@ class EnsembleCovariance : public ModelSpaceCovarianceBase<MODEL>,
   typedef State4D<MODEL>                            State4D_;
 
  public:
-  typedef EnsembleCovarianceParameters<MODEL> Parameters_;
-
   static const std::string classname() {return "oops::EnsembleCovariance";}
 
   EnsembleCovariance(const Geometry_ &, const Variables &,
-                     const Parameters_ &, const State4D_ &, const State4D_ &);
+                     const eckit::Configuration &, const State4D_ &, const State4D_ &);
   ~EnsembleCovariance();
 
  private:
@@ -95,16 +71,14 @@ class EnsembleCovariance : public ModelSpaceCovarianceBase<MODEL>,
 // -----------------------------------------------------------------------------
 template<typename MODEL>
 EnsembleCovariance<MODEL>::EnsembleCovariance(const Geometry_ & resol, const Variables & vars,
-                                              const Parameters_ & params,
+                                              const eckit::Configuration & conf,
                                               const State4D_ & xb, const State4D_ & fg)
-  : ModelSpaceCovarianceBase<MODEL>(resol, params, xb, fg), ens_(),
+  : ModelSpaceCovarianceBase<MODEL>(resol, conf, xb, fg), ens_(),
     ensTransInputVars_(vars), ensTransOutputVars_(vars), loc_()
 {
   Log::trace() << "EnsembleCovariance::EnsembleCovariance start" << std::endl;
   util::Timer timer("oops::Covariance", "EnsembleCovariance");
   size_t init = eckit::system::ResourceUsage().maxResidentSetSize();
-
-  eckit::LocalConfiguration conf = params.toConfiguration();
 
   // Create ensemble
   StateSet<MODEL> tmp(resol, conf, xb.commTime());
@@ -117,36 +91,36 @@ EnsembleCovariance<MODEL>::EnsembleCovariance(const Geometry_ & resol, const Var
 
   // Setup ensemble transform
   if (conf.has("ensemble transform")) {
-    // Create ensemble transform
-    const auto & ensTransParams = *params.ensTrans.value();
+    const eckit::LocalConfiguration confEns(conf, "ensemble transform");
 
     // Define localization variables as ensemble transform input variables
     // If missing, default is vars (ensemble variables)
-    if (ensTransParams.inputVariables.value() != boost::none) {
-      ensTransInputVars_ = *ensTransParams.inputVariables.value();
+    if (confEns.has("input variables")) {
+      ensTransInputVars_ = Variables(confEns, "input variables");
     }
 
     // If present, check that ensemble transform output variables are
     // a subset of ensemble variables
     // If missing, default is vars (ensemble variables)
-    if (ensTransParams.outputVariables.value() != boost::none) {
-      ensTransOutputVars_ = *ensTransParams.outputVariables.value();
+    if (confEns.has("output variables")) {
+      ensTransOutputVars_ = Variables(confEns, "output variables");
       ASSERT(ensTransOutputVars_ <= vars);
     }
 
     // Set trajectories
     for (size_t jt = 0; jt < fg.size(); ++jt) {
-      ensTrans_.push_back(std::make_unique<LinearVariableChange_>(resol, ensTransParams));
+      ensTrans_.push_back(std::make_unique<LinearVariableChange_>(resol, confEns));
       ensTrans_[jt]->changeVarTraj(fg[jt], ensTransOutputVars_);
     }
   }
 
-  if (conf.has("inflation value") || conf.has("inflation field")) {
+  if (ensTrans_.size() > 0 || conf.has("inflation value") || conf.has("inflation field")) {
     // Read inflation field
     std::unique_ptr<Increment_> inflationField;
     if (conf.has("inflation field")) {
+      const eckit::LocalConfiguration confInflationFld(conf, "inflation field");
       inflationField.reset(new Increment_(resol, vars, xb[0].validTime()));
-      inflationField->read(*params.inflationField.value());
+      inflationField->read(confInflationFld);
     }
 
     // Get inflation value

@@ -45,6 +45,7 @@ class TrajectorySaver : public PostBase<State<MODEL> > {
   PPTLAD_ pptraj_;
   std::unique_ptr<const ModelAux_>  lrBias_;
   std::shared_ptr<LinearModel_>     tlm_;
+  util::DateTime first_;
 
   void doInitialize(const State_ &, const util::DateTime &, const util::Duration &) override;
   void doProcessing(const State_ &) override;
@@ -60,7 +61,7 @@ TrajectorySaver<MODEL>::TrajectorySaver(const eckit::Configuration & conf,
                                         std::shared_ptr<LinearModel_> tlm,
                                         PPTLAD_ pptraj):
   PostBase<State_>(conf),
-  resol_(resol), pptraj_(pptraj), lrBias_(new ModelAux_(resol, bias)), tlm_(tlm)
+  resol_(resol), pptraj_(pptraj), lrBias_(new ModelAux_(resol, bias)), tlm_(tlm), first_()
 {
   Log::trace() << "TrajectorySaver::TrajectorySaver 4D" << std::endl;
 }
@@ -70,7 +71,7 @@ TrajectorySaver<MODEL>::TrajectorySaver(const eckit::Configuration & conf,
 template <typename MODEL>
 TrajectorySaver<MODEL>::TrajectorySaver(const eckit::Configuration & conf,
                                         const Geometry_ & resol, PPTLAD_ pptraj):
-  PostBase<State_>(conf), resol_(resol), pptraj_(pptraj), lrBias_(), tlm_()
+  PostBase<State_>(conf), resol_(resol), pptraj_(pptraj), lrBias_(), tlm_(), first_()
 {
   Log::trace() << "TrajectorySaver::TrajectorySaver 3D" << std::endl;
 }
@@ -82,6 +83,7 @@ void TrajectorySaver<MODEL>::doInitialize(const State_ & x0,
                                           const util::DateTime & end,
                                           const util::Duration & step) {
   Log::trace() << "TrajectorySaver::doInitialize start" << std::endl;
+  first_ = x0.validTime();
   State_ xlr(resol_, x0);
   pptraj_.initializeTraj(xlr, end, step);
   Log::trace() << "TrajectorySaver::doInitialize done" << std::endl;
@@ -92,9 +94,14 @@ void TrajectorySaver<MODEL>::doInitialize(const State_ & x0,
 template <typename MODEL>
 void TrajectorySaver<MODEL>::doProcessing(const State_ & xx) {
   Log::trace() << "TrajectorySaver::doProcessing start" << std::endl;
-  State_ xlr(resol_, xx);
-  if (tlm_) tlm_->setTrajectory(xx, xlr, *lrBias_);
-  pptraj_.processTraj(xlr);
+  const util::Duration dt = xx.validTime() - first_;
+  bool steptraj = false;
+  if (tlm_) steptraj = (dt % tlm_->stepTrajectory() == 0);
+  if (steptraj || pptraj_.itIsTime(xx.validTime())) {
+    State_ xlr(resol_, xx);
+    if (steptraj) tlm_->setTrajectory(xx, xlr, *lrBias_);
+    pptraj_.processTraj(xlr);
+  }
   Log::trace() << "TrajectorySaver::doProcessing done" << std::endl;
 }
 
@@ -105,6 +112,7 @@ void TrajectorySaver<MODEL>::doFinalize(const State_ & xx) {
   Log::trace() << "TrajectorySaver::doFinalize start" << std::endl;
   State_ xlr(resol_, xx);
   pptraj_.finalizeTraj(xlr);
+  first_ = util::DateTime();
   Log::trace() << "TrajectorySaver::doFinalize done" << std::endl;
 }
 

@@ -100,6 +100,22 @@ void ObsDataVector<OBS, DATATYPE>::read(const std::string & name) {
 }
 // -----------------------------------------------------------------------------
 template <typename OBS, typename DATATYPE>
+void ObsDataVector<OBS, DATATYPE>::readAppended(const std::string & name) {
+  Log::trace() << "ObsDataVector<OBS, DATATYPE>::readAppended starting " << name << std::endl;
+  util::Timer timer(classname(), "readAppended");
+  data_->readAppended(name);
+  Log::trace() << "ObsDataVector<OBS, DATATYPE>::readAppended done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+template <typename OBS, typename DATATYPE>
+void ObsDataVector<OBS, DATATYPE>::zeroAppended() {
+  Log::trace() << "ObsDataVector<OBS, DATATYPE>::zeroAppended starting " << std::endl;
+  util::Timer timer(classname(), "zeroAppended");
+  data_->zeroAppended();
+  Log::trace() << "ObsDataVector<OBS, DATATYPE>::zeroAppended done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+template <typename OBS, typename DATATYPE>
 void ObsDataVector<OBS, DATATYPE>::save(const std::string & name) const {
   Log::trace() << "ObsDataVector<OBS, DATATYPE>::save starting " << name << std::endl;
   util::Timer timer(classname(), "save");

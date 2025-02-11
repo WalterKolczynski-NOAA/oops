@@ -84,8 +84,6 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
 
 template <typename MODEL>
 std::unique_ptr<StateSet<MODEL> > & StateSetSaver<MODEL>::getStateSet(void) {
-//  std::cout << "statesetsaver returning this state [0] " << (*States_)[0] << std::endl;
-//  std::cout << "statesetsaver returning this state [1] " << (*States_)[1] << std::endl;
   Log::trace() << "StateSetSaver::returning StateSet" << std::endl;
   Log::trace() << "StateSetSaver::StateSet size is " << States_->size() << std::endl;
   return(States_);
@@ -97,9 +95,10 @@ template <typename MODEL>
 void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
                            const util::DateTime & bgndate,
                            const util::Duration & fcstlen ) {
+  // Don't save the first/initial state, so skip before setting initialized_
   if (!initialized_) {
     Log::trace() << "StateSetSaver::doInitialize start for times_ " << times_[0] << std::endl;
-    States_.reset( new StateSet(resol_, x0.variables(), times_, commTime_, ens_, commEns_) );
+    States_.reset( new StateSet<MODEL>(resol_, x0.variables(), times_, commTime_, ens_, commEns_) );
     stateIndex_ = 0;
     Log::trace() << "StateSetSaver::doInitialize done " << std::endl;
   }
@@ -111,14 +110,10 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
 
 template <typename MODEL>
 void StateSetSaver<MODEL>::doProcessing(const State_ & xx) {
-  
-  Log::trace() << "StateSetSaver::doProcessing initialized_ is " << initialized_ << std::endl;
   if ( initialized_ ) {
     (*States_)[stateIndex_] = xx;
     stateIndex_++;
   }
-//  std::cout << "StateSetSaver::doProcessing initialized_ is " << initialized_ << "and idx " << stateIndex_ << std::endl;
-//  std::cout << "statesetsaver pushed back this state [stateIndex_] " << (*States_)[stateIndex_-1] << std::endl;
   initialized_ = true;
 }
 template <typename MODEL>

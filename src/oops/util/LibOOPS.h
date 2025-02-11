@@ -47,6 +47,7 @@ class LibOOPS : public eckit::system::Library {
   void testReferenceInitialise(const eckit::LocalConfiguration &);
   void teeOutput(const std::string &);
   void finalise(bool finaliseMPI = true);
+  bool validateParameters() const {return validate_parameters_;}
 
  protected:
   const void* addr() const override;
@@ -72,6 +73,7 @@ class LibOOPS : public eckit::system::Library {
   bool trace_;
   std::string pretrace_;
   std::string prestat_;
+  bool validate_parameters_;
 
   // TestReferece associated member variables
   std::stringstream testStream_;

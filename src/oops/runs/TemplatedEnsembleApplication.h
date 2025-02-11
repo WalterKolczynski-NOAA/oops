@@ -37,7 +37,7 @@ class TemplatedEnsembleApplication : public Application {
 
 // -----------------------------------------------------------------------------
 
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     // Define member applications from a template yaml and templating information
 
     const auto templatingInformation = fullConfig.getSubConfiguration("templating information");
@@ -78,52 +78,8 @@ class TemplatedEnsembleApplication : public Application {
     const auto memberTemplate = fullConfig.getSubConfiguration("template yaml");
     const auto memberConf = fillInTemplate(memberTemplate, templatingInformation, mymember);
     APP ensapp(commMember);
-    return ensapp.execute(memberConf, validate);
+    return ensapp.execute(memberConf);
     return 1;
-  }
-
-// -----------------------------------------------------------------------------
-
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    if (!fullConfig.has("templating information")) {
-        throw eckit::UserError("Missing required yaml entry `templating information`",
-                               Here());
-    }
-
-    if (!fullConfig.has("template yaml")) {
-        throw eckit::UserError("Missing required yaml entry `template yaml`",
-                               Here());
-    }
-
-    const auto templatingInformation = fullConfig.getSubConfiguration("templating information");
-
-    if (!templatingInformation.has("number of members")) {
-        throw eckit::UserError("Missing required yaml parameter "
-                               "`templating information: number of members",
-                               Here());
-    }
-
-    if (!templatingInformation.has("pattern with zero padding")) {
-        throw eckit::UserError("Missing required yaml parameter "
-                               "`templating information: pattern with zero padding",
-                               Here());
-    }
-
-    if (!templatingInformation.has("pattern without zero padding")) {
-        throw eckit::UserError("Missing required yaml parameter "
-                               "`templating information: pattern without zero padding",
-                               Here());
-    }
-
-    // For ensemble applications we also need to validate individual yamls
-    APP ensapp(oops::mpi::world());
-    const auto memberTemplate = fullConfig.getSubConfiguration("template yaml");
-    const size_t nMembers = templatingInformation.getUnsigned("number of members");
-
-    for (size_t jj = 0; jj < nMembers; ++jj) {
-      const auto memberConf = fillInTemplate(memberTemplate, templatingInformation, jj);
-      ensapp.validateConfig(memberConf);
-    }
   }
 
 // -----------------------------------------------------------------------------

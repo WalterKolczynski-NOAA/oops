@@ -85,6 +85,13 @@ class TimeWindow : public util::Printable {
   /// a number of seconds.
   void setEpoch(const util::DateTime &) const;
 
+  /// move/copy constructors and operators
+  TimeWindow &  operator = (TimeWindow &&);
+  TimeWindow & operator = (const TimeWindow &);
+  TimeWindow(const TimeWindow &);
+  TimeWindow(TimeWindow &&);
+  ~TimeWindow();
+
  private:
   /// Constructor for internal use only.
   TimeWindow(const util::DateTime & winbgn,
@@ -99,10 +106,10 @@ class TimeWindow : public util::Printable {
   std::vector<int64_t> convertDateTimesToEpochTimes
     (const std::vector<util::DateTime> &, const util::DateTime &) const;
 
-  const util::DateTime winbgn_;
-  const util::DateTime winend_;
+  util::DateTime winbgn_;
+  util::DateTime winend_;
   mutable util::DateTime epoch_;
-  const InclusiveWindowBound incBound_;
+  InclusiveWindowBound incBound_;
 };
 
 }  // namespace util

@@ -34,6 +34,7 @@
 #include "oops/interface/ObsOperator.h"
 #include "oops/interface/ObsSpace.h"
 #include "oops/util/Logger.h"
+#include "oops/util/parameters/OptionalParameter.h"
 #include "oops/util/parameters/Parameter.h"
 #include "oops/util/parameters/Parameters.h"
 #include "oops/util/parameters/RequiredParameter.h"
@@ -130,6 +131,8 @@ class Observer {
 
   int resetObsPert(const Geometry_ &, std::unique_ptr<ObsOperatorBase_>,
                    const std::shared_ptr<GetValueTLADs_> &, int &);
+
+  void updateObserver(const eckit::Configuration &);
 
  private:
   typedef std::vector<size_t> VariableSizes;
@@ -311,6 +314,18 @@ int Observer<MODEL, OBS>::resetObsPert(const Geometry_ & geom,
   initialized_ = true;
 
   return size + index;
+}
+
+// -----------------------------------------------------------------------------
+
+template <typename MODEL, typename OBS>
+void Observer<MODEL, OBS>::updateObserver(const eckit::Configuration & cdaConfig) {
+  for (size_t jj = 0; jj < getvals_.size(); ++jj) {
+    getvals_[jj]->updateGetVals(cdaConfig);
+  }
+  qcflags_->zeroAppended();
+  obserrfilter_->readAppended("ObsError");
+  Log::trace() << "Observer obs error appended" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

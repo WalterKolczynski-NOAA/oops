@@ -62,6 +62,7 @@ class TLML95: public oops::interface::LinearModelBase<L95Traits>,
 
 /// Other utilities
   const util::Duration & timeResolution() const override {return tstep_;}
+  const util::Duration & stepTrajectory() const override {return steptraj_;}
 
  private:
   const ModelTrajectory * getTrajectory(const util::DateTime &) const;
@@ -75,6 +76,7 @@ class TLML95: public oops::interface::LinearModelBase<L95Traits>,
 // Data
   const Resolution resol_;
   const util::Duration tstep_;
+  const util::Duration steptraj_;
   const double dt_;
   std::map< util::DateTime, ModelTrajectory * > traj_;
   const ModelL95 lrmodel_;

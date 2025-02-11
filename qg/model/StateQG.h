@@ -79,11 +79,11 @@ class StateQG : public util::Printable,
   size_t serialSize() const;
   void serialize(std::vector<double> &) const;
   void deserialize(const std::vector<double> &, size_t &);
-  void transpose(const StateQG & FCState, const eckit::mpi::Comm & global, const int & mytask,
+  void transpose(const StateQG & FCState, const eckit::mpi::Comm & global,
      const int & ensNum, const int & transNum) {
      throw eckit::NotImplemented("StateQG::transpose not implemented", Here());
   }
-  void Rtranspose(const StateQG & DAState, const eckit::mpi::Comm & global, const int & mytask,
+  void Rtranspose(const StateQG & DAState, const eckit::mpi::Comm & global,
      const int & ensNum, const int & transNum) {
      throw eckit::NotImplemented("StateQG::Rtranspose not implemented", Here());
   }

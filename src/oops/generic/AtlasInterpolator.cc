@@ -130,12 +130,6 @@ void AtlasInterpolator::apply(const Variables& variables,
   // Resize targetFieldVec (just in case);
   targetFieldVec.resize(getTotalElements(variables, sourceFieldSet));
 
-  // Exit if all mask elements are false.
-  if (std::none_of(mask.cbegin(), mask.cend(),
-                   [](const bool & maskElem)->bool { return maskElem; })) {
-    return;
-  }
-
   // Get atlas interpolation object.
   const auto& interp = getInterp(mask);
 
@@ -182,12 +176,6 @@ void AtlasInterpolator::applyAD(
 
   Log::trace() << classname() + "::applyAD start" << std::endl;
   util::Timer timer(classname(), "applyAD");
-
-  // Exit if all mask elements are false.
-  if (std::none_of(mask.cbegin(), mask.cend(),
-                   [](const bool & maskElem)->bool { return maskElem; })) {
-    return;
-  }
 
   // Get atlas interpolation object.
   const auto& interp = getInterp(mask);

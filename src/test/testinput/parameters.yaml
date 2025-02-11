@@ -326,6 +326,9 @@ constraints_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 int_min_constraint_not_met:
   int_with_min: 4 # violates constraint
   int_with_exclusive_min: 6
@@ -335,6 +338,9 @@ int_min_constraint_not_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 float_min_constraint_not_met:
   float_with_min: 5 # violates constraint
   int_with_min: 5
@@ -344,6 +350,9 @@ float_min_constraint_not_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 int_exclusive_min_constraint_not_met:
   int_with_exclusive_min: 5 # violates constraint
   int_with_min: 5
@@ -353,6 +362,9 @@ int_exclusive_min_constraint_not_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 float_exclusive_min_constraint_not_met:
   float_with_exclusive_min: 5.5 # violates constraint
   int_with_min: 5
@@ -362,6 +374,9 @@ float_exclusive_min_constraint_not_met:
   float_with_min: 5.5
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 int_max_constraint_not_met:
   int_with_max: 6 # violates constraint
   int_with_min: 5
@@ -371,6 +386,9 @@ int_max_constraint_not_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 float_max_constraint_not_met:
   float_with_max: 6 # violates constraint
   int_with_min: 5
@@ -380,6 +398,9 @@ float_max_constraint_not_met:
   float_with_min: 5.5
   float_with_exclusive_min: 6
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 int_exclusive_max_constraint_not_met:
   int_with_exclusive_max: 5 # violates constraint
   int_with_min: 5
@@ -389,6 +410,9 @@ int_exclusive_max_constraint_not_met:
   float_with_exclusive_min: 6
   float_with_max: 5.5
   float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
 float_exclusive_max_constraint_not_met:
   float_with_exclusive_max: 5.5 # violates constraint
   int_with_min: 5
@@ -398,3 +422,42 @@ float_exclusive_max_constraint_not_met:
   float_with_min: 5.5
   float_with_exclusive_min: 6
   float_with_max: 5.5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
+nonempty_constraint_not_met:
+  nonempty_vector: [] # violates constraint
+  int_with_min: 5
+  int_with_exclusive_min: 6
+  int_with_max: 5
+  int_with_exclusive_max: 4
+  float_with_min: 5.5
+  float_with_exclusive_min: 6
+  float_with_max: 5.5
+  float_with_exclusive_max: 5
+  vector_with_min_items: [7, 8]
+  vector_with_max_items: [7, 8, 9]
+min_items_constraint_not_met:
+  vector_with_min_items: [7] # violates constraint
+  int_with_min: 5
+  int_with_exclusive_min: 6
+  int_with_max: 5
+  int_with_exclusive_max: 4
+  float_with_min: 5.5
+  float_with_exclusive_min: 6
+  float_with_max: 5.5
+  float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_max_items: [7, 8, 9]
+max_items_constraint_not_met:
+  vector_with_max_items: [7, 8, 9, 10] # violates constraint
+  int_with_min: 5
+  int_with_exclusive_min: 6
+  int_with_max: 5
+  int_with_exclusive_max: 4
+  float_with_min: 5.5
+  float_with_exclusive_min: 6
+  float_with_max: 5.5
+  float_with_exclusive_max: 5
+  nonempty_vector: [7]
+  vector_with_min_items: [7, 8]

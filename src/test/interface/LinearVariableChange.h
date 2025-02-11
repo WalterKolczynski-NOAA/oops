@@ -240,19 +240,6 @@ template <typename MODEL> void testLinearVariableChangeInverse() {
 
 // -----------------------------------------------------------------------------
 
-template <typename MODEL> void testLinearVarChangeParametersValidName() {
-  typedef LinearVariableChangeFixture<MODEL> Test_;
-  typedef oops::LinearVariableChange<MODEL>  LinearVariableChange_;
-  for (const eckit::Configuration &config : Test_::confs()) {
-    typename LinearVariableChange_::Parameters_ parameters;
-    const eckit::LocalConfiguration lvcConfig(config, "linear variable change");
-    EXPECT_NO_THROW(parameters.validateAndDeserialize(lvcConfig));
-  }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-
 template <typename MODEL>
 class LinearVariableChange : public oops::Test {
  public:
@@ -271,8 +258,6 @@ class LinearVariableChange : public oops::Test {
       { testLinearVariableChangeAdjoint<MODEL>(); });
     ts.emplace_back(CASE("interface/LinearVariableChange/testLinearVariableChangeInverse")
       { testLinearVariableChangeInverse<MODEL>(); });
-    ts.emplace_back(CASE("interface/LinearVariableChange/testLinearVarChangeParametersValidName")
-      { testLinearVarChangeParametersValidName<MODEL>(); });
   }
 
   void clear() const override {}

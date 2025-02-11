@@ -14,7 +14,6 @@
 #include <utility>
 #include <vector>
 
-#include "oops/base/ForecastParameters.h"
 #include "oops/base/Geometry.h"
 #include "oops/base/IncrementSet.h"
 #include "oops/base/Model.h"
@@ -61,7 +60,6 @@ class EnsembleForecastApplication : public Application {
   typedef ModelAuxControl<MODEL>       ModelAux_;
   typedef State<MODEL>                 State_;
   typedef StateSet<MODEL>              StateSet_;
-  typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
 
  public:
 // -----------------------------------------------------------------------------
@@ -71,10 +69,9 @@ class EnsembleForecastApplication : public Application {
 // -----------------------------------------------------------------------------
   virtual ~EnsembleForecastApplication() {}
 // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     EnsembleForecastApplicationParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 
@@ -113,22 +110,17 @@ class EnsembleForecastApplication : public Application {
     eckit::PathName confPath = files[mymember-1];
     eckit::YAMLConfiguration memberConf(confPath);
 
-    ForecastAppParameters_ fcstparams;
-    fcstparams.validate(memberConf);
-    fcstparams.deserialize(memberConf);
-    const Geometry_ resol(fcstparams.fcstConf.geometry, commMember);
+    const Geometry_ resol(eckit::LocalConfiguration(memberConf, "geometry"), commMember);
 
-    eckit::LocalConfiguration initialCondition =
-          memberConf.getSubConfiguration("initial condition");
     std::vector<int> ens;  // vector of ensemble numbers
     PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
 //  Setup times
     Log::info() << "setting up times" << std::endl;
-    eckit::LocalConfiguration model = fcstparams.fcstConf.model;
+    const eckit::LocalConfiguration model(memberConf, "model");
     const util::Duration tstep(model.getString("tstep"));
-    eckit::LocalConfiguration ic = fcstparams.fcstConf.initialCondition;
+    const eckit::LocalConfiguration ic(memberConf, "initial condition");
     const util::DateTime bgndate(ic.getString("datetime"));
-    const util::Duration fclength = fcstparams.fcstConf.forecastLength;
+    const util::Duration fclength(model.getString("forecast length"));
     const util::DateTime enddate(bgndate + fclength);
     std::vector<util::DateTime> times;
 
@@ -144,7 +136,7 @@ class EnsembleForecastApplication : public Application {
        if ( m == mymember ) {
          Log::trace() << "running on mymember = " << mymember  << " " << mytask << std::endl;
 //         APP ensapp(commMember);
-         executeForecast(resol, memberConf, validate, post);
+         executeForecast(resol, memberConf, post);
          Log::trace() << "Done with ens execute\n";
        }
        if ( batchsize > 0 ) {  // don't divide by zero
@@ -161,9 +153,8 @@ class EnsembleForecastApplication : public Application {
      return 0;
   }
 // -----------------------------------------------------------------------------
-  void executeForecast(const Geometry_ & resol,
-      const eckit::Configuration & fullConfig,
-      bool validate, PostProcessor<State_> & post) const {
+  void executeForecast(const Geometry_ & resol, const eckit::Configuration & fullConfig,
+                       PostProcessor<State_> & post) const {
 //  Setup Model
     Log::info() << "Forecast:setting up model" << std::endl;
     const Model_ model(resol, eckit::LocalConfiguration(fullConfig, "model"));
@@ -186,24 +177,6 @@ class EnsembleForecastApplication : public Application {
     Log::info() << "Forecast:done running forecast" << std::endl;
   }
 
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    EnsembleForecastApplicationParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    EnsembleForecastApplicationParameters_ params;
-    params.validate(fullConfig);
-    // For ensemble applications also need to validate individual yamls
-    APP ensapp(oops::mpi::world());
-    params.deserialize(fullConfig);
-    for (size_t jj = 0; jj < params.files.value().size(); ++jj) {
-      const eckit::PathName confPath(params.files.value()[jj]);
-      const eckit::YAMLConfiguration memberConf(confPath);
-      ensapp.validateConfig(memberConf);
-    }
-  }
 // -----------------------------------------------------------------------------
  private:
   std::string appname() const override {

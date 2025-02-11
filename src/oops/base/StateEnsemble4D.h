@@ -66,6 +66,8 @@ template<typename MODEL> class StateEnsemble4D {
  private:
   void getMembers(const eckit::Configuration &);
   std::vector<eckit::LocalConfiguration> membersConfig;
+  // TODO(mpotts) remove std::vector<StateSet_> and replace it with a singular StateSet_
+  // variable states_
   std::vector<StateSet_> states_;
 };
 
@@ -101,7 +103,6 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
                                         const int mymember)
   : states_() {
   // Abort if both "members" and "members from template" are specified
-
   getMembers(config);
   // Reserve memory to hold ensemble
   states_.reserve(times.size());

@@ -23,21 +23,12 @@ namespace test {
    public:
     explicit DummyApp(const eckit::mpi::Comm & comm = oops::mpi::world()) : Application(comm) {}
     virtual ~DummyApp() = default;
-    int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+    int execute(const eckit::Configuration & fullConfig) const override {
       DummyAppParameters params;
-      if (validate) params.validate(fullConfig);
       params.deserialize(fullConfig);
       std::string hello_str = params.hello;
       oops::Log::info() << "hello " << hello_str << std::endl;
       return 0;
-    }
-    void outputSchema(const std::string & outputPath) const override {
-      DummyAppParameters params;
-      params.outputSchema(outputPath);
-    }
-    void validateConfig(const eckit::Configuration & fullConfig) const override {
-      DummyAppParameters params;
-      params.validate(fullConfig);
     }
    private:
     std::string appname() const override {

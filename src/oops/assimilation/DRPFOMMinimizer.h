@@ -28,6 +28,7 @@
 #include "oops/assimilation/UpHessSolve.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 #include "oops/util/workflow.h"
 
 namespace oops {
@@ -111,6 +112,7 @@ double DRPFOMMinimizer<MODEL, OBS>::solve(CtrlInc_ & dx, CtrlInc_ & dxh, CtrlInc
   // dx   increment
   // dxh  B^{-1} dx
   // rr   (sum B^{-1} dx_i^{b} +) G^T R^{-1} d
+  util::printRunStats("DRPFOM start");
 
   CtrlInc_ zz(dxh);
   CtrlInc_ pr(dxh);
@@ -172,7 +174,11 @@ double DRPFOMMinimizer<MODEL, OBS>::solve(CtrlInc_ & dx, CtrlInc_ & dxh, CtrlInc
   Log::info() << std::endl;
   for (int jiter = 0; jiter < maxiter; ++jiter) {
     Log::info() << "DRPFOM Starting Iteration " << jiter+1 << std::endl;
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("DRPFOM iteration " + std::to_string(jiter+1));
+    }
 
     // v_{i+1} = ( pr_{i} + H^T R^{-1} H z_{i} )
     HtRinvH.multiply(zz, vv);
@@ -256,6 +262,7 @@ double DRPFOMMinimizer<MODEL, OBS>::solve(CtrlInc_ & dx, CtrlInc_ & dxh, CtrlInc
     }
   }
 
+  util::printRunStats("DRPFOM end");
   return normReduction;
 }
 

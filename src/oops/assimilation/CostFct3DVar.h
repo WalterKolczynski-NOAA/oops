@@ -12,6 +12,7 @@
 #define OOPS_ASSIMILATION_COSTFCT3DVAR_H_
 
 #include <memory>
+#include <vector>
 
 #include "eckit/config/Configuration.h"
 #include "eckit/mpi/Comm.h"
@@ -50,6 +51,7 @@ template<typename MODEL, typename OBS> class CostFct3DVar : public CostFunction<
   typedef CostJo<MODEL, OBS>              CostJo_;
   typedef Geometry<MODEL>                 Geometry_;
   typedef State<MODEL>                    State_;
+  typedef CostTermBase<MODEL, OBS>        CostBase_;
 
  public:
   CostFct3DVar(const eckit::Configuration &, const eckit::mpi::Comm &);
@@ -65,6 +67,8 @@ template<typename MODEL, typename OBS> class CostFct3DVar : public CostFunction<
 
   void runNL(CtrlVar_ &, PostProcessor<State_>&) const override;
 
+  void applyContDaUpdate(const eckit::Configuration & cdaConfig) override;
+
  protected:
   const Geometry_ & geometry() const override {return resol_;}
 
@@ -77,7 +81,7 @@ template<typename MODEL, typename OBS> class CostFct3DVar : public CostFunction<
   void doLinearize(const Geometry_ &, const eckit::Configuration &, CtrlVar_ &, CtrlVar_ &,
                    PostProcessor<State_> &, PostProcessorTLAD<MODEL> &) override;
 
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   const eckit::mpi::Comm & comm_;
   const Geometry_ resol_;
   const Variables ctlvars_;
@@ -250,6 +254,29 @@ void CostFct3DVar<MODEL, OBS>::addIncr(CtrlVar_ & xx, const CtrlInc_ & dx,
   ASSERT(dx.state().validTime() == timeWindow_.midpoint());
   xx.state() += dx.state();
   Log::trace() << "CostFct3DVar::addIncr done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostFct3DVar<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig) {
+  Log::trace() << "CostFct3DVar::applyContDaUpdate start" << std::endl;
+  // update for jo, must update jo before other cost terms
+  this->getNonConstJo()->applyContDaUpdate(cdaConfig);
+  if (cdaConfig.has("time window")) {
+    throw eckit::NotImplemented("oops::CostFct3D: continuous DA"
+                    "window shift not implemented for 3dVar. ", Here());
+  }
+
+  // For VarBC, update for jb needs to be called even if window is not shifted,
+  // note if timeWindow is not changed times remains unchanged
+  std::vector<util::DateTime> midPoint(1);
+  midPoint[0] = timeWindow_.midpoint();
+  this->getNonConstJb()->applyContDaUpdate(cdaConfig, midPoint);
+
+  // update for constraint terms
+  // currently no constraint terms work with 3dvar.
+  Log::trace() << "CostFct3DVar::applyContDaUpdate done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

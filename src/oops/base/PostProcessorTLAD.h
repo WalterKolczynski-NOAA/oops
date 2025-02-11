@@ -110,6 +110,14 @@ class PostProcessorTLAD {
     }
   }
 
+  bool itIsTime(const util::DateTime & tt) {
+    bool itstime = false;
+    for (auto & jp : processors_) {
+      itstime = itstime || jp->itIsTime(tt);
+    }
+    return itstime;
+  }
+
  private:
   std::vector< std::shared_ptr<PostBaseTLAD_> > processors_;
   PostProcessorTLAD operator= (const PostProcessorTLAD &);

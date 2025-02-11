@@ -12,6 +12,7 @@
 #ifndef OOPS_BASE_INCREMENT_H_
 #define OOPS_BASE_INCREMENT_H_
 
+#include <optional>
 #include <memory>
 #include<string>
 #include<vector>
@@ -191,22 +192,41 @@ std::vector<double> Increment<MODEL>::rmsByVariableByLevel(const Variable & var,
   if (resol_.fields().empty()) {
     ABORT("Increment<MODEL>::rmsByVariableByLevel: requires Atlas interface");
   }
+
   const auto ownedView = atlas::array::make_view<int, 2>(resol_.fields()["owned"]);
-  const auto fieldView = atlas::array::make_view<double, 2>(fieldSet()[var.name()]);
-  std::vector<double> rms(fieldView.shape(1), 0.0);
-  for (atlas::idx_t k = 0; k < fieldView.shape(1); ++k) {
-    size_t nOwned = 0;
-    for (atlas::idx_t i = 0; i < fieldView.shape(0); ++i) {
-      if (ownedView(i, 0) > 0) {
-        ++nOwned;
-        rms[k] += fieldView(i, k) * fieldView(i, k);
-      }
+  const auto field = fieldSet()[var.name()];
+  const auto fieldView = atlas::array::make_view<double, 2>(field);
+  std::vector<double> rms(field.shape(1), 0.0);
+
+  // get the field mask, if there is one
+  std::optional<atlas::array::ArrayView<double, 2>> maskView;
+  if (field.metadata().has("mask")) {
+    const auto mask = resol_.fields()[field.metadata().getString("mask")];
+    maskView = atlas::array::make_view<double, 2>(mask);
+  }
+
+  // calculate sum of squares and counts for each level for points that are
+  // owned and not masked
+  size_t nOwned = 0;
+  for (atlas::idx_t i = 0; i < field.shape(0); ++i) {
+    if (ownedView(i, 0) == 0) continue;  // skip unowned points
+    if (maskView && (*maskView)(i, 0) == 0.0) continue;  // skip masked points
+
+    ++nOwned;
+    for (atlas::idx_t k = 0; k < field.shape(1); ++k) {
+      rms[k] += fieldView(i, k) * fieldView(i, k);
     }
-    if (global) {
-      resol_.getComm().allReduceInPlace(nOwned, eckit::mpi::sum());
-      resol_.getComm().allReduceInPlace(rms[k], eckit::mpi::sum());
-    }
-    rms[k] = sqrt(rms[k] / nOwned);
+  }
+
+  // reduce to global sum
+  if (global) {
+    resol_.getComm().allReduceInPlace(nOwned, eckit::mpi::sum());
+    resol_.getComm().allReduceInPlace(rms.begin(), rms.end(), eckit::mpi::sum());
+  }
+
+  // calculate rms. Note that we need to check for divide by zero
+  for (atlas::idx_t k = 0; k < field.shape(1); ++k) {
+    rms[k] = nOwned == 0 ? 0.0 : sqrt(rms[k] / nOwned);
   }
   Log::trace() << "Increment<MODEL>::rmsByVariableByLevel done" << std::endl;
   return rms;

@@ -97,7 +97,7 @@ WeightedDiffTLAD<MODEL>::WeightedDiffTLAD(const Variables & vars,
                                           const util::Duration & tstep,
                                           const Geometry_ & resol,
                                           WeightingFct & wfct)
-  : PostBaseTLAD<MODEL>(vt-span/2, vt+span/2),
+  : PostBaseTLAD<MODEL>(vt-span/2, vt+span/2, tstep),
     vars_(vars), wfct_(wfct), wdiff_(vars, vt, span, tstep, resol, wfct_),
     weights_(), forcing_(), avg_(), sum_(0.0), linit_(false),
     vtime_(vt), bgn_(vt-span/2), end_(vt+span/2), tstep_(tstep),

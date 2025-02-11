@@ -13,6 +13,7 @@
 
 #include <math.h>
 #include <limits>
+#include <sstream>
 
 #include "eckit/config/Configuration.h"
 #include "eckit/exception/Exceptions.h"
@@ -223,6 +224,30 @@ void ObsVec1D::print(std::ostream & os) const {
   } else {
     os << "Lorenz 95 : No observations";
   }
+}
+// -----------------------------------------------------------------------------
+std::string ObsVec1D::info(const std::string & prefix) const {
+  std::stringstream ss;
+  this->print(ss);
+  std::string grep = "\n" + prefix;
+  if (!grep.empty() && std::isalnum(grep.back())) grep += ": ";
+  return grep + ss.str();
+}
+// -----------------------------------------------------------------------------
+std::string ObsVec1D::info(const std::string & prefix, const ObsData1D<int> &) const {
+  std::stringstream ss;
+  this->print(ss);
+  std::string grep = "\n" + prefix;
+  if (!grep.empty() && std::isalnum(grep.back())) grep += ": ";
+  return grep + ss.str();
+}
+// -----------------------------------------------------------------------------
+void ObsVec1D::readAppended(const std::string & name) {
+  throw eckit::NotImplemented("ObsVec1D::readAppended() is not implemented.", Here());
+}
+// -----------------------------------------------------------------------------
+void ObsVec1D::zeroAppended() {
+  throw eckit::NotImplemented("ObsVec1D::zeroAppended() is not implemented.", Here());
 }
 // -----------------------------------------------------------------------------
 }  // namespace lorenz95

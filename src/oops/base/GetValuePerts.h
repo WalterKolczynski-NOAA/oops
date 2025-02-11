@@ -18,7 +18,6 @@
 #include "oops/base/GetValueTLADs.h"
 #include "oops/base/Increment.h"
 #include "oops/base/State.h"
-#include "oops/interface/LinearVariableChange.h"
 #include "oops/util/DateTime.h"
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
@@ -33,9 +32,7 @@ class GetValuePerts : public GetValuePosts<MODEL, OBS> {
   typedef GetValuePosts<MODEL, OBS>              GetValuePosts_;
   typedef GetValueTLADs<MODEL, OBS>              GetValueTLADs_;
   typedef Increment<MODEL>                       Increment_;
-  typedef LinearVariableChange<MODEL>            LinearVariableChange_;
-  typedef VariableChange<MODEL>     VariableChange_;
-  typedef typename VariableChange_::Parameters_ VariableChangeParameters_;
+  typedef VariableChange<MODEL>                  VariableChange_;
   typedef std::shared_ptr<GetValues<MODEL, OBS>> GetValuePtr_;
 
  public:

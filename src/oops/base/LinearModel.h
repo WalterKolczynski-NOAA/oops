@@ -85,6 +85,7 @@ class LinearModel : public util::Printable,
   /// \brief Time step for running LinearModel's forecast in oops (frequency with which the
   /// State will be updated)
   const util::Duration & timeResolution() const {return linearmodel_->timeResolution();}
+  const util::Duration & stepTrajectory() const {return linearmodel_->stepTrajectory();}
 
  private:
   /// \brief Tangent linear forecast initialization, called before every run

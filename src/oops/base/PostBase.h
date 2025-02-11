@@ -23,8 +23,6 @@ namespace eckit {
 
 namespace oops {
 
-class PostTimerParameters;
-
 // -----------------------------------------------------------------------------
 
 /// Handles post-processing of model fields.
@@ -40,7 +38,6 @@ template <typename FLDS> class PostBase : private boost::noncopyable {
 /// Constructors and basic operators
   PostBase() : timer_() {}
   explicit PostBase(const eckit::Configuration & config) : timer_(config) {}
-  explicit PostBase(const PostTimerParameters & timerParams) : timer_(timerParams) {}
   PostBase(const util::DateTime & start, const util::DateTime & finish,
            const util::Duration & freq = util::Duration(0))
     : timer_(start, finish, freq) {}

@@ -154,8 +154,15 @@ int ObsSpaceQG::nobs() const {
 }
 // -----------------------------------------------------------------------------
 
-void ObsSpaceQG::append(const std::string & appendDir) {
-  throw eckit::NotImplemented("ObsSpaceQG::append() is not implemented.", Here());
+bool ObsSpaceQG::has(const std::string & colname) const {
+  int ihas;
+  qg_obsdb_has_f90(key_, colname.size(), colname.c_str(), ihas);
+  return ihas > 0;
+}
+// -----------------------------------------------------------------------------
+
+void ObsSpaceQG::updateObsSpace(const eckit::Configuration & appendConfig) {
+  throw eckit::NotImplemented("ObsSpaceQG::updateObsSpace() is not implemented.", Here());
 }
 
 // -----------------------------------------------------------------------------

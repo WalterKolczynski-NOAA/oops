@@ -1,10 +1,10 @@
 /*
  * (C) Copyright 2009-2016 ECMWF.
  * (C) Crown Copyright 2024, the Met Office.
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
- * In applying this licence, ECMWF does not waive the privileges and immunities 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
  * granted to it by virtue of its status as an intergovernmental organisation nor
  * does it submit to any jurisdiction.
  */
@@ -18,6 +18,7 @@
 #include "oops/assimilation/MinimizerUtils.h"
 #include "oops/util/dot_product.h"
 #include "oops/util/Logger.h"
+#include "oops/util/printRunStats.h"
 
 namespace oops {
 
@@ -64,6 +65,7 @@ template <typename VECTOR, typename AMATRIX, typename PMATRIX>
 double GMRESR(VECTOR & xx, const VECTOR & bb,
               const AMATRIX & A, const PMATRIX & precond,
               const int maxiter, const double tolerance) {
+  util::printRunStats("GMRESR start");
   const double stagthresh = 1.0e-3;
   const double smallres = 1.0e-6;
 
@@ -126,6 +128,7 @@ double GMRESR(VECTOR & xx, const VECTOR & bb,
     }
   }
 
+  util::printRunStats("GMRESR end");
   return normReduction;
 }
 

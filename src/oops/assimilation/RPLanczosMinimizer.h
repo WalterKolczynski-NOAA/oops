@@ -184,8 +184,11 @@ double RPLanczosMinimizer<MODEL, OBS>::solve(Dual_ & vv, double & vvp, Dual_ & r
   Log::info() << std::endl;
   while (jiter < maxiter) {
     Log::info() << "RPLanczos Starting Iteration " << jiter+1 << std::endl;
-    util::printRunStats("RPLanczos iteration " + std::to_string(jiter+1));
-    if (jiter < 5 || (jiter + 1) % 5 == 0) util::update_workflow_meter("iteration", jiter+1);
+
+    if (jiter < 5 || (jiter + 1) % 5 == 0) {
+      util::update_workflow_meter("iteration", jiter+1);
+      util::printRunStats("RPLanczos iteration " + std::to_string(jiter+1));
+    }
 
     // ww = (RinvHBHt + I) zz - beta * vold
     Rinv.multiply(tt, ww);

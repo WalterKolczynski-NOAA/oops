@@ -27,6 +27,7 @@
 #include "eckit/config/LocalConfiguration.h"
 #include "eckit/testing/Test.h"
 
+#include "oops/base/Geometry.h"
 #include "oops/base/Variables.h"
 #include "oops/generic/UnstructuredInterpolator.h"
 #include "oops/runs/Test.h"
@@ -34,7 +35,6 @@
 #include "oops/util/missingValues.h"
 #include "oops/util/Random.h"
 
-#include "test/interface/GeometryFixture.h"
 #include "test/TestEnvironment.h"
 
 using atlas::array::make_view;
@@ -75,7 +75,8 @@ void testInterpolator(const bool testSourcePointMask) {
   ASSERT(nlev > 0);  // to ensure the rank-2 atlas::Fields expected by OOPS
   const std::string varname = config.getString("variable name");
 
-  const std::unique_ptr<const Geometry_> geom(new Geometry_(GeometryFixture<MODEL>::getParameters(),
+  const eckit::LocalConfiguration conf(TestEnvironment::config(), "geometry");
+  const std::unique_ptr<const Geometry_> geom(new Geometry_(conf,
                                                       oops::mpi::world(), oops::mpi::myself()));
 
   // Generate random point cloud for the target grid.

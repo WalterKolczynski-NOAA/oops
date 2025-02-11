@@ -106,7 +106,7 @@ class LinearizationError : public Application {
 
   virtual ~LinearizationError() = default;
 
-  int execute(const eckit::Configuration & config, bool validate) const override {
+  int execute(const eckit::Configuration & config) const override {
     Log::trace() << "LinearizationError::execute() start" << std::endl;
     util::printRunStats("LinearizationError start");
 
@@ -191,10 +191,6 @@ class LinearizationError : public Application {
     Log::trace() << "LinearizationError::execute() done" << std::endl;
     return 0;
   }
-
-  void outputSchema(const std::string & outputPath) const override {}
-
-  void validateConfig(const eckit::Configuration & config) const override {}
 
  private:
   std::string appname() const override {

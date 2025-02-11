@@ -74,7 +74,8 @@ LibOOPS::LibOOPS() : Library("oops"),
                      info_(false), preinfo_(""),
                      debug_(false), predebug_("OOPS_DEBUG"),
                      trace_(false), pretrace_("OOPS_TRACE"),
-                     prestat_("OOPS_STATS") {
+                     prestat_("OOPS_STATS"),
+                     validate_parameters_(false) {
 }
 
 LibOOPS::~LibOOPS() {
@@ -116,6 +117,9 @@ void LibOOPS::initialise() {
   if (id > 0) debug_ = info_;
   if (id < 0) debug_ = true;
   predebug_ += "[" + std::to_string(rank_) + "]";
+
+  const int vp = getEnv("VALIDATE_PARAMETERS", 0);
+  if (vp != 0) validate_parameters_ = true;
 
   const int do_trapfpe = getEnv("OOPS_TRAPFPE", 0);
   int do_abortfpe;

@@ -33,26 +33,11 @@ template <typename MODEL> class IncrementParameters : public Parameters {
   OOPS_CONCRETE_PARAMETERS(IncrementParameters, Parameters);
 
  public:
-  typedef typename Increment<MODEL>::ReadParameters_  ReadParameters_;
-
   RequiredParameter<util::DateTime> date{"date", this};
   RequiredParameter<oops::Variables> inputVariables{"input variables", this};
-  RequiredParameter<ReadParameters_> input{"input", this};
+  RequiredParameter<eckit::LocalConfiguration> input{"input", this};
   RequiredParameter<eckit::LocalConfiguration> output{"output", this};
   RequiredParameter<eckit::LocalConfiguration> trajectory{"trajectory", this};
-};
-
-/// Options controlling linear variable change
-template <typename MODEL> class LinearVarChangeParameters : public Parameters {
-  OOPS_CONCRETE_PARAMETERS(LinearVarChangeParameters, Parameters)
-  typedef typename LinearVariableChange<MODEL>::Parameters_ LinearVariableChangeParameters_;
-
- public:
-  // parameters for linear variable change.
-  LinearVariableChangeParameters_ linearVarChange{this};
-  Parameter<bool> doInverse{"do inverse",
-                     "apply inverse linear variable change instead of linear variable change",
-                     false, this};
 };
 
 
@@ -61,21 +46,17 @@ template <typename MODEL> class ConvertIncrementParameters : public ApplicationP
   OOPS_CONCRETE_PARAMETERS(ConvertIncrementParameters, ApplicationParameters);
 
  public:
-  typedef typename Geometry<MODEL>::Parameters_ GeometryParameters_;
-  typedef IncrementParameters<MODEL>            IncrementParameters_;
-
   /// Input geometry parameters.
-  RequiredParameter<GeometryParameters_> inputGeometry{"input geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> inputGeometry{"input geometry", this};
 
   /// Output geometry parameters.
-  RequiredParameter<GeometryParameters_> outputGeometry{"output geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> outputGeometry{"output geometry", this};
 
   /// Linear variable change.
-  OptionalParameter<LinearVarChangeParameters<MODEL>> linearVarChange{"linear variable change",
-                                                                      this};
+  OptionalParameter<eckit::LocalConfiguration> linearVarChange{"linear variable change", this};
 
   /// List of increments.
-  RequiredParameter<std::vector<IncrementParameters_>> increments{"increments", this};
+  RequiredParameter<std::vector<eckit::LocalConfiguration>> increments{"increments", this};
 };
 
 // -----------------------------------------------------------------------------
@@ -86,9 +67,6 @@ template <typename MODEL> class ConvertIncrement : public Application {
   typedef State<MODEL>                       State_;
   typedef LinearVariableChange<MODEL>        LinearVariableChange_;
 
-  typedef typename Increment<MODEL>::ReadParameters_  ReadParameters_;
-  typedef IncrementParameters<MODEL>                  IncrementParameters_;
-
   typedef ConvertIncrementParameters<MODEL>  ConvertIncrementParameters_;
 
  public:
@@ -98,10 +76,9 @@ template <typename MODEL> class ConvertIncrement : public Application {
 // -------------------------------------------------------------------------------------------------
   virtual ~ConvertIncrement() {}
 // -------------------------------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
 //  Deserialize parameters
     ConvertIncrementParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Setup resolution for intput and output
@@ -112,13 +89,13 @@ template <typename MODEL> class ConvertIncrement : public Application {
     bool lvcDefined = false;
     auto linVarChangeParams = params.linearVarChange.value();
     if (linVarChangeParams != boost::none) {
-        if (linVarChangeParams->linearVarChange.outputVariables.value() != boost::none) {
+        if (linVarChangeParams.value().has("output variables")) {
             lvcDefined = true;
         }
     }
 
 //  List of input and output increments
-    const std::vector<IncrementParameters_>& incrementParams = params.increments;
+    const std::vector<eckit::LocalConfiguration>& incrementParams = params.increments;
     const int nincrements = incrementParams.size();
 
 //  Loop over increments
@@ -127,13 +104,13 @@ template <typename MODEL> class ConvertIncrement : public Application {
       Log::info() << "Converting increment " << jm+1 << " of " << nincrements << std::endl;
 
 //    Datetime for increment
-      const util::DateTime incdatetime = incrementParams[jm].date;
+      const util::DateTime incdatetime(incrementParams[jm].getString("date"));
 
 //    Variables for input increment
-      const Variables incvars = incrementParams[jm].inputVariables;
+      const Variables incvars(incrementParams[jm], "input variables");
 
 //    Read input
-      const ReadParameters_ inputParams = incrementParams[jm].input;
+      const eckit::LocalConfiguration inputParams(incrementParams[jm], "input");
       Increment_ dxi(resol1, incvars, incdatetime);
       dxi.read(inputParams);
       Log::test() << "Input increment: " << dxi << std::endl;
@@ -143,15 +120,16 @@ template <typename MODEL> class ConvertIncrement : public Application {
 
 //    Variable transform
       if (lvcDefined) {
-        State_ xTrajBg(resol1, incrementParams[jm].trajectory);
+        const eckit::LocalConfiguration trajConf(incrementParams[jm], "trajectory");
+        State_ xTrajBg(resol1, trajConf);
         ASSERT(xTrajBg.validTime() == dx.validTime());  // Check time is consistent
         Log::test() << "Trajectory state: " << xTrajBg << std::endl;
 
         // Create variable change
-        LinearVariableChange_ lvc(resol2, linVarChangeParams->linearVarChange);
-        auto & varout = *linVarChangeParams->linearVarChange.outputVariables.value();
+        LinearVariableChange_ lvc(resol2, linVarChangeParams.value());
+        Variables varout(linVarChangeParams.value(), "output variables");
         lvc.changeVarTraj(xTrajBg, varout);
-        if (linVarChangeParams->doInverse) {
+        if (linVarChangeParams.value().getBool("do inverse", false)) {
           lvc.changeVarInverseTL(dx, varout);
         } else {
           lvc.changeVarTL(dx, varout);
@@ -159,7 +137,7 @@ template <typename MODEL> class ConvertIncrement : public Application {
       }
 
 //    Write state
-      const eckit::LocalConfiguration outputParams = incrementParams[jm].output;
+      const eckit::LocalConfiguration outputParams(incrementParams[jm], "output");
       dx.write(outputParams);
 
       Log::test() << "Output increment: " << dx << std::endl;
@@ -167,21 +145,11 @@ template <typename MODEL> class ConvertIncrement : public Application {
     return 0;
   }
 // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    ConvertIncrementParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    ConvertIncrementParameters_ params;
-    params.validate(fullConfig);
-  }
-// -------------------------------------------------------------------------------------------------
  private:
   std::string appname() const override {
     return "oops::ConvertIncrement<" + MODEL::name() + ">";
   }
-// -------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 };
 
 }  // namespace oops

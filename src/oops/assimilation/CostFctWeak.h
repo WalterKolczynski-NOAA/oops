@@ -54,6 +54,9 @@ template<typename MODEL, typename OBS> class CostFctWeak : public CostFunction<M
   typedef State<MODEL>                    State_;
   typedef Model<MODEL>                    Model_;
   typedef LinearModel<MODEL>              LinearModel_;
+  typedef CostJbTotal<MODEL, OBS>         JbTotal_;
+  typedef CostJo<MODEL, OBS>              CostJo_;
+  typedef CostTermBase<MODEL, OBS>        CostBase_;
 
  public:
   CostFctWeak(const eckit::Configuration &, const eckit::mpi::Comm &);
@@ -70,6 +73,7 @@ template<typename MODEL, typename OBS> class CostFctWeak : public CostFunction<M
   void runTLM(CtrlInc_ &, const bool idModel = false) const;
   void runADJ(CtrlInc_ &, const bool idModel = false) const;
   void runNL(CtrlVar_ &, PostProcessor<State_> &) const override;
+  void applyContDaUpdate(const eckit::Configuration & cdaConfig) override;
 
  protected:
   const Geometry_ & geometry() const override {return *resol_;}
@@ -85,7 +89,7 @@ template<typename MODEL, typename OBS> class CostFctWeak : public CostFunction<M
 
   size_t nsubwin_;
   size_t nsublocal_;
-  const util::TimeWindow timeWindow_;
+  util::TimeWindow timeWindow_;
   util::Duration subWinLength_;
   std::vector<util::DateTime> subWinBgn_;
   std::vector<util::DateTime> subWinEnd_;
@@ -199,7 +203,8 @@ CostTermBase<MODEL, OBS> * CostFctWeak<MODEL, OBS>::newJc(const eckit::Configura
   }
   const eckit::LocalConfiguration jcdfi(jcConf, "jcdfi");
   const util::DateTime vt(subWinBgn_[0] + subWinLength_/2);
-  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, vt, subWinLength_);
+  util::TimeWindow subWindow = timeWindow_.createSubWindow(vt, subWinLength_);
+  return new CostJcDFI<MODEL, OBS>(jcdfi, resol, subWindow);
 }
 
 // -----------------------------------------------------------------------------
@@ -357,6 +362,37 @@ void CostFctWeak<MODEL, OBS>::addIncr(CtrlVar_ & xx, const CtrlInc_ & dx,
   }
   xx.states() += dx.states();
   Log::trace() << "CostFctWeak::addIncr done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL, typename OBS>
+void CostFctWeak<MODEL, OBS>::applyContDaUpdate(const eckit::Configuration & cdaConfig) {
+  Log::trace() << "CostFctWeak::applyContDaUpdate start" << std::endl;
+  // update for jo, must update jo before other cost terms
+  this->getNonConstJo()->applyContDaUpdate(cdaConfig);
+  if (cdaConfig.has("time window")) {
+    ASSERT(cdaConfig.getSubConfiguration("time window").has("subwindow"));
+    throw eckit::NotImplemented("oops::CostFctWeak: continuous DA"
+                    "window shift not implemented for weak constraint. ", Here());
+  }
+
+  // for VarBC, update for jb needs to be called even if window is not shifted
+  // note if timeWindow is not changed times remains unchanged
+  std::vector<util::DateTime> times;
+  for (util::DateTime jj = timeWindow_.start(); jj <= timeWindow_.end(); jj += subWinLength_) {
+    times.push_back(jj);
+  }
+  this->getNonConstJb()->applyContDaUpdate(cdaConfig, times);
+
+  std::vector<std::shared_ptr<CostBase_>> & jterms = this->getJTerms();
+  // update for constraint terms
+  if (jterms.size() > 1) {
+    for (size_t jj = 1; jj < jterms.size(); ++jj) {
+      jterms[jj]->applyContDaUpdate(cdaConfig);
+    }
+  }
+  Log::trace() << "CostFctWeak::applyContDaUpdate done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

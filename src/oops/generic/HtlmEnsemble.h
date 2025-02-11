@@ -23,11 +23,10 @@ namespace oops {
 template <typename MODEL>
 class StatePerturbationParameters : public Parameters {
   OOPS_CONCRETE_PARAMETERS(StatePerturbationParameters, Parameters)
-  typedef ModelSpaceCovarianceParametersWrapper<MODEL>    CovarianceParameters_;
 
  public:
   RequiredParameter<size_t> ensembleSize{"ensemble size", this};
-  RequiredParameter<CovarianceParameters_> backgroundError{"background error", this};
+  RequiredParameter<eckit::LocalConfiguration> backgroundError{"background error", this};
   RequiredParameter<Variables> variables{"variables", this};
 };
 
@@ -62,15 +61,14 @@ class NonlinearEnsembleParameters : public Parameters {
 template <typename MODEL>
 class HtlmEnsembleParameters : public Parameters {
   OOPS_CONCRETE_PARAMETERS(HtlmEnsembleParameters, Parameters);
-  typedef typename Geometry<MODEL>::Parameters_    GeometryParameters_;
   typedef NonlinearEnsembleParameters<MODEL>       NonlinearEnsembleParameters_;
   typedef StateEnsembleParameters<MODEL>           StateEnsembleParameters_;
 
  public:
   RequiredParameter<eckit::LocalConfiguration> model{"model", this};
-  RequiredParameter<GeometryParameters_> modelGeometry{"model geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> modelGeometry{"model geometry", this};
   OptionalParameter<eckit::LocalConfiguration> modelForEnsemble{"model for ensemble", this};
-  OptionalParameter<GeometryParameters_> geometryForEnsemble{"geometry for ensemble", this};
+  OptionalParameter<eckit::LocalConfiguration> geometryForEnsemble{"geometry for ensemble", this};
   RequiredParameter<eckit::LocalConfiguration> nonlinearControl{"nonlinear control", this};
   RequiredParameter<NonlinearEnsembleParameters_> nonlinearEnsemble{"nonlinear ensemble", this};
 };
@@ -89,7 +87,6 @@ class HtlmEnsemble{
   typedef ModelAuxControl<MODEL>                       ModelAuxCtl_;
   typedef ModelAuxIncrement<MODEL>                     ModelAuxIncrement_;
   typedef ModelSpaceCovarianceBase<MODEL>              CovarianceBase_;
-  typedef ModelSpaceCovarianceParametersBase<MODEL>    CovarianceParameters_;
   typedef SimpleLinearModel<MODEL>                     SimpleLinearModel_;
   typedef State<MODEL>                                 State_;
   typedef StateEnsemble<MODEL>                         StateEnsemble_;
@@ -163,10 +160,9 @@ HtlmEnsemble<MODEL>::HtlmEnsemble(const Parameters_ & params,
   if (params.nonlinearEnsemble.value().fromCovar.value() != boost::none) {
     const PerturbationParameters_ pertParams = *params.nonlinearEnsemble.value().fromCovar.value();
     const Variables vars(pertParams.variables);
-    const CovarianceParameters_ & covParams
-      = pertParams.backgroundError.value().covarianceParameters;
+    const eckit::LocalConfiguration covConf = pertParams.backgroundError.value();
     std::unique_ptr<CovarianceBase_> Bmat(CovarianceFactory_::create(
-      *ensembleGeometry_, vars, covParams, nonlinearControl_, nonlinearControl_));
+      *ensembleGeometry_, vars, covConf, nonlinearControl_, nonlinearControl_));
     Increment4D_ dx(*ensembleGeometry_, vars, nonlinearControl_.times());
     for (size_t m = 0; m < ensembleSize_; m++) {
       Bmat->randomize(dx);

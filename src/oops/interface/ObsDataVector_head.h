@@ -70,6 +70,10 @@ class ObsDataVector : public util::Printable,
 
   /// Fill ObsDataVector with data with group \p name from the associated ObsSpace
   void read(const std::string & name);
+  /// Read newly appended ObsData
+  void readAppended(const std::string &);
+  /// Set newly appended ObsData to zero
+  void zeroAppended();
   /// Save this ObsDataVector as group \p name in the ObsSpace
   void save(const std::string & name) const;
 

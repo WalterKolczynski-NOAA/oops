@@ -33,7 +33,6 @@ class GetValueTLADs : public PostBaseTLAD<MODEL> {
   typedef Increment<MODEL>          Increment_;
   typedef State<MODEL>              State_;
   typedef VariableChange<MODEL>     VariableChange_;
-  typedef typename VariableChange_::Parameters_ VariableChangeParameters_;
   typedef std::shared_ptr<GetValues<MODEL, OBS>> GetValPtr_;
   typedef std::unique_ptr<LinearVariableChange<MODEL>> CVarPtr_;
 
@@ -64,7 +63,7 @@ class GetValueTLADs : public PostBaseTLAD<MODEL> {
   Variables linvars_;
   std::vector<GetValPtr_> getvals_;
   std::map<util::DateTime, CVarPtr_> chvartlad_;
-  GetValuesParameters<MODEL> params_;
+  const eckit::LocalConfiguration cvConf_;
 };
 
 // -----------------------------------------------------------------------------
@@ -72,7 +71,7 @@ template <typename MODEL, typename OBS>
 GetValueTLADs<MODEL, OBS>::GetValueTLADs(const GetValuesParameters<MODEL> & params,
               const util::DateTime & bgn, const util::DateTime & end)
   : PostBaseTLAD<MODEL>(bgn, end), geovars_(), linvars_(), getvals_(), chvartlad_(),
-    params_(params)
+    cvConf_(params.variableChange.value())
 {
   Log::trace() << "GetValueTLADs::GetValueTLADs" << std::endl;
 }
@@ -100,7 +99,7 @@ template <typename MODEL, typename OBS>
 void GetValueTLADs<MODEL, OBS>::doProcessingTraj(const State_ & xx) {
   Log::trace() << "GetValueTLADs::doProcessingTraj start" << std::endl;
 
-  VariableChange_ chvar(params_.variableChange.value(), xx.geometry());
+  VariableChange_ chvar(cvConf_, xx.geometry());
 
   State_ zz(xx);
   chvar.changeVar(zz, geovars_);
@@ -111,8 +110,7 @@ void GetValueTLADs<MODEL, OBS>::doProcessingTraj(const State_ & xx) {
 
   for (GetValPtr_ getval : getvals_) getval->process(zz);
 
-  CVarPtr_ cvtlad(new LinearVariableChange<MODEL>(xx.geometry(),
-                  params_.variableChange.value().toConfiguration()));
+  CVarPtr_ cvtlad(new LinearVariableChange<MODEL>(xx.geometry(), cvConf_));
   cvtlad->changeVarTraj(xx, linvars_);
   chvartlad_[xx.validTime()] = std::move(cvtlad);
 

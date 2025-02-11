@@ -37,7 +37,6 @@
 #include "oops/util/Logger.h"
 #include "oops/util/Random.h"
 
-#include "test/interface/GeometryFixture.h"
 #include "test/TestEnvironment.h"
 
 using atlas::array::make_view;
@@ -76,8 +75,9 @@ void testInterpolator() {
   const size_t nlev = static_cast<size_t>(conf.getInt("number of levels", 3));
   const std::string varname = conf.getString("variable name", "test field");
 
+  const eckit::LocalConfiguration confGeom(conf, "geometry");
   const std::unique_ptr<const Geometry_> geom(new Geometry_(
-        GeometryFixture<MODEL>::getParameters(), oops::mpi::world(), oops::mpi::myself()));
+        confGeom, oops::mpi::world(), oops::mpi::myself()));
 
   // Generate a random point cloud for the target grid. We need each proc to own a distinct set
   // of target points, so we partition the requested lat/lon region across the available MPI tasks:

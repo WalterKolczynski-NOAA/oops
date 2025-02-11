@@ -1,8 +1,8 @@
 /*
  * (C) Copyright 2019  UCAR
- * 
+ *
  * This software is licensed under the terms of the Apache Licence Version 2.0
- * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0. 
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
  */
 
 #ifndef LORENZ95_OBSDATA1D_H_
@@ -44,6 +44,8 @@ class ObsData1D : public util::Printable,
   ObsData1D & operator= (const ObsData1D &);
 
   void zero();
+  /// Zero values appended from ObsSpace
+  void zeroAppended();
   void mask(const ObsData1D<int> &);
 
   size_t nobs() const {return data_.size();}
@@ -53,6 +55,7 @@ class ObsData1D : public util::Printable,
 // I/O
   void read(const std::string &);
   void save(const std::string &) const;
+  void readAppended(const std::string &);
 
  private:
   void print(std::ostream &) const;
@@ -145,6 +148,16 @@ void ObsData1D<DATATYPE>::print(std::ostream & os) const {
   } else {
     os << "Lorenz 95 : No observations";
   }
+}
+// -----------------------------------------------------------------------------
+template<typename DATATYPE>
+void ObsData1D<DATATYPE>::readAppended(const std::string & name) {
+  throw eckit::NotImplemented("ObsData1D::readAppended() is not implemented.", Here());
+}
+// -----------------------------------------------------------------------------
+template<typename DATATYPE>
+void ObsData1D<DATATYPE>::zeroAppended() {
+  throw eckit::NotImplemented("ObsData1D::zeroAppended() is not implemented.", Here());
 }
 // -----------------------------------------------------------------------------
 }  // namespace lorenz95

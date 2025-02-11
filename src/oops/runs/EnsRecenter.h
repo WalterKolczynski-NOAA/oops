@@ -38,11 +38,10 @@ class EnsRecenterParameters : public ApplicationParameters {
   typedef State<MODEL> State_;
 
  public:
-  typedef typename Geometry_::Parameters_   GeometryParameters_;
   typedef StateEnsembleParameters<MODEL>    StateEnsembleParameters_;
 
   /// Geometry parameters.
-  RequiredParameter<GeometryParameters_> geometry{"geometry", this};
+  RequiredParameter<eckit::LocalConfiguration> geometry{"geometry", this};
 
   /// Central state parameters.
   RequiredParameter<eckit::LocalConfiguration> center{"center", this};
@@ -75,10 +74,9 @@ template <typename MODEL> class EnsRecenter : public Application {
   // -----------------------------------------------------------------------------
   virtual ~EnsRecenter() {}
   // -----------------------------------------------------------------------------
-  int execute(const eckit::Configuration & fullConfig, bool validate) const override {
+  int execute(const eckit::Configuration & fullConfig) const override {
     // Deserialize parameters
     EnsRecenterParameters<MODEL> params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
     // Setup Geometry
@@ -123,17 +121,7 @@ template <typename MODEL> class EnsRecenter : public Application {
 
     return 0;
   }
-  // -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    EnsRecenterParameters<MODEL> params;
-    params.outputSchema(outputPath);
-  }
 // -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    EnsRecenterParameters<MODEL> params;
-    params.validate(fullConfig);
-  }
-  // -----------------------------------------------------------------------------
  private:
   std::string appname() const override {
     return "oops::EnsRecenter<" + MODEL::name() + ">";

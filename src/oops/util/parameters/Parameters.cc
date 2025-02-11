@@ -13,6 +13,7 @@
 #include "eckit/config/LocalConfiguration.h"
 #include "eckit/value/Value.h"
 #include "oops/util/CompositePath.h"
+#include "oops/util/LibOOPS.h"
 #include "oops/util/parameters/ObjectJsonSchema.h"
 #include "oops/util/parameters/ParameterBase.h"
 #include "oops/util/parameters/Parameters.h"
@@ -149,28 +150,32 @@ eckit::LocalConfiguration Parameters::toConfiguration() const {
 
 void Parameters::validate(const eckit::Configuration &config) {
 #ifdef OOPS_HAVE_NLOHMANN_JSON_SCHEMA_VALIDATOR
-  util::Timer timer("oops::Parameters", "validate");
-  std::string strSchema = jsonSchema().toString(true /*includeSchemaKeyword?*/);
-  nlohmann::json jsonSchema = nlohmann::json::parse(strSchema);
+  // Validator off be default, environment variable to switch on e.g.
+  // export VALIDATE_PARAMETERS=1
+  if (LibOOPS::instance().validateParameters()) {
+    util::Timer timer("oops::Parameters", "validate");
+    std::string strSchema = jsonSchema().toString(true /*includeSchemaKeyword?*/);
+    nlohmann::json jsonSchema = nlohmann::json::parse(strSchema);
 
-  std::stringstream jsonStream;
-  {
-    eckit::JSON json(jsonStream);
-    json << config;
+    std::stringstream jsonStream;
+    {
+      eckit::JSON json(jsonStream);
+      json << config;
+    }
+    std::string jsonString = jsonStream.str();
+    if (jsonString == "null") {
+      // Stop the validator from complaining the top-level JSON node is not of the correct type
+      jsonString = "{}";
+    }
+
+    const nlohmann::json jsonConfig = nlohmann::json::parse(jsonString);
+
+    nlohmann::json_schema::json_validator validator(nullptr, checkStringFormat);
+    validator.set_root_schema(jsonSchema);
+
+    ValidationErrorHandler errorHandler;
+    validator.validate(jsonConfig, errorHandler);
   }
-  std::string jsonString = jsonStream.str();
-  if (jsonString == "null") {
-    // Stop the validator from complaining the top-level JSON node is not of the correct type
-    jsonString = "{}";
-  }
-
-  const nlohmann::json jsonConfig = nlohmann::json::parse(jsonString);
-
-  nlohmann::json_schema::json_validator validator(nullptr, checkStringFormat);
-  validator.set_root_schema(jsonSchema);
-
-  ValidationErrorHandler errorHandler;
-  validator.validate(jsonConfig, errorHandler);
 #endif
 }
 

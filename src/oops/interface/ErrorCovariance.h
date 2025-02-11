@@ -61,15 +61,8 @@ class ErrorCovariance : public oops::ModelSpaceCovarianceBase<MODEL>,
   typedef State4D<MODEL>             State_;
 
  public:
-  /// Defined as Covariance_::Parameters_ if Covariance_ defines a Parameters_ type; otherwise as
-  /// GenericModelSpaceCovarianceParameters<MODEL>.
-  typedef TParameters_IfAvailableElseFallbackType_t<
-    Covariance_, GenericModelSpaceCovarianceParameters<MODEL>> Parameters_;
-
   static const std::string classname() {return "oops::ErrorCovariance";}
 
-  ErrorCovariance(const Geometry_ &, const Variables &, const Parameters_ &,
-                  const State_ &, const State_ &);
   ErrorCovariance(const Geometry_ &, const Variables &, const eckit::Configuration &,
                   const State_ &, const State_ &);
   virtual ~ErrorCovariance();
@@ -84,35 +77,22 @@ class ErrorCovariance : public oops::ModelSpaceCovarianceBase<MODEL>,
   std::unique_ptr<Covariance_> covariance_;
 };
 
-// =============================================================================
-
-template<typename MODEL>
-ErrorCovariance<MODEL>::ErrorCovariance(const Geometry_ & resol, const Variables & vars,
-                                        const Parameters_ & parameters,
-                                        const State_ & xb, const State_ & fg)
-  : ModelSpaceCovarianceBase<MODEL>(resol, parameters, xb, fg),
-    covariance_()
-{
-  Log::trace() << "ErrorCovariance<MODEL>::ErrorCovariance starting" << std::endl;
-  util::Timer timer(classname(), "ErrorCovariance");
-  size_t init = eckit::system::ResourceUsage().maxResidentSetSize();
-  covariance_.reset(new Covariance_(resol.geometry(), vars,
-                                    parametersOrConfiguration<HasParameters_<Covariance_>::value>(
-                                      parameters),
-                                    xb[0].state(), fg[0].state()));
-  size_t current = eckit::system::ResourceUsage().maxResidentSetSize();
-  this->setObjectSize(current - init);
-  Log::trace() << "ErrorCovariance<MODEL>::ErrorCovariance done" << std::endl;
-}
-
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
 ErrorCovariance<MODEL>::ErrorCovariance(const Geometry_ & resol, const Variables & vars,
                                         const eckit::Configuration & conf,
                                         const State_ & xb, const State_ & fg)
-  : ErrorCovariance<MODEL>(resol, vars, conf, xb, fg)
-{}
+  : ModelSpaceCovarianceBase<MODEL>(resol, conf, xb, fg), covariance_()
+{
+  Log::trace() << "ErrorCovariance<MODEL>::ErrorCovariance starting" << std::endl;
+  util::Timer timer(classname(), "ErrorCovariance");
+  size_t init = eckit::system::ResourceUsage().maxResidentSetSize();
+  covariance_.reset(new Covariance_(resol.geometry(), vars, conf, xb[0].state(), fg[0].state()));
+  size_t current = eckit::system::ResourceUsage().maxResidentSetSize();
+  this->setObjectSize(current - init);
+  Log::trace() << "ErrorCovariance<MODEL>::ErrorCovariance done" << std::endl;
+}
 
 // -----------------------------------------------------------------------------
 

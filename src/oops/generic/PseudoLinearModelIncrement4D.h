@@ -62,6 +62,7 @@ class PseudoLinearModelIncrement4D : public LinearModelBase<MODEL> {
 
   /// linear model time step
   const util::Duration & timeResolution() const override {return tstep_;}
+  const util::Duration & stepTrajectory() const override {return tstep_;}
   /// linear model variables
   const oops::Variables & variables() const {return vars_;}
 
