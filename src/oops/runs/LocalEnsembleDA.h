@@ -133,26 +133,6 @@ public:
   const eckit::mpi::Comm & commMem() { return *commMember; };
 };
 
-/// \brief Options controlling output and observer for LocalEnsembleDA application.
-class LocalEnsembleInlineParameters : public Parameters {
-  OOPS_CONCRETE_PARAMETERS(LocalEnsembleInlineParameters, Parameters)
- public:
-  Parameter<bool> runForecast{"Run Forecast",
-                  "controls whether or not a forecast is run before computing H(x)", false, this};
-  Parameter<int> batch{"forecast batch size",
-                  "the number of ensemble members to run at a given time", 1, this};
-  Parameter<std::string> pattern{"output file pattern",
-                  "pattern in obsdataout.engine.obsfile to be replaced", "%ensmem%", this};
-  Parameter<int> zpad{"zero padding",
-                  "number of zeros to add in front of member number", 1, this};
-  Parameter<bool> hofXOnly{"Compute HofX Only",
-                  "stop after computing HofX and write out files", false, this};
-  /// Parameters containing a list of YAML files for each ensemble member to be processed.
-  std::vector<std::string> defaultFiles = {"empty"};
-  Parameter<std::vector<std::string>> files{"Forecast configuration",
-                 "list of yaml files with forecast configurations", defaultFiles, this};
-};
-// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 /// \brief Top-level options taken by the LocalEnsembleDA application.
 template <typename MODEL>
@@ -176,11 +156,6 @@ class LocalEnsembleDAParameters : public ApplicationParameters {
 
   Parameter<LocalEnsembleDADriverParameters> driver{"driver",
           "options controlling output and observer runs", {}, this};
-
-//  OptionalParameter<LocalEnsembleInlineParameters> inlineParams{"inline parameters",
-//          "inline", this};
-
-  Parameter<LocalEnsembleInlineParameters> inlineParams{"inline parameters", {}, this};
 
   RequiredParameter<eckit::LocalConfiguration> background{"background",
           "ensemble of backgrounds", this};
@@ -247,7 +222,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
-  typedef ForecastAppParameters<MODEL> ForecastAppParameters_;
   typedef LocalEnsembleForecastVars<MODEL> LocalEnsembleForecastVars_;
  public:
 // -----------------------------------------------------------------------------
@@ -280,12 +254,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // Instantiate ens_xx depending on whether we are running inline or not
     auto ens_xx = [&] {
       if (params.runInline.value() == false) {
-        geometry = std::unique_ptr<Geometry_>(new Geometry_(params.geometry, this->getComm() ));
+        geometry = std::make_unique<Geometry_>(params.geometry, this->getComm());
         auto object = StateEnsemble4D_(*geometry, params.background);
         return object;
       } else {
-        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, validate, params,
-            geometry, post, saver_, FCVars);
+        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
+            geometry);
         auto object = StateEnsemble4D_(localVec, 0);
         return object;
       }
@@ -313,14 +287,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       delete FCVars.state_;
       std::vector<State_> states_;
       for(size_t ens=0; ens < ens_xx.size(); ++ens){
-        states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(), FCVars.mytask,
+        states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(),
            FCVars.mymember,ens)));
       }
       FCVars.state_ = new State_(states_[FCVars.mymember - 1]);
 
       PostProcessor<State_> *post2 = new PostProcessor<State_>();  // Create the post processor where StateSet will be stored
       std::cout << "calling localEnsStep to advance forecast again " << std::endl;
-      std::vector<StateSet_> localVec = localizeEnsembleStep(fullConfig, validate, params,
+      std::vector<StateSet_> localVec = localizeEnsembleStep(fullConfig, params,
             geometry, *post2, saver_, FCVars);
       ens_xx = StateEnsemble4D_(localVec, 0);
       Log::trace() << "State validtime and enddate are " << FCVars.state().validTime() << " " << FCVars.enddate << std::endl;
@@ -336,9 +310,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     Observations_ yobs(obsdb, "ObsValue");
 
     // Read all ensemble members and compute the ensemble mean
-    std::cout << "setting variables" << std::endl;
-    nens = ens_xx.size();
-    statevars = ens_xx.variables();
+    const size_t nens = ens_xx.size();
+    const Variables statevars = ens_xx.variables();
     Variables incvars;
     if (params.incvars.value() == boost::none) {
       incvars += statevars;
@@ -564,11 +537,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       obsdb.save();
     }
 
-
     }
     return 0;
   }
-
 
 // -----------------------------------------------------------------------------
 
@@ -687,8 +658,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 // -----------------------------------------------------------------------------
 
  private:
-  
-
   std::string appname() const override {
     return "oops::LocalEnsembleDA<" + MODEL::name() + ", " + OBS::name() + ">";
   }
@@ -696,7 +665,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 // -----------------------------------------------------------------------------
 
   std::vector<StateSet_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
-          bool validate, LocalEnsembleDAParameters_ & params,
+          LocalEnsembleDAParameters_ & params,
           std::unique_ptr<Geometry_> & DAgeometry, 
           PostProcessor<State_> & post,
           StateSetSaver<MODEL> *saver_,
@@ -756,8 +725,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     //  Each member uses a different configuration:
     eckit::PathName confPath = files[FCVars.mymember-1];
     FCVars.memberConf = new eckit::YAMLConfiguration(confPath);
-    ForecastAppParameters_ fcstparams;
-    fcstparams.validate(FCVars.mConf());
+//    fcstparams.validate(FCVars.mConf());
     fcstparams.deserialize(FCVars.mConf());
 
 //    std::cout << "creating FCgeometry " << std::endl;
@@ -807,7 +775,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       for (int m = 1; m <=FCVars.nmembers; m++) {
          if ( m == FCVars.mymember ) {
            Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
-           initForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.mConf(), validate, bgndate, FCVars.fclength, post, FCVars);
+           initForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.mConf(), bgndate, FCVars.fclength, post, FCVars);
            stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
            Log::info() << "Done with ens execute\n";
          }
@@ -837,7 +805,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 // -----------------------------------------------------------------------------
 
   std::vector<StateSet_> localizeEnsembleStep(const eckit::Configuration & fullConfig,
-          bool validate, LocalEnsembleDAParameters_ & params,
+          LocalEnsembleDAParameters_ & params,
           std::unique_ptr<Geometry_> & DAgeometry, 
           PostProcessor<State_> & post,
           StateSetSaver<MODEL> *saver_,
@@ -856,11 +824,16 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   // LocalEnsembleSolver functionality.
 
 
-    LocalEnsembleInlineParameters inlineParams = params.inlineParams;
 
-    const bool HofXOnly = inlineParams.hofXOnly.value();
-    const bool runForecast = inlineParams.runForecast.value();
-    const std::vector<std::string> &files = inlineParams.files.value();
+
+    eckit::LocalConfiguration inlineParams = fullConfig.getSubConfiguration("inline parameters");
+
+    const bool HofXOnly = inlineParams.getBool("Compute HofX Only");
+    const bool runForecast = fullConfig.getBool("Run Inline");
+    const std::vector<std::string> &files = inlineParams.getStringVector("Forecast configuration");
+    const int batchSize = inlineParams.getInt("forecast batch size");
+    const int zpad = inlineParams.getInt("zero padding");
+    const std::string pattern = inlineParams.getString("output file pattern");
 
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
@@ -901,8 +874,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
-    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry, FCVars.mytask,
-       FCVars.mymember);
+    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
+		     FCVars.mymember);
     return(localVec);
   }
 
@@ -1014,14 +987,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       const Model_  & model_,
       State_ & xx,
       const eckit::Configuration & fullConfig,
-      bool validate,
       const util::DateTime & bgndate,
       util::Duration & fclength,
       PostProcessor<State_> & post,
       LocalEnsembleForecastVars_ & FCVars) const {
 //  Deserialize parameters
-    ForecastAppParameters_ params;
-    if (validate) params.validate(fullConfig);
     params.deserialize(fullConfig);
 
 //  Setup Model
@@ -1061,46 +1031,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
 // -----------------------------------------------------------------------------
 
-  void executeForecast(const Geometry_ & geometry,
-      const eckit::Configuration & fullConfig,
-      bool validate, PostProcessor<State_> & post) const {
-//  Deserialize parameters
-    ForecastAppParameters_ params;
-    if (validate) params.validate(fullConfig);
-    params.deserialize(fullConfig);
-
-//  Setup Model
-    Log::info() << "Forecast:setting up model" << std::endl;
-    const Model_ model(geometry, eckit::LocalConfiguration(fullConfig, "model"));
-
-//  Setup initial state
-    State_ xx(geometry, params.fcstConf.initialCondition);
-
-//  Setup augmented state
-    const ModelAux_ moderr(geometry, params.fcstConf.modelAuxControl);
-
-    const util::Duration fclength = params.fcstConf.forecastLength;
-    const util::DateTime bgndate(xx.validTime());
-    const util::DateTime enddate(bgndate + fclength);
-
-    Log::info() << "Forecast:Running forecast from " << bgndate << " to " << enddate << std::endl;
-    post.initialize(xx, bgndate, fclength);
-//  Run forecast
-    Log::info() << "Forecast:running forecast" << std::endl;
-    model.forecast(xx, moderr, fclength, post);
-    Log::info() << "Forecast:done running forecast" << std::endl;
-  }
-
-// -----------------------------------------------------------------------------
-  void outputSchema(const std::string & outputPath) const override {
-    LocalEnsembleDAParameters_ params;
-    params.outputSchema(outputPath);
-  }
-// -----------------------------------------------------------------------------
-  void validateConfig(const eckit::Configuration & fullConfig) const override {
-    LocalEnsembleDAParameters_ params;
-    params.validate(fullConfig);
-  }
 
   void executeForecast(const Geometry_ & geometry,
       const eckit::Configuration & fullConfig,

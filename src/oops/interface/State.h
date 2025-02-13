@@ -63,10 +63,10 @@ class State : public util::Printable,
   /// Assignment operator
   State & operator =(const State &);
 
-  void transpose(const State_ & FCState, const eckit::mpi::Comm & global,
-       const int & ensNum, const int & transNum);
-  void Rtranspose(const State_ & DAState, const eckit::mpi::Comm & global,
-       const int & ensNum, const int & transNum);
+  void transpose(const State_ &, const eckit::mpi::Comm &,
+       const int, const int);
+  void Rtranspose(const State_ &, const eckit::mpi::Comm &,
+       const int, const int);
 
   /// Accessor
   State_ & state() {if (fset_) {fset_->clear();} return *state_;}
@@ -213,11 +213,11 @@ void State<MODEL>::transpose(const State_ & DistState, const eckit::mpi::Comm & 
 
 template<typename MODEL>
 void State<MODEL>::Rtranspose(const State_ & DistState, const eckit::mpi::Comm & global,
-       const int & ensNum, const int & transNum) {
+       const int ensNum, const int transNum) {
   // The FCState has a distributed set of states. Transpose returns a vector of local
   // states on a smaller patch of geometry
   Log::trace() << "State<MODEL>::Rtranspose interface starting" << std::endl;
-  state_->Rtranspose(DistState, global, mytask, ensNum, transNum);
+  state_->Rtranspose(DistState, global, ensNum, transNum);
   Log::trace() << "State<MODEL>::Rtranspose interface done" << std::endl;
 }
 
