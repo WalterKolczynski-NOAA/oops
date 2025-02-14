@@ -127,7 +127,8 @@ template <typename MODEL> void testStateSetConstructors() {
   states.push_back(*state2);
 
   // Test main constructor
-  std::unique_ptr<StateSet_> ss1(new StateSet_(states));
+  std::vector<util::DateTime> times = {vt, vt};
+  std::unique_ptr<StateSet_> ss1(new StateSet_(Test_::resol(), state1->variables(), times, oops::mpi::world()));
   EXPECT(ss1.get());
   EXPECT(ss1->size() == 2);
   oops::Log::test() << "Printing StateSet: " << *ss1 << std::endl;
