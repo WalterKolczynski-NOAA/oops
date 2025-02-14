@@ -526,6 +526,7 @@ test/interface/ObsTestsFixture.h
 test/interface/ObsVector.h
 test/interface/SampledLocations.h
 test/interface/State.h
+test/interface/StateSet.h
 test/interface/UnstructuredInterpolator.h
 test/interface/VariableChange.h
 
