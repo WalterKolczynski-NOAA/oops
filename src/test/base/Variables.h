@@ -16,7 +16,9 @@
 #include <string>
 #include <vector>
 
+#ifndef ECKIT_TESTING_SELF_REGISTER_CASES
 #define ECKIT_TESTING_SELF_REGISTER_CASES 0
+#endif
 
 #include "eckit/config/Configuration.h"
 #include "eckit/config/LocalConfiguration.h"
@@ -347,39 +349,49 @@ void testIntersection() {
   EXPECT(test == empty);
 }
 
-// -----------------------------------------------------------------------------
-
 class Variables : public oops::Test {
  public:
-  using oops::Test::Test;
-  virtual ~Variables() {}
+  Variables() = default;
+  virtual ~Variables() = default;
+
+  std::string testid() const override {
+    return "test::Variables";
+  }
 
  private:
-  std::string testid() const override {return "test::Variables";}
-
   void register_tests() const override {
-    std::vector<eckit::testing::Test>& ts = eckit::testing::specification();
+    auto & ts = eckit::testing::specification();
 
-    ts.emplace_back(CASE("Variables/testConstructor")
-      { testConstructor(); });
-    ts.emplace_back(CASE("Variables/testCopyConstructor")
-      { testCopyConstructor(); });
-    ts.emplace_back(CASE("Variables/testFortranInterface")
-      { testFortranInterface(); });
-    ts.emplace_back(CASE("Variables/testArithmeticOperators")
-      { testArithmeticOperators(); });
-    ts.emplace_back(CASE("Variables/testMetaDataArithmeticOperators")
-      { testMetaDataArithmeticOperators(); });
-    ts.emplace_back(CASE("Variables/testEquality")
-      { testEquality(); });
-    ts.emplace_back(CASE("Variables/testEqualityWithMetaData")
-      { testEqualityWithMetaData(); });
-    ts.emplace_back(CASE("Variables/testIntersection")
-      { testIntersection(); });
-    ts.emplace_back(CASE("Variables/testVariableConstructorAndEqualsComparison")
-      { testVariableConstructorAndEqualsComparison(); });
-    ts.emplace_back(CASE("Variables/testPushBack")
-      { testPushBack(); });
+    ts.emplace_back("Variables/testConstructor", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testConstructor();
+    });
+    ts.emplace_back("Variables/testCopyConstructor", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testCopyConstructor();
+    });
+    ts.emplace_back("Variables/testFortranInterface", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testFortranInterface();
+    });
+    ts.emplace_back("Variables/testArithmeticOperators", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testArithmeticOperators();
+    });
+    ts.emplace_back("Variables/testMetaDataArithmeticOperators", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testMetaDataArithmeticOperators();
+    });
+    ts.emplace_back("Variables/testEquality", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testEquality();
+    });
+    ts.emplace_back("Variables/testEqualityWithMetaData", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testEqualityWithMetaData();
+    });
+    ts.emplace_back("Variables/testIntersection", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testIntersection();
+    });
+    ts.emplace_back("Variables/testVariableConstructorAndEqualsComparison", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testVariableConstructorAndEqualsComparison();
+    });
+    ts.emplace_back("Variables/testPushBack", [](std::string& _test_subsection, int& _num_subsections, int _subsection) {
+      testPushBack();
+    });
   }
 
   void clear() const override {}
