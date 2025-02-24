@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <ostream>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -59,6 +60,7 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
            const int transNum) const;
   /// Zero
   void zero();
+  void random();
   /// Accumulator
   void accumul(const double &, const StateSet &);
   virtual ~StateSet() = default;
@@ -240,6 +242,48 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
   return mean;
 }
 
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
+void StateSet<MODEL>::random() {
+  std::cout << "StateSet<MODEL>::random starting" << std::endl;
+  Log::trace() << "StateSet<MODEL>::random starting" << std::endl;
+  const double fact = 1.0 / static_cast<double>(this->ens_size());
+  // Create random number generator
+  std::random_device rd;  // Used to obtain a seed for the random number engine
+  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+
+  // Create distribution for the range you want (e.g., between 0.0 and 1.0)
+  std::uniform_real_distribution<double> dis(0.0d, 1.0d);
+  std::vector<std::vector<double> > zz(this->local_ens_size());
+
+  size_t dataSize = (*this)(0, 0).serialSize();  // would be good to make this a method
+
+  std::cout << "dataSize is " << dataSize << std::endl;
+  
+// add up all the state values on the local communicator and put them in zz[0][:]
+    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+      for (size_t i = 0; i < dataSize -3; ++i) {
+      // Generate a random double
+          (zz[jm]).push_back(dis(gen)); 
+//	  std::cout << "pushing back " << zz[jm][i] << std::endl;
+      }
+      (zz[jm]).push_back(54321.56789); 
+      (zz[jm]).push_back(0.0); 
+      (zz[jm]).push_back(0.0); 
+    }
+  std::cout << "about to deserialize " << std::endl;
+// deserialize back to stateSet
+  for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+    // Put States from each local ensemble member in a vector
+    for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+      // serialize local ensembles
+      size_t indx = 0;
+      (*this)(jt, jm).deserialize(zz[jm], indx);
+    }
+  }
+  Log::trace() << "StateSet<MODEL>::random done" << std::endl;
+}
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
