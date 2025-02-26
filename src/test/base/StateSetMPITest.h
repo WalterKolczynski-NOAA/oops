@@ -15,7 +15,7 @@
 #include "test/TestEnvironment.h"
 
 namespace oops {
-namespace test {
+//namespace test {
 
 template <typename MODEL>
 class StateSetMPITest : public oops::Application {
@@ -23,6 +23,7 @@ class StateSetMPITest : public oops::Application {
 //  typedef Model<MODEL>  Model_;
   typedef State<MODEL>  State_;
   typedef StateSet<MODEL>  StateSet_;
+//  const eckit::Configuration & config2 = test::TestEnvironment::config();
  public:
   explicit StateSetMPITest(const eckit::Configuration & config) 
     : Application(oops::mpi::world()), config_(config) {}
@@ -33,29 +34,29 @@ class StateSetMPITest : public oops::Application {
 
   // Required override for Application
   int execute(const eckit::Configuration & config) const override {
-    std::cout << "starting testDiffGeom " << std::endl;
     testDifferentGeometries();
     return 0;
   }
 
  private:
   void testDifferentGeometries() const {
-    const int nEns = 2;  // Number of ensemble members
-    
-    std::cout << "testDiffGeom 1 " << std::endl;
+//    const eckit::Configuration & config = test::TestEnvironment::config();  
+    eckit::PathName confPath("testinput/test_stateset.yaml");
+    const eckit::YAMLConfiguration config2(confPath);
+    int nEns;  // Number of ensemble members
+  
+    config2.get("ensemble members", nEns); 
     // DA geom uses all mpi tasks on MPI_COMM_WORLD
     // Get DA geometry configuration from config_
-    eckit::LocalConfiguration daGeomConfig = config_.getSubConfiguration("da geometry");
+    eckit::LocalConfiguration daGeomConfig = config2.getSubConfiguration("da geometry");
     // Get full configuration
 //    config_.get("da geometry", daGeomConfig);
 
     //FC geometry is created on each ensemble communicator
-    std::cout << "testDiffGeom 2 " << std::endl;
     // Get FC geometry configuration from config_
     eckit::LocalConfiguration fcGeomConfig;
-    config_.get("fc geometry", fcGeomConfig);
+    config2.get("fc geometry", fcGeomConfig);
 
-    std::cout << "testDiffGeom 3 " << std::endl;
     // Create DA communicator
     const eckit::mpi::Comm & worldComm = oops::mpi::world();
     const int ntasks = worldComm.size();
@@ -76,32 +77,45 @@ class StateSetMPITest : public oops::Application {
     char const *patchName = patchNameStr.c_str();
     eckit::mpi::Comm & patchMember = worldComm.split(subrank, patchName);
 
-    std::cout << "testDiffGeom 6 " << std::endl;
     // Create geometries using appropriate communicators
-    std::cout << "daGeom is " << daGeomConfig << std::endl;
+//    std::cout << "creating daGeometry " << daGeomConfig << std::endl;
     Geometry_ daGeom(daGeomConfig, worldComm);
-    std::cout << "daGeom constructed" << std::endl;
+//    std::cout << "creating fcGeometry" << fcGeomConfig << std::endl;
+    fcGeomConfig.set("member_number",mymember);
     Geometry<MODEL> fcGeom(fcGeomConfig, commMember);
-    std::cout << "fcGeom constructed" << std::endl;
 
-
-    // Create variables and times for StateSet
-    Variables vars;
-    vars.push_back(Variable("ua"));
-    vars.push_back(Variable("va"));
-    vars.push_back(Variable("t"));
-    vars.push_back(Variable("delp"));
-    vars.push_back(Variable("sphum"));
-    
+    //  Setup times
+    Log::info() << "setting up times" << std::endl;
+    eckit::LocalConfiguration fcstparams = config2.getSubConfiguration("fcst");
+    eckit::LocalConfiguration model = fcstparams.getSubConfiguration("model");
+//    std::cout << "fcstparams is " << fcstparams << std::endl;
+//    std::cout << "model config is " << model << std::endl;
+    const util::Duration tstep(model.getString("tstep"));
+    eckit::LocalConfiguration ic = fcstparams.getSubConfiguration("initial condition");
+    const util::DateTime bgndate(ic.getString("datetime"));
+    const util::Duration fclength(fcstparams.getString("forecast length"));
+    const util::DateTime enddate(bgndate + fclength);
     std::vector<util::DateTime> times;
-    times.push_back(util::DateTime("2021-03-23T06:00:00Z"));
-
+    const Variables vars(ic, "state variables");
     // Create ensemble members vector
     std::vector<int> ensMembers;
     for (int i = 1; i <= nEns; i++) {
       ensMembers.push_back(i);
     }
+    for (util::DateTime ii=(bgndate+tstep); ii <= enddate; ii=ii+tstep) {
+       Log::info() << "pushing back time " << ii << std::endl;
+       times.push_back(ii);
+    }
+    oops::mpi::world().barrier();
+    /*
+    StateSetSaver<MODEL> *saver_ =
+        new StateSetSaver<MODEL>(memberConf, fcGeom, times, oops::mpi::myself(),
+                    ensMembers, patchMember);
+    post.enrollProcessor(saver_);
 
+    std::unique_ptr<StateSet_> ens_SS;
+    PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
+*/
     // Create StateSet for DA geometry
     /*
     StateSet<MODEL> daStateSet(daGeom, vars, times, oops::mpi::myself(), 
@@ -110,15 +124,36 @@ class StateSetMPITest : public oops::Application {
     daStateSet.random();
     */
     // Create StateSet for FC geometry
+    std::cout << "creating fcStateSet" << std::endl;
     StateSet<MODEL> fcStateSet(fcGeom, vars, times, oops::mpi::myself(),
                               ensMembers, patchMember);
 
+    std::cout << "DONE creating fcStateSet" << std::endl;
     fcStateSet.random();
     std::cout << "fc stateset size is " << fcStateSet.size() << std::endl;
-    std::cout << "fc stateset is " << fcStateSet << std::endl;
+    Log::trace() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
+    // localVec is on the daGeom with both ensemble members on each MPI proc
     std::vector<StateSet<MODEL>> localVec = fcStateSet.transpose(worldComm, daGeom, mymember);
     oops::mpi::world().barrier();
+    Log::trace() << "size of localVec is " << localVec.size() << std::endl;
+    Log::trace() << "localvec[0] is " << localVec[0] << std::endl;
+    Log::trace() << "localvec[1] is " << localVec[1] << std::endl;
+    std::vector<State_> states_;
+    // after Rtranspose, states are back to distributed across ensemble ranks
+    for(size_t ens=0; ens < localVec.size(); ++ens){
+//      if((mymember - 1) == ens) { //we only want our ensemble member
+        states_.emplace_back(((localVec[ens]).Rtranspose(this->getComm(), fcGeom,
+          mymember,ens)));
+//      }
+    }
+    Log::trace() << "size of states_ is " << states_.size() << std::endl;
+    Log::trace() << "state after Rtranspose is " << states_[0] << std::endl;
+    Log::trace() << "state[1] after Rtranspose is " << states_[1] << std::endl;
+    StateSet_ *newFCState = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
+		                       ensMembers, patchMember);
+    Log::trace() << "newFCState after Rtranspose is " << *newFCState << std::endl;
+     
     /*
     for(size_t ii=0; ii < localVec.size(); ++ii) {
 	std::cout << "localVec[" << ii << "] is " << localVec[ii] << std::endl;
@@ -136,7 +171,7 @@ class StateSetMPITest : public oops::Application {
   const eckit::Configuration & config_;
 };
 
-}  // namespace test
+//}  // namespace test
 }  // namespace oops
 
 #endif  // TEST_BASE_STATESET_H_TEST

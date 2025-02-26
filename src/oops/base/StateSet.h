@@ -47,6 +47,12 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
            const eckit::mpi::Comm & commEns = oops::mpi::myself());
   // create a StateSet variable from a std::vector of State variables distributed
   // across communicators
+  StateSet(const std::vector<State_> &, 
+           const int,
+           const std::vector<util::DateTime> &,
+           const eckit::mpi::Comm &,
+           const std::vector<int> & ens = {0},
+           const eckit::mpi::Comm & commEns = oops::mpi::myself());
   StateSet(const Geometry_ &, const StateSet &);
   StateSet(const StateSet &) = default;
   StateSet(const std::vector<StateSet> &, const int &);
@@ -114,6 +120,33 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
   this->check_consistency();
 
   Log::trace() << "StateSet::StateSet read done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+template<typename MODEL>
+StateSet<MODEL>::StateSet(const std::vector<State_> & states_, 
+		          const int ensNum,
+                          const std::vector<util::DateTime> & times,
+                          const eckit::mpi::Comm & commTime,
+                          const std::vector<int> & ens,
+                          const eckit::mpi::Comm & commEns)
+  : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
+{
+  Log::trace() << "StateSet::StateSet start " << states_.size() << std::endl;
+//  std::cout << "StateSet::StateSet my ensNum is " << ensNum << std::endl;
+//  std::cout << "StateSet::StateSet my states_[" << ensNum << "] is " << states_[ensNum] << std::endl;
+  for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+    for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+      this->dataset().emplace_back(new State_(states_[ensNum]));
+    }
+  }
+  this->sync_times();
+  this->check_consistency();
+
+  Log::trace() << "StateSet::StateSet" << std::endl;
+//  std::cout << "after emplace_back, dataset is " << (*this)(0,0).state() << std::endl;
+
+  Log::trace() << "StateSet::StateSet done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

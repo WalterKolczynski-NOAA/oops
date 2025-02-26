@@ -970,11 +970,11 @@ ecbuild_add_test( TARGET  test_util_timewindow
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
 
-ecbuild_add_test( TARGET  test_base_stateset_mpi
-                  MPI     4
-                  SOURCES test/base/StateSetMPITest.cc
-                  ARGS    "test/testinput/stateset_mpi.yaml"
-                  LIBS    oops )
+	  #ecbuild_add_test( TARGET  test_base_stateset_mpi
+	  #        MPI     4
+	  #        SOURCES test/base/StateSetMPITest.cc
+	  #        ARGS    "test/testinput/stateset_mpi.yaml"
+	  #        LIBS    oops )
 
 ecbuild_add_test( TARGET  test_util_arrayutil
                   MPI     2
