@@ -9,6 +9,7 @@
 #include "oops/base/Variables.h"
 #include "oops/mpi/mpi.h"
 #include "oops/runs/Test.h"
+#include "oops/base/IncrementSet.h"
 #include "oops/base/StateSet.h"
 #include "oops/base/Geometry.h"
 #include "oops/util/DateTime.h"
@@ -23,6 +24,7 @@ class StateSetMPITest : public oops::Application {
 //  typedef Model<MODEL>  Model_;
   typedef State<MODEL>  State_;
   typedef StateSet<MODEL>  StateSet_;
+  typedef IncrementSet<MODEL>  IncrementSet_;
 //  const eckit::Configuration & config2 = test::TestEnvironment::config();
  public:
   explicit StateSetMPITest(const eckit::Configuration & config) 
@@ -133,36 +135,39 @@ class StateSetMPITest : public oops::Application {
     std::cout << "fc stateset size is " << fcStateSet.size() << std::endl;
     Log::trace() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
-    // localVec is on the daGeom with both ensemble members on each MPI proc
-    std::vector<StateSet<MODEL>> localVec = fcStateSet.transpose(worldComm, daGeom, mymember);
+    // daStateSet is on the daGeom with both ensemble members on each MPI proc
+    std::vector<StateSet<MODEL>> daStateSet = fcStateSet.transpose(worldComm, daGeom, mymember);
     oops::mpi::world().barrier();
-    Log::trace() << "size of localVec is " << localVec.size() << std::endl;
-    Log::trace() << "localvec[0] is " << localVec[0] << std::endl;
-    Log::trace() << "localvec[1] is " << localVec[1] << std::endl;
+    Log::trace() << "size of daStateSet is " << daStateSet.size() << std::endl;
+    Log::trace() << "localvec[0] is " << daStateSet[0] << std::endl;
+    Log::trace() << "localvec[1] is " << daStateSet[1] << std::endl;
     std::vector<State_> states_;
     // after Rtranspose, states are back to distributed across ensemble ranks
-    for(size_t ens=0; ens < localVec.size(); ++ens){
+    for(size_t ens=0; ens < daStateSet.size(); ++ens){
 //      if((mymember - 1) == ens) { //we only want our ensemble member
-        states_.emplace_back(((localVec[ens]).Rtranspose(this->getComm(), fcGeom,
+        states_.emplace_back(((daStateSet[ens]).Rtranspose(this->getComm(), fcGeom,
           mymember,ens)));
 //      }
     }
     Log::trace() << "size of states_ is " << states_.size() << std::endl;
     Log::trace() << "state after Rtranspose is " << states_[0] << std::endl;
     Log::trace() << "state[1] after Rtranspose is " << states_[1] << std::endl;
-    StateSet_ *newFCState = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
+    StateSet_ *newFCStateSet = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
 		                       ensMembers, patchMember);
-    Log::trace() << "newFCState after Rtranspose is " << *newFCState << std::endl;
-     
+    Log::trace() << "newFCState after Rtranspose is " << *newFCStateSet << std::endl;
+    IncrementSet_ newState(fcGeom, vars, times, oops::mpi::myself(), ensMembers, patchMember);
+    newState.diff(fcStateSet,*newFCStateSet);
+    Log::trace() << "diff between stateSets is " << newState << std::endl;
+    delete newFCStateSet;
     /*
-    for(size_t ii=0; ii < localVec.size(); ++ii) {
-	std::cout << "localVec[" << ii << "] is " << localVec[ii] << std::endl;
+    for(size_t ii=0; ii < daStateSet.size(); ++ii) {
+	std::cout << "daStateSet[" << ii << "] is " << daStateSet[ii] << std::endl;
     }
     */
     /*
 
     // Verify dimensions
-    EXPECT(localVec.size() == nEns);
+    EXPECT(daStateSet.size() == nEns);
     EXPECT(daStateSet.size() == nEns * times.size());
     EXPECT(fcStateSet.size() == times.size());
     */

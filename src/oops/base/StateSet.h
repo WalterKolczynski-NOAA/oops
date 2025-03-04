@@ -284,7 +284,8 @@ void StateSet<MODEL>::random() {
   const double fact = 1.0 / static_cast<double>(this->ens_size());
   // Create random number generator
   std::random_device rd;  // Used to obtain a seed for the random number engine
-  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+//  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+  std::mt19937 gen(123+oops::mpi::world().rank()); // Standard mersenne_twister_engine seeded with rd()
 
   // Create distribution for the range you want (e.g., between 0.0 and 1.0)
   std::uniform_real_distribution<double> dis(0.0d, 1.0d);
