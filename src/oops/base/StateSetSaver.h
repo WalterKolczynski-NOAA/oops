@@ -85,7 +85,6 @@ StateSetSaver<MODEL>::StateSetSaver(const eckit::Configuration & conf,
 template <typename MODEL>
 std::unique_ptr<StateSet<MODEL> > & StateSetSaver<MODEL>::getStateSet(void) {
   Log::trace() << "StateSetSaver::returning StateSet" << std::endl;
-  Log::trace() << "StateSetSaver::StateSet size is " << States_->size() << std::endl;
   return(States_);
 }
 
@@ -102,8 +101,6 @@ void StateSetSaver<MODEL>::doInitialize(const State_ & x0,
     stateIndex_ = 0;
     Log::trace() << "StateSetSaver::doInitialize done " << std::endl;
   }
-  initialized_ = true;
-  Log::trace() << "StateSetSaver::doInitialize initialized_ is " << initialized_ << std::endl;
 }
 
 // -----------------------------------------------------------------------------

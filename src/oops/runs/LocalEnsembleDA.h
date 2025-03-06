@@ -260,6 +260,9 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       } else {
         std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
             geometry);
+	std::cout << "just finished localizeEnsembleFC" << std::endl;
+	Log::trace() << "localvec[0] is " << localVec[0] << std::endl;
+	Log::trace() << "localvec[0] time is " << (localVec[0])[0].validTime() << std::endl;
         auto object = StateEnsemble4D_(localVec, 0);
         return object;
       }
@@ -269,13 +272,17 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
 
+    std::cout << "here 1\n";
     // Get observations configuration
     const eckit::LocalConfiguration observationsConfig = params.observations;
     eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
+    std::cout << "here 2\n";
+    Log::trace() << "obsConfig is " << obsConfig << std::endl;
     // if any of the obs. spaces uses Halo distribution it will need to know the geometry
     // of the local grid on this PE
     if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(*geometry, obsConfig);
+    std::cout << "here 2.5\n";
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
@@ -283,10 +290,13 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     bool run_loop = true;
     while(run_loop) {
     if( ii != 0) {
+      std::cout << "here 3\n";
       // use the updated state from ens_xx
       delete FCVars.state_;
       std::vector<State_> states_;
+      std::cout << "here 4\n";
       for(size_t ens=0; ens < ens_xx.size(); ++ens){
+        std::cout << "here 5\n";
         states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(),
            FCVars.mymember,ens)));
       }
@@ -304,10 +314,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     } 
     ii++;
 
+    std::cout << "here 7\n";
     const util::TimeWindow timeSubWindow =
       timeWindow.createSubWindow(FCVars.state().validTime(), util::Duration("PT1H"));
+    std::cout << "here 8\n";
     ObsSpaces_ obsdb(obsConfig, this->getComm(), timeSubWindow, time);
+    std::cout << "here 9\n";
     Observations_ yobs(obsdb, "ObsValue");
+    std::cout << "here 10\n";
 
     // Read all ensemble members and compute the ensemble mean
     const size_t nens = ens_xx.size();
@@ -574,12 +588,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const int tasks_per_member = ntasks / nmembers;
     // divide by blocks of tasks_per_member
     int mymember = mytask / tasks_per_member + 1;
-
+    Log::trace() << "starting localizeEnsembldFC" << std::endl;
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
-    Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
+    Log::info() << "Running " << nmembers << " LETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
                 << tasks_per_member << " MPI tasks per member." << std::endl;
 
@@ -639,7 +653,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       if ( m == mymember ) {
          Log::info() << "running on mymember = " << mymember  << " " << mytask << std::endl;
          executeForecast(FCgeometry, memberConf, post);
-         Log::info() << "Done with ens execute\n";
+         Log::info() << "Done with ens3 execute\n";
        }
        if ( batchSize > 0 ) {  // don't divide by zero
          if (m % batchSize == 0) oops::mpi::world().barrier();
@@ -652,6 +666,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
        mymember);
+    Log::trace() << "localVec size is " << localVec.size() << std::endl;
+    Log::trace() << "localVec[0] is " << localVec[0] << std::endl;
+    Log::trace() << "localVec[1] is " << localVec[1] << std::endl;
+    Log::trace() << "finished localizeEnsembldFC" << std::endl;
     return(localVec);
   }
 
@@ -700,13 +718,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // divide by blocks of tasks_per_member
     FCVars.mymember = FCVars.mytask / FCVars.tasks_per_member + 1;
 
+    Log::trace() << "start localizeEnsembleFC 2" << std::endl;
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
 //    std::cout << "creating DAgeometry " << std::endl;
 //    std::cout << "subconfig is " << subconfig << std::endl;
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
-    Log::info() << "Running " << FCVars.nmembers << " EnsembleGETKFApplication members handled by "
+    Log::info() << "Running " << FCVars.nmembers << " LETKFApplication members handled by "
                 << FCVars.ntasks << " total MPI tasks and "
                 << FCVars.tasks_per_member << " MPI tasks per member." << std::endl;
 
@@ -777,13 +796,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
            Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
            initForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.mConf(), bgndate, FCVars.fclength, post, FCVars);
            stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
-           Log::info() << "Done with ens execute\n";
+           Log::info() << "Done with ens1 execute\n";
          }
          if ( FCVars.batchSize > 0 ) {  // don't divide by zero
            if (m % FCVars.batchSize == 0) oops::mpi::world().barrier();
          }
        }
        oops::mpi::world().barrier();
+       std::cout << "moving states to ens_SS" << std::endl;
        ens_SS = std::move(saver_->getStateSet());
 //       std::cout << "after std::move ens_SS[0] is " << (*ens_SS)[0] << std::endl;
 //       std::cout << "after std::move ens_SS[1] is " << (*ens_SS)[1] << std::endl;
@@ -799,6 +819,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry, FCVars.mytask,
        FCVars.mymember);
+    Log::trace() << "finished localizeEnsembleFC 2" << std::endl;
     return(localVec);
   }
 
@@ -838,7 +859,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
 
-    Log::info() << "Running " << FCVars.nmembers << " EnsembleGETKFApplication members handled by "
+    Log::trace() << "starting localizeEnsembleStep" << std::endl;
+    Log::info() << "Running " << FCVars.nmembers << " LETKFApplication members handled by "
                 << FCVars.ntasks << " total MPI tasks and "
                 << FCVars.tasks_per_member << " MPI tasks per member." << std::endl;
 
@@ -863,19 +885,21 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
            Log::trace() << "fcst state after transpose is " << FCVars.state() << std::endl;
            Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
            stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
-           Log::info() << "Done with ens execute\n";
+           Log::info() << "Done with ens2 execute\n";
          }
          if ( FCVars.batchSize > 0 ) {  // don't divide by zero
            if (m % FCVars.batchSize == 0) oops::mpi::world().barrier();
          }
     }
     oops::mpi::world().barrier();
+       std::cout << "moving states2 to ens_SS" << std::endl;
     ens_SS = std::move(saver_->getStateSet());
 
     // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
 		     FCVars.mymember);
+    Log::trace() << "finished localizeEnsembleStep" << std::endl;
     return(localVec);
   }
 
