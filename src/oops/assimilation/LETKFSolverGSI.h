@@ -66,9 +66,9 @@ void LETKFSolverGSI<MODEL, OBS>::computeWeights(const Eigen::VectorXd & dy,
   const float infl = inflopt.mult;
 
   // cast eigen<double> to eigen<float>
-  Eigen::VectorXf dy_f = dy.cast<float>();
-  Eigen::MatrixXf Yb_f = Yb.cast<float>();
-  Eigen::VectorXf R_invvar_f = R_invvar.cast<float>();
+  const Eigen::VectorXf dy_f = dy.cast<float>();
+  const Eigen::MatrixXf Yb_f = Yb.cast<float>();
+  const Eigen::VectorXf R_invvar_f = R_invvar.cast<float>();
 
   Eigen::MatrixXf Wa_f(this->nens_, this->nens_);
   Eigen::VectorXf wa_f(this->nens_);

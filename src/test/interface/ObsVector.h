@@ -186,8 +186,7 @@ template <typename OBS> void testReadWrite() {
   }
 }
 // -----------------------------------------------------------------------------
-/// \brief Tests ObsVector::mask, ObsVector::packEigen and
-///        ObsVector::packEigenSize methods.
+/// \brief Tests ObsVector::mask and ObsVector::maskAndSerialize methods
 /// \details Tests that:
 /// - mask of "nothing to mask" applied to ObsVector doesn't change its size
 ///   and content;
@@ -195,9 +194,6 @@ template <typename OBS> void testReadWrite() {
 ///   from the file applied to ObsVector changes its size.
 /// - linear algebra operations with ObsVector that were masked out produce
 ///   ObsVectors that have the same number of obs masked out.
-/// - size returned by packEigenSize is consistent with size of Eigen Vector
-///   returned by packEigen, and is the same as reference value for each MPI
-///   task.
 template <typename OBS> void testMask() {
   typedef ObsTestsFixture<OBS>           Test_;
   typedef oops::ObsDataVector<OBS, int>  ObsDataVectorInt_;
@@ -321,17 +317,15 @@ template <typename OBS> void testMask() {
     with_mask.axpy(2.0, test);
     EXPECT_EQUAL(with_mask.nobs(), nobs_after_mask);
 
-    /// test packEigen
+    /// test maskAndSerialize
     // create maskvec ObsVector - mask with missing values
     ObsVector_ maskvec = test;
     maskvec.ones();
     maskvec.mask(mask);
-    // randomize the vector, and call packEigen with maskvec
+    // randomize the vector, and call maskAndSerialize with maskvec
     test.random();
-    Eigen::VectorXd with_mask_vec = test.packEigen(maskvec);
-    // check that the size of returned Eigen Vector is consistent with size
-    // returned by packEigenSize()
-    EXPECT_EQUAL(static_cast<size_t>(with_mask_vec.size()), test.packEigenSize(maskvec));
+    std::vector<double> with_mask_vec;
+    test.maskAndSerialize(maskvec, with_mask_vec);
     oops::Log::debug() << "Local number of masked observations is: " <<
                           with_mask_vec.size() << std::endl;
     // check that the size is consistent with reference for this MPI task

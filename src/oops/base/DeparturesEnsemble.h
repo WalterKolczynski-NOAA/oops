@@ -60,11 +60,12 @@ DeparturesEnsemble<OBS>::DeparturesEnsemble(const ObsSpaces_ & obsdb, const size
 
 template<typename OBS>
 Eigen::MatrixXd DeparturesEnsemble<OBS>::packEigen(const Departures_ & mask) const {
-  std::size_t myNobs = ensemblePerturbs_[0].packEigenSize(mask);
-  std::size_t myNens = ensemblePerturbs_.size();
-
+  const size_t myNens = ensemblePerturbs_.size();
+  const Eigen::VectorXd dep0 = ensemblePerturbs_.front().packEigen(mask);
+  const size_t myNobs = dep0.size();
   Eigen::MatrixXd depEns(myNens, myNobs);
-  for (std::size_t iens = 0; iens < myNens; ++iens) {
+  depEns.row(0) = dep0;
+  for (std::size_t iens = 1; iens < myNens; ++iens) {
     depEns.row(iens) = ensemblePerturbs_[iens].packEigen(mask);
   }
   Log::trace() << "DeparturesEnsemble::packEigen() completed" << std::endl;

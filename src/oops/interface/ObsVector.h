@@ -11,13 +11,13 @@
 #ifndef OOPS_INTERFACE_OBSVECTOR_H_
 #define OOPS_INTERFACE_OBSVECTOR_H_
 
-#include <Eigen/Dense>
 #include <math.h>
 #include <memory>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "oops/interface/ObsDataVector_head.h"
 #include "oops/interface/ObsSpace.h"
@@ -70,12 +70,9 @@ class ObsVector : public util::Printable,
   /// Add \p zz * \p rhs to the ObsVector.
   void axpy(const double & zz, const ObsVector & rhs);
 
-  /// Pack observations local to this MPI task into an Eigen vector
+  /// Serialize observations local to this MPI task into a \p values vector
   /// (excluding vector elements that are masked out: where \p mask is a missing value)
-  Eigen::VectorXd packEigen(const ObsVector & mask) const;
-  /// Number of non-masked out observations local to this MPI task
-  /// (size of an Eigen vector returned by `packEigen`)
-  size_t packEigenSize(const ObsVector & mask) const;
+  void maskAndSerialize(const ObsVector & mask, std::vector<double> & values) const;
 
   /// Zero out this ObsVector
   void zero();
@@ -104,6 +101,8 @@ class ObsVector : public util::Printable,
 
   /// Number of non-masked out observations (across all MPI tasks)
   unsigned int nobs() const;
+  /// Serialization size (size of data on this MPI task)
+  size_t serialSize() const;
 
   std::string info(const std::string &) const;
   std::string info(const std::string &, const ObsDataVector<OBS, int> &) const;
@@ -311,6 +310,11 @@ unsigned int ObsVector<OBS>::nobs() const {
 }
 // -----------------------------------------------------------------------------
 template <typename OBS>
+size_t ObsVector<OBS>::serialSize() const {
+  return data_->serialSize();
+}
+// -----------------------------------------------------------------------------
+template <typename OBS>
 void ObsVector<OBS>::print(std::ostream & os) const {
   Log::trace() << "ObsVector<OBS>::print starting" << std::endl;
   util::Timer timer(classname(), "print");
@@ -344,25 +348,13 @@ void ObsVector<OBS>::save(const std::string & name) const {
 }
 // -----------------------------------------------------------------------------
 template <typename OBS>
-Eigen::VectorXd  ObsVector<OBS>::packEigen(const ObsVector & mask) const {
-  Log::trace() << "ObsVector<OBS>::packEigen starting " << std::endl;
-  util::Timer timer(classname(), "packEigen");
+void  ObsVector<OBS>::maskAndSerialize(const ObsVector & mask, std::vector<double> & values) const {
+  Log::trace() << "ObsVector<OBS>::maskAndSerialize starting " << std::endl;
+  util::Timer timer(classname(), "maskAndSerialize");
 
-  Eigen::VectorXd vec = data_->packEigen(mask.obsvector());
+  data_->maskAndSerialize(mask.obsvector(), values);
 
-  Log::trace() << "ObsVector<OBS>::packEigen done" << std::endl;
-  return vec;
-}
-// -----------------------------------------------------------------------------
-template <typename OBS>
-size_t ObsVector<OBS>::packEigenSize(const ObsVector & mask) const {
-  Log::trace() << "ObsVector<OBS>::packEigenSize starting " << std::endl;
-  util::Timer timer(classname(), "packEigenSize");
-
-  size_t len = data_->packEigenSize(mask.obsvector());
-
-  Log::trace() << "ObsVector<OBS>::packEigen done" << std::endl;
-  return len;
+  Log::trace() << "ObsVector<OBS>::maskAndSerialize done" << std::endl;
 }
 // -----------------------------------------------------------------------------
 template <typename OBS>

@@ -12,9 +12,9 @@
 #ifndef QG_MODEL_OBSVECQG_H_
 #define QG_MODEL_OBSVECQG_H_
 
-#include <Eigen/Dense>
 #include <ostream>
 #include <string>
+#include <vector>
 
 #include "oops/util/ObjectCounter.h"
 #include "oops/util/Printable.h"
@@ -45,9 +45,9 @@ class ObsVecQG : public util::Printable,
   ObsVecQG & operator*= (const ObsVecQG &);
   ObsVecQG & operator/= (const ObsVecQG &);
 
-  Eigen::VectorXd packEigen(const ObsVecQG &) const;
-  size_t packEigenSize(const ObsVecQG &) const;
+  void maskAndSerialize(const ObsVecQG &, std::vector<double> &) const;
   size_t size() const;
+  size_t serialSize() const;
 
   /// set all values to zero
   void zero();

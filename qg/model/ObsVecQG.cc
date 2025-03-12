@@ -131,16 +131,12 @@ void ObsVecQG::save(const std::string & name) const {
   obsdb_.putdb(name, keyOvec_);
 }
 // -----------------------------------------------------------------------------
-Eigen::VectorXd ObsVecQG::packEigen(const ObsVecQG & mask) const {
-  Eigen::VectorXd vec(packEigenSize(mask));
-  qg_obsvec_get_withmask_f90(keyOvec_, mask.toFortran(), vec.data(), vec.size());
-  return vec;
-}
-// -----------------------------------------------------------------------------
-size_t ObsVecQG::packEigenSize(const ObsVecQG & mask) const {
+void ObsVecQG::maskAndSerialize(const ObsVecQG & mask, std::vector<double> & values) const {
   int nobs;
   qg_obsvec_nobs_withmask_f90(keyOvec_, mask.toFortran(), nobs);
-  return nobs;
+  std::vector<double> newvalues(nobs);
+  qg_obsvec_get_withmask_f90(keyOvec_, mask.toFortran(), newvalues.data(), newvalues.size());
+  values.insert(values.end(), newvalues.begin(), newvalues.end());
 }
 // -----------------------------------------------------------------------------
 void ObsVecQG::read(const std::string & name) {
@@ -191,6 +187,11 @@ size_t ObsVecQG::size() const {
   qg_obsvec_size_f90(keyOvec_, iobs);
   size_t nobs(iobs);
   return nobs;
+}
+
+// -----------------------------------------------------------------------------
+size_t ObsVecQG::serialSize() const {
+  return this->size();
 }
 // -----------------------------------------------------------------------------
 void ObsVecQG::readAppended(const std::string & name) {

@@ -12,6 +12,7 @@
 #include "lorenz95/ObsVec1D.h"
 
 #include <math.h>
+#include <algorithm>
 #include <limits>
 #include <sstream>
 
@@ -179,25 +180,13 @@ void ObsVec1D::save(const std::string & name) const {
   obsdb_.putdb(name, data_);
 }
 // -----------------------------------------------------------------------------
-Eigen::VectorXd ObsVec1D::packEigen(const ObsVec1D & mask) const {
-  Eigen::VectorXd vec(packEigenSize(mask));
-  size_t ii = 0;
+void ObsVec1D::maskAndSerialize(const ObsVec1D & mask, std::vector<double> & values) const {
+  values.reserve(values.size() + data_.size());
   for (size_t jj = 0; jj < data_.size(); ++jj) {
     if ((data_[jj] != missing_) && (mask[jj] != missing_)) {
-      vec(ii++) = data_[jj];
+      values.push_back(data_[jj]);
     }
   }
-  return vec;
-}
-// -----------------------------------------------------------------------------
-size_t ObsVec1D::packEigenSize(const ObsVec1D & mask) const {
-  size_t ii = 0;
-  for (size_t jj = 0; jj < data_.size(); ++jj) {
-    if ((data_[jj] != missing_) && (mask[jj] != missing_)) {
-      ii++;
-    }
-  }
-  return ii;
 }
 // -----------------------------------------------------------------------------
 void ObsVec1D::read(const std::string & name) {

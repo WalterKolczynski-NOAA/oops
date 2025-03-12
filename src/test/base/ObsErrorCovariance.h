@@ -96,12 +96,13 @@ template <typename OBS> void testReader() {
         R.multiply(unit);
         ObsVector_ mask(Test_::obspace()[jj]);
         mask.zero();
-        Eigen::VectorXd unitVec = unit.packEigen(mask);
+        std::vector<double> unitVec;
+        unit.maskAndSerialize(mask, unitVec);
         oops::Log::info() << "Column of R matrix: " << std::endl << unitVec << std::endl;
         std::vector<float> refVec = testParams.refVec.value().value();
 
         // unitVec after Multiplication with R should equal reference vector
-        for (int i = 0; i < unitVec.size(); i++) {
+        for (size_t i = 0; i < unitVec.size(); i++) {
             EXPECT_EQUAL(unitVec[i], refVec[i]);
         }
     }

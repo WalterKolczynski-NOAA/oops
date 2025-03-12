@@ -69,6 +69,7 @@ class Departures : public GeneralizedDepartures {
   double rms() const;
 /// Return number of departures (excluding departures that are masked out)
   size_t nobs() const;
+  size_t serialSize() const;
 
 /// Mask out departures where the passed in qc flags are > 0
   void mask(ObsDataVec_<int>);
@@ -77,8 +78,6 @@ class Departures : public GeneralizedDepartures {
 
 /// Pack departures in an Eigen vector (excluding departures that are masked out)
   Eigen::VectorXd packEigen(const Departures &) const;
-/// Size of departures packed into an Eigen vector
-  size_t packEigenSize(const Departures &) const;
 
 /// Save departures values
   void save(const std::string &) const;
@@ -207,6 +206,15 @@ size_t Departures<OBS>::nobs() const {
 }
 // -----------------------------------------------------------------------------
 template<typename OBS>
+size_t Departures<OBS>::serialSize() const {
+  size_t serialSize = 0;
+  for (size_t jj = 0; jj < dep_.size(); ++jj) {
+    serialSize += dep_[jj].serialSize();
+  }
+  return serialSize;
+}
+// -----------------------------------------------------------------------------
+template<typename OBS>
 void Departures<OBS>::mask(ObsDataVec_<int> qcflags) {
   for (size_t ii = 0; ii < dep_.size(); ++ii) {
     dep_[ii].mask(*qcflags[ii]);
@@ -222,28 +230,14 @@ void Departures<OBS>::mask(const Departures & mask) {
 // -----------------------------------------------------------------------------
 template <typename OBS>
 Eigen::VectorXd Departures<OBS>::packEigen(const Departures & mask) const {
-  std::vector<size_t> len(dep_.size());
+  std::vector<double> valid_values;
+  valid_values.reserve(this->serialSize());
   for (size_t idep = 0; idep < dep_.size(); ++idep) {
-    len[idep] = dep_[idep].packEigenSize(mask[idep]);
+    dep_[idep].maskAndSerialize(mask[idep], valid_values);
   }
-  size_t all_len = std::accumulate(len.begin(), len.end(), 0);
-
-  Eigen::VectorXd vec(all_len);
-  size_t ii = 0;
-  for (size_t idep = 0; idep < dep_.size(); ++idep) {
-    vec.segment(ii, len[idep]) = dep_[idep].packEigen(mask[idep]);
-    ii += len[idep];
-  }
+  const Eigen::VectorXd vec = Eigen::Map<Eigen::VectorXd>(valid_values.data(),
+                                                          valid_values.size());
   return vec;
-}
-// -----------------------------------------------------------------------------
-template <typename OBS>
-size_t Departures<OBS>::packEigenSize(const Departures & mask) const {
-  size_t len = 0;
-  for (size_t idep = 0; idep < dep_.size(); ++idep) {
-    len += dep_[idep].packEigenSize(mask[idep]);
-  }
-  return len;
 }
 // -----------------------------------------------------------------------------
 template <typename OBS>

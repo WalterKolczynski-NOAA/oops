@@ -37,6 +37,7 @@ oops/assimilation/FGMRESMinimizer.h
 oops/assimilation/FtnTriDiagSpectrum.F90
 oops/assimilation/FullGMRES.h
 oops/assimilation/GETKFSolver.h
+oops/assimilation/GETKFSolverPert.h
 oops/assimilation/gletkfInterface.h
 oops/assimilation/gletkf_interface.f90
 oops/assimilation/gletkf_mod.f90
@@ -60,6 +61,7 @@ oops/assimilation/LBHessianMatrix.h
 oops/assimilation/LBMinimizer.h
 oops/assimilation/LETKFSolver.h
 oops/assimilation/LETKFSolverGSI.h
+oops/assimilation/LETKFSolverPert.h
 oops/assimilation/LocalEnsembleSolverParameters.h
 oops/assimilation/LocalEnsembleSolver.h
 oops/assimilation/Minimizer.h
@@ -483,6 +485,7 @@ list( APPEND oops_test_src_files
 test/TestEnvironment.h
 test/TestFixture.h
 
+test/assimilation/ETKF.h
 test/assimilation/FullGMRES.h
 test/assimilation/rotmat.h
 test/assimilation/SolveMatrixEquation.h
@@ -583,6 +586,7 @@ list( APPEND oops_test_input
   test/testinput/atlas_global_interpolator.yaml
   test/testinput/atlas_interpolator.yaml
   test/testinput/empty.yaml
+  test/testinput/etkf.yaml
   test/testinput/fieldsets.yaml
   test/testinput/fft_multiple.yaml
   test/testinput/hello.yaml
@@ -1016,6 +1020,11 @@ ecbuild_add_test( TARGET  test_util_functionspace_helpers_p4
                   COMMAND test_oops_util_functionspace_helpers
                   MPI     4
                   ARGS    "test/testinput/empty.yaml"
+                  LIBS    oops )
+
+ecbuild_add_test( TARGET  test_assimilation_etkf
+                  SOURCES test/assimilation/ETKF.cc
+                  ARGS    "test/testinput/etkf.yaml"
                   LIBS    oops )
 
 ecbuild_add_test( TARGET  test_assimilation_fullgmres

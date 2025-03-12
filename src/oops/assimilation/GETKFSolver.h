@@ -104,13 +104,14 @@ class GETKFSolver : public LocalEnsembleSolver<MODEL, OBS> {
   void applyWeights(const IncrementEnsemble4D_ &, IncrementEnsemble4D_ &,
                     const GeometryIterator_ &);
 
- private:
+ protected:
   // parameters
   size_t nens_;
   const Geometry_ & geometry_;
   VerticalLocEV_ vertloc_;
   size_t neig_;
   size_t nanal_;
+  bool fortranETKF_;
 
   DeparturesEnsemble_ HZb_;
 
@@ -127,7 +128,9 @@ GETKFSolver<MODEL, OBS>::GETKFSolver(ObsSpaces_ & obspaces, const Geometry_ & ge
   : LocalEnsembleSolver<MODEL, OBS>(obspaces, geometry, config, nens, xbmean, incvars),
     nens_(nens), geometry_(geometry),
     vertloc_(config.getSubConfiguration("local ensemble DA.vertical localization"), xbmean[0],
-    incvars), neig_(vertloc_.neig()), nanal_(neig_*nens_), HZb_(obspaces, nanal_)
+    incvars), neig_(vertloc_.neig()), nanal_(neig_*nens_),
+    fortranETKF_(config.getBool("local ensemble DA.fortran ETKF", true)),
+    HZb_(obspaces, nanal_)
 {
   // pre-allocate transformation matrices
   Wa_.resize(nanal_, nens);
@@ -320,30 +323,70 @@ void GETKFSolver<MODEL, OBS>::computeWeights(const Eigen::VectorXd & dy,
                                              const Eigen::VectorXd & R_invvar) {
   // compute transformation matrix, save in Wa_, wa_
   // Yb(nobs,neig*nens), YbOrig(nobs,nens)
-  // uses GSI GETKF code
   util::Timer timer(classname(), "computeWeights");
   const LocalEnsembleSolverInflationParameters & inflopt = this->options_.infl;
   const float infl = inflopt.mult;
 
-  const int nobsl = dy.size();
-
   // cast eigen<double> to eigen<float>
-  Eigen::VectorXf dy_f = dy.cast<float>();
-  Eigen::MatrixXf Yb_f = Yb.cast<float>();
-  Eigen::MatrixXf YbOrig_f = YbOrig.cast<float>();
-  Eigen::VectorXf R_invvar_f = R_invvar.cast<float>();
+  const Eigen::VectorXf dy_f = dy.cast<float>();
+  const Eigen::MatrixXf Yb_f = Yb.cast<float>();
+  const Eigen::MatrixXf YbOrig_f = YbOrig.cast<float>();
+  const Eigen::VectorXf R_invvar_f = R_invvar.cast<float>();
 
   Eigen::MatrixXf Wa_f(nanal_, this->nens_);
   Eigen::VectorXf wa_f(nanal_);
 
-  // call into GSI interface to compute Wa and wa
-  const int getkf_inflation = 0;
-  const int denkf = 0;
-  const int getkf = 1;
-  letkf_core_f90(nobsl, Yb_f.data(), YbOrig_f.data(), dy_f.data(),
-                 wa_f.data(), Wa_f.data(),
-                 R_invvar_f.data(), nanal_, neig_,
-                 getkf_inflation, denkf, getkf, infl);
+  if (fortranETKF_) {
+    // call into GSI interface to compute Wa and wa
+    const int nobsl = dy.size();
+    const int getkf_inflation = 0;
+    const int denkf = 0;
+    const int getkf = 1;
+    letkf_core_f90(nobsl, Yb_f.data(), YbOrig_f.data(), dy_f.data(),
+                   wa_f.data(), Wa_f.data(),
+                   R_invvar_f.data(), nanal_, neig_,
+                   getkf_inflation, denkf, getkf, infl);
+  } else {
+    // Identity
+    const Eigen::VectorXf I = Eigen::VectorXf::Constant(this->nanal_, 1.0);
+
+    // Yb R^-1
+    const Eigen::MatrixXf YbRinv = Yb_f * R_invvar_f.asDiagonal();
+
+    // Yb R^-1 Yb^T + (nens - 1) I / infl
+    const Eigen::MatrixXf YbRinvYbpI =
+      YbRinv * Yb_f.transpose() +
+      I.asDiagonal().toDenseMatrix() * (nens_ - 1) / infl;
+
+    // Eigendecomposition
+    const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> es(YbRinvYbpI);
+    const Eigen::VectorXf eival = es.eigenvalues().real();
+    const Eigen::MatrixXf eivec = es.eigenvectors().real();
+
+    // Pa = [Yb R^-1 Yb^T + (nens - 1)/infl I]^-1
+    const Eigen::MatrixXf Pa =
+      eivec * eival.cwiseInverse().asDiagonal() * eivec.transpose();
+
+    // wa_f = Pa Yb R^-1 dy
+    wa_f.noalias() = Pa * (YbRinv * dy_f);
+
+    // Normalisation
+    const float norm = 1.0 / (nens_ - 1.0);
+
+    // (I - Gamma^{-1/2} / (nens - 1)) * (Gamma - (nens - 1) I / rho)
+    const Eigen::VectorXf diag = (I - (norm * eival).cwiseInverse().cwiseSqrt()).
+      cwiseProduct((eival - I / (infl * norm)).cwiseInverse());
+
+    // C ((I - Gamma^{-1/2} / (nens - 1)) * (Gamma - (nens - 1) I / rho)) C^T
+    const Eigen::MatrixXf scaledCCT = eivec * diag.asDiagonal() * eivec.transpose();
+
+    // Yb R^-1 YbOrig^T
+    const Eigen::MatrixXf YbRinvYbOrig = YbRinv * YbOrig_f.transpose();
+
+    // Wa_f
+    Wa_f.noalias() = -scaledCCT * YbRinvYbOrig;
+  }
+
   this->Wa_ = Wa_f.cast<double>();
   this->wa_ = wa_f.cast<double>();
 }
@@ -371,7 +414,7 @@ void GETKFSolver<MODEL, OBS>::applyWeights(const IncrementEnsemble4D_ & bkg_pert
 
     // postmulptiply
     // ensemble mean update
-    Eigen::VectorXd xa = XbModulated*wa_;
+    const Eigen::VectorXd xa = XbModulated*wa_;
     // ensemble perturbation update
     // Eq (10) from Lei 2018. (-) sign is accounted for in the Wa_ computation
     Eigen::MatrixXd Xa = XbOriginal + XbModulated*Wa_;
@@ -401,7 +444,7 @@ void GETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementEnsemble4D_ & bkg
      (this->invVarR_)->mask(this->HZb_[iens]);
   }
   locvector.mask(*(this->invVarR_));
-  Eigen::VectorXd local_omb_vec = this->omb_.packEigen(locvector);
+  const Eigen::VectorXd local_omb_vec = this->omb_.packEigen(locvector);
 
   if (local_omb_vec.size() == 0) {
     // no obs. so no need to update Wa_ and wa_
@@ -410,13 +453,12 @@ void GETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementEnsemble4D_ & bkg
   } else {
     // if obs are present do normal KF update
     // get local Yb & HZ
-    Eigen::MatrixXd local_Yb_mat = this->Yb_.packEigen(locvector);
-    Eigen::MatrixXd local_HZ_mat = this->HZb_.packEigen(locvector);
-    // create local obs errors
-    Eigen::VectorXd local_invVarR_vec = this->invVarR_->packEigen(locvector);
-    // and apply localization
-    Eigen::VectorXd localization = locvector.packEigen(locvector);
-    local_invVarR_vec.array() *= localization.array();
+    const Eigen::MatrixXd local_Yb_mat = this->Yb_.packEigen(locvector);
+    const Eigen::MatrixXd local_HZ_mat = this->HZb_.packEigen(locvector);
+    // create local obs errors and apply localization
+    const Eigen::VectorXd localization = locvector.packEigen(locvector);
+    const Eigen::VectorXd local_invVarR_vec = this->invVarR_->packEigen(locvector).array()
+                                              * localization.array();
     computeWeights(local_omb_vec, local_HZ_mat, local_Yb_mat, local_invVarR_vec);
     applyWeights(bkg_pert, ana_pert, i);
   }
