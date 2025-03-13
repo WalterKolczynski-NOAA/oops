@@ -66,23 +66,19 @@ class StateSetMPITest : public oops::Application {
     const int tasks_per_member = ntasks / nEns;
     const int mymember = mytask / tasks_per_member + 1;
 
-    std::cout << "testDiffGeom 4 -- " << ntasks << " " << nEns << " " << tasks_per_member << " " << mymember << " " << mytask << " " << std::endl;
     // Create member communicator
     std::string commNameStr = "comm_member_" + std::to_string(mymember);
     char const *commName = commNameStr.c_str();
     eckit::mpi::Comm & commMember = worldComm.split(mymember, commName);
     const int subrank = commMember.rank();
 
-    std::cout << "my rank is " << mytask << " and subrank is " << subrank << std::endl;
     // Create patch communicator
     std::string patchNameStr = "patch_member_" + std::to_string(subrank);
     char const *patchName = patchNameStr.c_str();
     eckit::mpi::Comm & patchMember = worldComm.split(subrank, patchName);
 
     // Create geometries using appropriate communicators
-//    std::cout << "creating daGeometry " << daGeomConfig << std::endl;
     Geometry_ daGeom(daGeomConfig, worldComm);
-//    std::cout << "creating fcGeometry" << fcGeomConfig << std::endl;
     fcGeomConfig.set("member_number",mymember);
     Geometry<MODEL> fcGeom(fcGeomConfig, commMember);
 
@@ -90,8 +86,6 @@ class StateSetMPITest : public oops::Application {
     Log::info() << "setting up times" << std::endl;
     eckit::LocalConfiguration fcstparams = config2.getSubConfiguration("fcst");
     eckit::LocalConfiguration model = fcstparams.getSubConfiguration("model");
-//    std::cout << "fcstparams is " << fcstparams << std::endl;
-//    std::cout << "model config is " << model << std::endl;
     const util::Duration tstep(model.getString("tstep"));
     eckit::LocalConfiguration ic = fcstparams.getSubConfiguration("initial condition");
     const util::DateTime bgndate(ic.getString("datetime"));
@@ -109,32 +103,12 @@ class StateSetMPITest : public oops::Application {
        times.push_back(ii);
     }
     oops::mpi::world().barrier();
-    /*
-    StateSetSaver<MODEL> *saver_ =
-        new StateSetSaver<MODEL>(memberConf, fcGeom, times, oops::mpi::myself(),
-                    ensMembers, patchMember);
-    post.enrollProcessor(saver_);
 
-    std::unique_ptr<StateSet_> ens_SS;
-    PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
-*/
-    // Create StateSet for DA geometry
-    /*
-    StateSet<MODEL> daStateSet(daGeom, vars, times, oops::mpi::myself(), 
-                              ensMembers, patchMember);
-    std::cout << "about to randomize daStatSet" << std::endl;
-    daStateSet.random();
-    */
     // Create StateSet for FC geometry
-    std::cout << "creating fcStateSet with times[0]" << times[0] << std::endl;
     StateSet<MODEL> fcStateSet(fcGeom, vars, times, oops::mpi::myself(),
                               ensMembers, patchMember);
 
-    std::cout << "DONE creating fcStateSet" << std::endl;
-    std::cout << "fcStateSet[0].validTime is " << fcStateSet[0].validTime() << std::endl;
     fcStateSet.random();
-    std::cout << "after random fcStateSet[0].validTime is " << fcStateSet[0].validTime() << std::endl;
-    std::cout << "fc stateset size is " << fcStateSet.size() << std::endl;
     Log::trace() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
     // daStateSet is on the daGeom with both ensemble members on each MPI proc
@@ -162,11 +136,6 @@ class StateSetMPITest : public oops::Application {
     newState.diff(fcStateSet,*newFCStateSet);
     Log::trace() << "diff between stateSets is " << newState << std::endl;
     delete newFCStateSet;
-    /*
-    for(size_t ii=0; ii < daStateSet.size(); ++ii) {
-	std::cout << "daStateSet[" << ii << "] is " << daStateSet[ii] << std::endl;
-    }
-    */
     /*
 
     // Verify dimensions
