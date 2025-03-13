@@ -126,12 +126,14 @@ class StateSetMPITest : public oops::Application {
     daStateSet.random();
     */
     // Create StateSet for FC geometry
-    std::cout << "creating fcStateSet" << std::endl;
+    std::cout << "creating fcStateSet with times[0]" << times[0] << std::endl;
     StateSet<MODEL> fcStateSet(fcGeom, vars, times, oops::mpi::myself(),
                               ensMembers, patchMember);
 
     std::cout << "DONE creating fcStateSet" << std::endl;
+    std::cout << "fcStateSet[0].validTime is " << fcStateSet[0].validTime() << std::endl;
     fcStateSet.random();
+    std::cout << "after random fcStateSet[0].validTime is " << fcStateSet[0].validTime() << std::endl;
     std::cout << "fc stateset size is " << fcStateSet.size() << std::endl;
     Log::trace() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
@@ -152,6 +154,7 @@ class StateSetMPITest : public oops::Application {
     Log::trace() << "size of states_ is " << states_.size() << std::endl;
     Log::trace() << "state after Rtranspose is " << states_[0] << std::endl;
     Log::trace() << "state[1] after Rtranspose is " << states_[1] << std::endl;
+    Log::trace() << "times[0] is " << times[0] << std::endl;
     StateSet_ *newFCStateSet = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
 		                       ensMembers, patchMember);
     Log::trace() << "newFCState after Rtranspose is " << *newFCStateSet << std::endl;

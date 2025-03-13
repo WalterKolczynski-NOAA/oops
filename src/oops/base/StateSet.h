@@ -133,8 +133,6 @@ StateSet<MODEL>::StateSet(const std::vector<State_> & states_,
   : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
 {
   Log::trace() << "StateSet::StateSet start " << states_.size() << std::endl;
-//  std::cout << "StateSet::StateSet my ensNum is " << ensNum << std::endl;
-//  std::cout << "StateSet::StateSet my states_[" << ensNum << "] is " << states_[ensNum] << std::endl;
   for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
     for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
       this->dataset().emplace_back(new State_(states_[ensNum]));
@@ -142,9 +140,6 @@ StateSet<MODEL>::StateSet(const std::vector<State_> & states_,
   }
   this->sync_times();
   this->check_consistency();
-
-  Log::trace() << "StateSet::StateSet" << std::endl;
-//  std::cout << "after emplace_back, dataset is " << (*this)(0,0).state() << std::endl;
 
   Log::trace() << "StateSet::StateSet done" << std::endl;
 }
@@ -279,7 +274,6 @@ StateSet<MODEL> StateSet<MODEL>::ens_mean() const {
 
 template<typename MODEL>
 void StateSet<MODEL>::random() {
-  std::cout << "StateSet<MODEL>::random starting" << std::endl;
   Log::trace() << "StateSet<MODEL>::random starting" << std::endl;
   const double fact = 1.0 / static_cast<double>(this->ens_size());
   // Create random number generator
@@ -293,20 +287,15 @@ void StateSet<MODEL>::random() {
 
   size_t dataSize = (*this)(0, 0).serialSize();  // would be good to make this a method
 
-  std::cout << "dataSize is " << dataSize << std::endl;
   
 // add up all the state values on the local communicator and put them in zz[0][:]
     for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+      (*this)(0, jm).serialize(zz[jm]);
       for (size_t i = 0; i < dataSize -3; ++i) {
       // Generate a random double
-          (zz[jm]).push_back(dis(gen)); 
-//	  std::cout << "pushing back " << zz[jm][i] << std::endl;
+          zz[jm][i] = dis(gen); 
       }
-      (zz[jm]).push_back(54321.56789); 
-      (zz[jm]).push_back(0.0); 
-      (zz[jm]).push_back(0.0); 
     }
-  std::cout << "about to deserialize " << std::endl;
 // deserialize back to stateSet
   for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
     // Put States from each local ensemble member in a vector
@@ -316,6 +305,8 @@ void StateSet<MODEL>::random() {
       (*this)(jt, jm).deserialize(zz[jm], indx);
     }
   }
+  this->sync_times();
+  this->check_consistency();
   Log::trace() << "StateSet<MODEL>::random done" << std::endl;
 }
 // -----------------------------------------------------------------------------
