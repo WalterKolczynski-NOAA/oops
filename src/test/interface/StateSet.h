@@ -42,58 +42,11 @@
 
 namespace test {
 
-#if 0
-// -----------------------------------------------------------------------------
-/// Configuration of the state set test.
-template <typename MODEL>
-class StateSetTestParameters : public oops::Parameters {
-  OOPS_CONCRETE_PARAMETERS(StateSetTestParameters, Parameters)
-
- public:
-  /// Configuration of the first state file to load
-  oops::RequiredParameter<eckit::LocalConfiguration> statefile1{"statefile1", this};
-  /// Configuration of the second state file to load
-  oops::RequiredParameter<eckit::LocalConfiguration> statefile2{"statefile2", this};
-  /// Validity time for states
-  oops::RequiredParameter<util::DateTime> date{"date", this};
-  /// Number of ensemble members (determines resolution ratio)
-  oops::RequiredParameter<int> nens{"number of members", this};
-};
-
-// -----------------------------------------------------------------------------
-/// Top-level test parameters.
-template <typename MODEL>
-class TopTestParameters : public oops::Parameters {
-  OOPS_CONCRETE_PARAMETERS(TopTestParameters, Parameters)
-
-  typedef oops::Geometry<MODEL>           Geometry_;
-  typedef StateSetTestParameters<MODEL>   StateSetTestParameters_;
-
- public:
-//  oops::RequiredParameter<StateSetTestParameters_> stateSetTest{"state set test", this};
-  oops::RequiredParameter<eckit::LocalConfiguration> daGeomConfig{"da geometry", this};
-  oops::RequiredParameter<eckit::LocalConfiguration> fcGeomConfig{"fc geometry", this};
-  oops::RequiredParameter<eckit::LocalConfiguration> fcstConfig{"fcst", this};
-  oops::RequiredParameter<eckit::LocalConfiguration> ensemble{"ensemble members", this};
-  oops::IgnoreOtherParameters ignore{this};
-};
-#endif
-
 // -----------------------------------------------------------------------------
 template <typename MODEL> class StateSetFixture : private boost::noncopyable {
  public:
   typedef oops::Geometry<MODEL>      Geometry_;
-//  typedef StateSetTestParameters<MODEL> StateSetTestParameters_;
-
-//  static const StateSetTestParameters_ & test()  {return *getInstance().test_;}
-//  static const Geometry_ & daGeom() {return *getInstance().daGeom_;}
-//  static const Geometry_ & fcGeom() {return *getInstance().fcGeom_;}
   static void reset() {
-/*
-    getInstance().daGeom_.reset();
-    getInstance().fcGeom_.reset();
-    getInstance().test_.reset();
-*/
   }
  private:
   static StateSetFixture<MODEL>& getInstance() {
@@ -102,33 +55,14 @@ template <typename MODEL> class StateSetFixture : private boost::noncopyable {
   }
 
   StateSetFixture() {
-    std::cout << "in statesetfixture" << std::endl;
-    /*
-    const eckit::LocalConfiguration ensembleConfig(TestEnvironment::config(), "ensemble members"));
-    const eckit::LocalConfiguration daGeomConfig(TestEnvironment::config(), "da geometry");
-    const eckit::LocalConfiguration fcGeomConfig(TestEnvironment::config(), "fc geometry");
-    const eckit::LocalConfiguration fcstConfig(TestEnvironment::config(), "fcst");
-    */
-
-/*
-    TopTestParameters<MODEL> parameters;
-    parameters.validateAndDeserialize(TestEnvironment::config());
-    std::cout << "starting dageom" << std::endl;
-    daGeom_ = std::make_unique<Geometry_>(parameters.daGeometry, oops::mpi::world());
-    std::cout << "starting fcgeom" << std::endl;
-    fcGeom_ = std::make_unique<Geometry_>(parameters.fcGeometry, oops::mpi::world());
-    */
   }
 
   ~StateSetFixture<MODEL>() {}
 
-//  std::unique_ptr<StateSetTestParameters_> test_;
-//  std::unique_ptr<Geometry_> daGeom_;
-//  std::unique_ptr<Geometry_> fcGeom_;
 };
 
 // -----------------------------------------------------------------------------
-/// \brief tests constructors
+/// \brief tests transpose and Rtranspose
 ///
 template <typename MODEL>
  void testStateSetTranspose() {
@@ -141,11 +75,8 @@ template <typename MODEL>
   
     config.get("ensemble members", nEns); 
     const eckit::LocalConfiguration daGeomConfig(TestEnvironment::config(), "da geometry");
-    std::cout << "da geom" << daGeomConfig << std::endl;
     eckit::LocalConfiguration fcGeomConfig(TestEnvironment::config(), "fc geometry");
-    std::cout << "fc geom" << fcGeomConfig << std::endl;
     const eckit::LocalConfiguration fcstConfig(TestEnvironment::config(), "fcst");
-    std::cout << "we have nEns = " << nEns << std::endl;
     // DA geom uses all mpi tasks on MPI_COMM_WORLD
     // Get DA geometry configuration from config_
     // Get full configuration
@@ -174,10 +105,7 @@ template <typename MODEL>
     oops::Log::info() << "size of patchMember/ENS comm is " << patchMember.size() << std::endl;
     // Create geometries using appropriate communicators
     Geometry_ daGeom(daGeomConfig, worldComm);
-    std::cout << "Hey, myrank is " << mytask << " and mymember is " << mymember << std::endl;
     fcGeomConfig.set("member_number",mymember);
-    std::cout << "fcgeomconf is " << fcGeomConfig << std::endl;
-    std::cout << "commMember size is " << commMember.size() << std::endl;
     Geometry_ fcGeom(fcGeomConfig, commMember);
 
     //  Setup times
@@ -206,129 +134,28 @@ template <typename MODEL>
                               ensMembers, patchMember);
 
     fcStateSet.random();
-    oops::Log::trace() << "before transpose fc stateset is " << fcStateSet << std::endl;
+    oops::Log::info() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
     // daStateSet is on the daGeom with both ensemble members on each MPI proc
     std::vector<StateSet_> daStateSet = fcStateSet.transpose(worldComm, daGeom, mymember);
     oops::mpi::world().barrier();
-    oops::Log::trace() << "size of daStateSet is " << daStateSet.size() << std::endl;
-    oops::Log::trace() << "localvec[0] is " << daStateSet[0] << std::endl;
-    oops::Log::trace() << "localvec[1] is " << daStateSet[1] << std::endl;
     std::vector<State_> states_;
     // after Rtranspose, states are back to distributed across ensemble ranks
     for(size_t ens=0; ens < daStateSet.size(); ++ens){
-//      if((mymember - 1) == ens) { //we only want our ensemble member
         states_.emplace_back(((daStateSet[ens]).Rtranspose(worldComm, fcGeom,
           mymember,ens)));
-//      }
+          oops::Log::info() << "state[" << ens << "] after Rtranspose is " << states_[ens] << std::endl;
     }
-    oops::Log::trace() << "size of states_ is " << states_.size() << std::endl;
-    oops::Log::trace() << "state after Rtranspose is " << states_[0] << std::endl;
-    oops::Log::trace() << "state[1] after Rtranspose is " << states_[1] << std::endl;
-    oops::Log::trace() << "times[0] is " << times[0] << std::endl;
     StateSet_ *newFCStateSet = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
 		                       ensMembers, patchMember);
-    oops::Log::trace() << "newFCState after Rtranspose is " << *newFCStateSet << std::endl;
     IncrementSet_ newState(fcGeom, vars, times, oops::mpi::myself(), ensMembers, patchMember);
     newState.diff(fcStateSet,*newFCStateSet);
-    oops::Log::trace() << "diff between stateSets is " << newState << std::endl;
-    delete newFCStateSet;
-    /*
-
+    oops::Log::info() << "diff between stateSets is " << newState << std::endl;
     // Verify dimensions
-    EXPECT(daStateSet.size() == nEns);
-    EXPECT(daStateSet.size() == nEns * times.size());
-    EXPECT(fcStateSet.size() == times.size());
-    */
-}
+    EXPECT(newState[0].norm() == 0.0);
 
-template <typename MODEL> void testStateSetConstructors() {
-  typedef StateSetFixture<MODEL>     Test_;
-  typedef oops::State<MODEL>      State_;
-  typedef oops::StateSet<MODEL>   StateSet_;
-  typedef oops::Geometry<MODEL>   Geometry_;
-  typedef oops::GeometryIterator<MODEL> GeometryIterator_;
+    delete newFCStateSet;
 
-#if 0 
-  const util::DateTime vt(Test_::test().date);
-  const int nens = Test_::test().nens;
-  
-  // Get the MPI partition
-  const int ntasks = oops::mpi::world().size();
-  const int mytask = oops::mpi::world().rank();
-  const int tasks_per_set = ntasks / 2;  // Split into 2 groups
-  const int myset = mytask / tasks_per_set + 1;
-
-  std::cout << "splitting communicators" << std::endl;
-  // Create split communicators for each set
-  std::string commNameStr = "comm_set_" + std::to_string(myset);
-  char const *commName = commNameStr.c_str();
-  eckit::mpi::Comm & commSet = oops::mpi::world().split(myset, commName);
-
-  // Create states on DA geometry (higher resolution)
-  std::cout << "creating DA states" << std::endl;
-  std::unique_ptr<State_> state1(new State_(Test_::daGeom(), Test_::test().statefile1));
-  std::unique_ptr<State_> state2(new State_(Test_::daGeom(), Test_::test().statefile2));
-  
-  std::vector<State_> states;
-  states.push_back(*state1);
-  states.push_back(*state2);
-
-  // Test main constructor, using split communicators like in LocalEnsembleDA.h
-  std::vector<util::DateTime> times = {vt, vt};
-  // Create ss1 on first set of processors using DA geometry
-  std::unique_ptr<StateSet_> ss1;
-  if (myset == 1) {
-    ss1.reset(new StateSet_(Test_::daGeom(), state1->variables(), times, commSet));
-    EXPECT(ss1.get());
-    EXPECT(ss1->size() == 2);
-    oops::oops::Log::test() << "Printing DA StateSet on set 1: " << *ss1 << std::endl;
-  }
-
-  // Create ss2 on second set of processors using FC geometry
-  std::unique_ptr<StateSet_> ss2;
-  if (myset == 2) {
-    ss2.reset(new StateSet_(Test_::fcGeom(), state1->variables(), times, commSet));
-    EXPECT(ss2.get());
-    if (ss1) {  // Only check size if ss1 exists on this processor
-      EXPECT(ss2->size() == ss1->size());
-    }
-    oops::oops::Log::test() << "Printing FC StateSet on set 2: " << *ss2 << std::endl;
-  }
-
-  // Test geometry resolution ratio
-  if (myset == 1) {
-    // Get resolution info from both geometries
-    GeometryIterator_ daIt = Test_::daGeom().begin();
-    GeometryIterator_ fcIt = Test_::fcGeom().begin();
-    
-    int daPoints = 0;
-    int fcPoints = 0;
-    
-    // Count grid points in each geometry
-    while (daIt != Test_::daGeom().end()) {
-      ++daPoints;
-      ++daIt;
-    }
-    while (fcIt != Test_::fcGeom().end()) {
-      ++fcPoints;
-      ++fcIt;
-    }
-    
-    // Check that DA has N times more points than FC
-    const double ratio = static_cast<double>(daPoints) / static_cast<double>(fcPoints);
-    EXPECT(std::abs(ratio - nens) < 0.1);  // Allow for small rounding differences
-    
-    oops::oops::Log::test() << "DA points: " << daPoints << ", FC points: " << fcPoints 
-                      << ", Ratio: " << ratio << " (expected " << nens << ")" << std::endl;
-  }
-
-  // Cleanup
-  ss1.reset();
-  ss2.reset();
-  EXPECT(!ss1.get());
-  EXPECT(!ss2.get());
-#endif
 }
 
 // -----------------------------------------------------------------------------
@@ -342,12 +169,8 @@ class StateSet : public oops::Test {
   std::string testid() const override {return "test::StateSet<" + MODEL::name() + ">";}
 
   void register_tests() const override {
-    std::cout << "at beginning of test" << std::endl;
     std::vector<eckit::testing::Test>& ts = eckit::testing::specification();
-/*
-    ts.emplace_back(CASE("interface/StateSet/testStateSetConstructors")
-      { testStateSetConstructors<MODEL>(); });
-*/
+
     ts.emplace_back(CASE("interface/StateSet/testStateSetTranspose")
       { testStateSetTranspose<MODEL>(); });
   }
