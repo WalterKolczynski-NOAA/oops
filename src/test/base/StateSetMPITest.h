@@ -51,6 +51,7 @@ class StateSetMPITest : public oops::Application {
     // DA geom uses all mpi tasks on MPI_COMM_WORLD
     // Get DA geometry configuration from config_
     eckit::LocalConfiguration daGeomConfig = config2.getSubConfiguration("da geometry");
+    std::cout << "da geom" << daGeomConfig << std::endl;
     // Get full configuration
 //    config_.get("da geometry", daGeomConfig);
 
@@ -58,6 +59,7 @@ class StateSetMPITest : public oops::Application {
     // Get FC geometry configuration from config_
     eckit::LocalConfiguration fcGeomConfig;
     config2.get("fc geometry", fcGeomConfig);
+    std::cout << "fc geom" << fcGeomConfig << std::endl;
 
     // Create DA communicator
     const eckit::mpi::Comm & worldComm = oops::mpi::world();
@@ -79,7 +81,10 @@ class StateSetMPITest : public oops::Application {
 
     // Create geometries using appropriate communicators
     Geometry_ daGeom(daGeomConfig, worldComm);
+    std::cout << "Hey, myrank is " << mytask << " and mymember is " << mymember << std::endl;
     fcGeomConfig.set("member_number",mymember);
+    std::cout << "fcgeomconf is " << fcGeomConfig << std::endl;
+    std::cout << "commMember size is " << commMember.size() << std::endl;
     Geometry<MODEL> fcGeom(fcGeomConfig, commMember);
 
     //  Setup times
