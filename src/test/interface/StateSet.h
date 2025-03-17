@@ -164,12 +164,10 @@ template <typename MODEL>
                    ensMembers, patchMember);
     IncrementSet_ newState(fcGeom, vars, times, oops::mpi::myself(), ensMembers, patchMember);
     newState.diff(fcStateSet, *newFCStateSet);
+    // This should be zero for all variables 
     oops::Log::info() << "diff between stateSets is " << newState << std::endl;
-    // Verify dimensions
+    // Verify that the norm is zero
     EXPECT(newState[0].norm() == 0.0);
-//  EXPECT(fcStateSet[0].norm() != 0.0);
-//  EXPECT(daStateSet[0].norm() != 0.0);
-//  EXPECT(daStateSet[0].norm() == fcStateSet[0].norm());
 
     delete newFCStateSet;
 }
