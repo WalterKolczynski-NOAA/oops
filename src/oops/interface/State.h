@@ -65,6 +65,8 @@ class State : public util::Printable,
 
   void transpose(const State_ &, const eckit::mpi::Comm &,
        const int, const int);
+  void Rtranspose(const State_ &, const eckit::mpi::Comm &,
+       const int, const int);
 
   /// Accessor
   State_ & state() {if (fset_) {fset_->clear();} return *state_;}
@@ -210,6 +212,18 @@ void State<MODEL>::transpose(const State_ & DistState, const eckit::mpi::Comm & 
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
+void State<MODEL>::Rtranspose(const State_ & LocState, const eckit::mpi::Comm & global,
+       const int ensNum, const int transNum) {
+  // The FCState has a distributed set of states. Rtranspose returns a
+  // distributed state on the FC geometry
+  Log::trace() << "State<MODEL>::Rtranspose interface starting" << std::endl;
+  state_->Rtranspose(LocState, global, ensNum, transNum);
+  Log::trace() << "State<MODEL>::Rtranspose interface done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
+
+template<typename MODEL>
 State<MODEL> & State<MODEL>::operator=(const State & rhs) {
   Log::trace() << "State<MODEL>::operator= starting" << std::endl;
   util::Timer timer(classname(), "operator=");
@@ -319,7 +333,7 @@ void State<MODEL>::fromFieldSet(const atlas::FieldSet & fset) {
 
 template<typename MODEL>
 void State<MODEL>::print(std::ostream & os) const {
-  Log::trace() << "State<MODEL>::print starting" << std::endl;
+  Log::trace() << "State<MODEL>::print starting " << state_->validTime() << std::endl;
   util::Timer timer(classname(), "print");
   os << *state_;
   Log::trace() << "State<MODEL>::print done" << std::endl;

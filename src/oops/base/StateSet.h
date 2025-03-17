@@ -46,6 +46,12 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
            const eckit::mpi::Comm & commEns = oops::mpi::myself());
   // create a StateSet variable from a std::vector of State variables distributed
   // across communicators
+  StateSet(const std::vector<State_> &,
+           const int,
+           const std::vector<util::DateTime> &,
+           const eckit::mpi::Comm &,
+           const std::vector<int> & ens = {0},
+           const eckit::mpi::Comm & commEns = oops::mpi::myself());
   StateSet(const Geometry_ &, const StateSet &);
   StateSet(const StateSet &) = default;
   StateSet(const std::vector<StateSet> &, const int &);
@@ -54,6 +60,9 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   // Collect distributed states and return a local subset
   std::vector<StateSet> transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int ensNum) const;
+  State_ Rtranspose(const eckit::mpi::Comm & global,
+           const Geometry_ & DAgeometry, const int ensNum,
+           const int transNum) const;
   /// Zero
   void zero();
   /// Accumulator
@@ -112,6 +121,28 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
 }
 
 // -----------------------------------------------------------------------------
+template<typename MODEL>
+StateSet<MODEL>::StateSet(const std::vector<State_> & states_,
+                          const int ensNum,
+                          const std::vector<util::DateTime> & times,
+                          const eckit::mpi::Comm & commTime,
+                          const std::vector<int> & ens,
+                          const eckit::mpi::Comm & commEns)
+  : DataSetBase<State_, Geometry_>(times, commTime, ens, commEns)
+{
+  Log::trace() << "StateSet::StateSet start " << states_.size() << std::endl;
+  for (size_t jm = 0; jm < this->local_ens_size(); ++jm) {
+    for (size_t jt = 0; jt < this->local_time_size(); ++jt) {
+      this->dataset().emplace_back(new State_(states_[ensNum]));
+    }
+  }
+  this->sync_times();
+  this->check_consistency();
+
+  Log::trace() << "StateSet::StateSet done" << std::endl;
+}
+
+// -----------------------------------------------------------------------------
 
 template<typename MODEL>
 StateSet<MODEL>::StateSet(const Geometry_ & resol, const StateSet & other)
@@ -127,20 +158,41 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const StateSet & other)
 
 // -----------------------------------------------------------------------------
 
+// StateSet constructor that populates the StateSet with either one ensemble
+// member or none (ensNum <= 0)
+template<typename MODEL>
+StateSet<MODEL>::StateSet(const std::vector<StateSet> & other, const int & ensNum)
+  : DataSetBase<State_, Geometry_>(other[0].times(), other[0].commTime(),
+                                   other[0].members(), other[0].commEns())
+{
+  Log::trace() << "StateSet::StateSet other ctr starting" << std::endl;
+  if (ensNum > 0) {
+/*
+    std::unique_ptr<State_> data;
+    data = std::unique_ptr<State_>( new State_((other[ensNum])[0]));
+    this->dataset().emplace_back(std::move(data));
+*/
+    this->dataset().emplace_back(std::move(std::unique_ptr<State_>
+         ( new State_((other[ensNum])[0]))));
+  }
+  Log::trace() << "StateSet::StateSet other ctr done" << std::endl;
+}
+// -----------------------------------------------------------------------------
+
 template<typename MODEL>
 std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int ensNum) const
 {
 /* This method collects parts of the distributed StateSet and places all ensemble
-   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet 
+   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet
    held in the local_ensemble. It is essentially a transpose of a distributed StateSet
    to a locally held vector of StateSets. The std::vector of StateSets is used here because
-   the LocalEnsemble infrastructure still expects that rather than a normal, single StateSet 
-   variable. If that infrastructure changes, the localize call below will support the new 
-   approach and this should be deprecated. The DAgeometry should be have a decomposition 
-   that is spread across N (number of ensemble members) times the number of MPI tasks that 
-   the forecast geometry decomposition. In other words, if the forecast geometry has a 
-   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a 
+   the LocalEnsemble infrastructure still expects that rather than a normal, single StateSet
+   variable. If that infrastructure changes, the localize call below will support the new
+   approach and this should be deprecated. The DAgeometry should be have a decomposition
+   that is spread across N (number of ensemble members) times the number of MPI tasks that
+   the forecast geometry decomposition. In other words, if the forecast geometry has a
+   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a
    layout that multiplies to 4*4*9 or something like 12,12. Note that the resolution
    of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
    is different between the geometries.
@@ -158,6 +210,23 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm 
     local[jm].sync_times();
   }
   return(local);
+}
+
+template<typename MODEL>
+State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
+           const Geometry_ & FCgeometry, const int ensNum,
+           const int transNum) const
+{
+/* This method performs a reverse transpose from a stateset of DA geometry and
+   returns the full forecast State for the given ensNum.
+
+   Since the StateEnsemble4D is a std::vector of statesets, this
+   stateset is always going to point to (0,0)
+*/
+  State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(),
+                (*this)(0, 0).state().validTime());
+  FCState.Rtranspose((*this)(0, 0).state(), global, ensNum, transNum);
+  return(FCState);
 }
 
 // -----------------------------------------------------------------------------
