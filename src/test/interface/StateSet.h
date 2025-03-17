@@ -14,6 +14,7 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -43,37 +44,18 @@
 namespace test {
 
 // -----------------------------------------------------------------------------
-template <typename MODEL> class StateSetFixture : private boost::noncopyable {
- public:
-  typedef oops::Geometry<MODEL>      Geometry_;
-  static void reset() {
-  }
- private:
-  static StateSetFixture<MODEL>& getInstance() {
-    static StateSetFixture<MODEL> theStateSetFixture;
-    return theStateSetFixture;
-  }
-
-  StateSetFixture() {
-  }
-
-  ~StateSetFixture<MODEL>() {}
-
-};
-
-// -----------------------------------------------------------------------------
 /// \brief tests transpose and Rtranspose
 ///
 template <typename MODEL>
  void testStateSetTranspose() {
-  typedef oops::Geometry<MODEL>  Geometry_;
-  typedef oops::State<MODEL>  State_;
-  typedef oops::StateSet<MODEL>  StateSet_;
-  typedef oops::IncrementSet<MODEL>  IncrementSet_;
-  const eckit::Configuration & config = test::TestEnvironment::config();  
+    typedef oops::Geometry<MODEL>  Geometry_;
+    typedef oops::State<MODEL>  State_;
+    typedef oops::StateSet<MODEL>  StateSet_;
+    typedef oops::IncrementSet<MODEL>  IncrementSet_;
+    const eckit::Configuration & config = test::TestEnvironment::config();
     int nEns;  // Number of ensemble members
-  
-    config.get("ensemble members", nEns); 
+
+    config.get("ensemble members", nEns);
     const eckit::LocalConfiguration daGeomConfig(TestEnvironment::config(), "da geometry");
     eckit::LocalConfiguration fcGeomConfig(TestEnvironment::config(), "fc geometry");
     const eckit::LocalConfiguration fcstConfig(TestEnvironment::config(), "fcst");
@@ -81,7 +63,7 @@ template <typename MODEL>
     // Get DA geometry configuration from config_
     // Get full configuration
 
-    //FC geometry is created on each ensemble communicator
+    // FC geometry is created on each ensemble communicator
     // Get FC geometry configuration from config_
 
     // Create DA communicator
@@ -105,7 +87,7 @@ template <typename MODEL>
     oops::Log::info() << "size of patchMember/ENS comm is " << patchMember.size() << std::endl;
     // Create geometries using appropriate communicators
     Geometry_ daGeom(daGeomConfig, worldComm);
-    fcGeomConfig.set("member_number",mymember);
+    fcGeomConfig.set("member_number", mymember);
     Geometry_ fcGeom(fcGeomConfig, commMember);
 
     //  Setup times
@@ -133,7 +115,39 @@ template <typename MODEL>
     StateSet_ fcStateSet(fcGeom, vars, times, oops::mpi::myself(),
                               ensMembers, patchMember);
 
-    fcStateSet.random();
+    std::random_device rd;  // Used to obtain a seed for the random number engine
+    //  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::mt19937 gen(123+oops::mpi::world().rank());
+
+    // Create distribution for the range you want (e.g., between 0.0 and 1.0)
+    std::uniform_real_distribution<double> dis(0.0d, 1.0d);
+    std::vector<std::vector<double> > zz(fcStateSet.local_ens_size());
+
+    size_t dataSize = fcStateSet(0, 0).serialSize() -3;
+
+
+  // Put random numbers in each State
+    for (size_t jm = 0; jm < fcStateSet.local_ens_size(); ++jm) {
+      fcStateSet(0, jm).serialize(zz[jm]);
+      for (size_t i = 0; i < dataSize; ++i) {
+      // Generate a random double
+          zz[jm][i] = dis(gen);
+      }
+    }
+
+  // deserialize back to stateSet
+    for (size_t jt = 0; jt < fcStateSet.local_time_size(); ++jt) {
+      // Put States from each local ensemble member in a vector
+      for (size_t jm = 0; jm < fcStateSet.local_ens_size(); ++jm) {
+        // serialize local ensembles
+        size_t indx = 0;
+        fcStateSet(jt, jm).deserialize(zz[jm], indx);
+      }
+    }
+  // Put random numbers in each State
+    for (size_t jm = 0; jm < fcStateSet.local_ens_size(); ++jm) {
+      fcStateSet(0, jm).serialize(zz[jm]);
+    }
     oops::Log::info() << "before transpose fc stateset is " << fcStateSet << std::endl;
     // Test transpose functionality between geometries
     // daStateSet is on the daGeom with both ensemble members on each MPI proc
@@ -141,21 +155,23 @@ template <typename MODEL>
     oops::mpi::world().barrier();
     std::vector<State_> states_;
     // after Rtranspose, states are back to distributed across ensemble ranks
-    for(size_t ens=0; ens < daStateSet.size(); ++ens){
+    for (size_t ens=0; ens < daStateSet.size(); ++ens) {
         states_.emplace_back(((daStateSet[ens]).Rtranspose(worldComm, fcGeom,
-          mymember,ens)));
-          oops::Log::info() << "state[" << ens << "] after Rtranspose is " << states_[ens] << std::endl;
+          mymember, ens)));
     }
+    oops::Log::info() << "state[0] after Rtranspose is " << states_[0] << std::endl;
     StateSet_ *newFCStateSet = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
-		                       ensMembers, patchMember);
+                   ensMembers, patchMember);
     IncrementSet_ newState(fcGeom, vars, times, oops::mpi::myself(), ensMembers, patchMember);
-    newState.diff(fcStateSet,*newFCStateSet);
+    newState.diff(fcStateSet, *newFCStateSet);
     oops::Log::info() << "diff between stateSets is " << newState << std::endl;
     // Verify dimensions
     EXPECT(newState[0].norm() == 0.0);
+//  EXPECT(fcStateSet[0].norm() != 0.0);
+//  EXPECT(daStateSet[0].norm() != 0.0);
+//  EXPECT(daStateSet[0].norm() == fcStateSet[0].norm());
 
     delete newFCStateSet;
-
 }
 
 // -----------------------------------------------------------------------------
@@ -163,7 +179,6 @@ template <typename MODEL>
 class StateSet : public oops::Test {
  public:
   using oops::Test::Test;
-  virtual ~StateSet() {StateSetFixture<MODEL>::reset();}
 
  private:
   std::string testid() const override {return "test::StateSet<" + MODEL::name() + ">";}

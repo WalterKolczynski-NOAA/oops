@@ -214,7 +214,7 @@ void State<MODEL>::transpose(const State_ & DistState, const eckit::mpi::Comm & 
 template<typename MODEL>
 void State<MODEL>::Rtranspose(const State_ & LocState, const eckit::mpi::Comm & global,
        const int ensNum, const int transNum) {
-  // The FCState has a distributed set of states. Rtranspose returns a  
+  // The FCState has a distributed set of states. Rtranspose returns a
   // distributed state on the FC geometry
   Log::trace() << "State<MODEL>::Rtranspose interface starting" << std::endl;
   state_->Rtranspose(LocState, global, ensNum, transNum);

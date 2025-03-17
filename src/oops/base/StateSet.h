@@ -47,7 +47,7 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
            const eckit::mpi::Comm & commEns = oops::mpi::myself());
   // create a StateSet variable from a std::vector of State variables distributed
   // across communicators
-  StateSet(const std::vector<State_> &, 
+  StateSet(const std::vector<State_> &,
            const int,
            const std::vector<util::DateTime> &,
            const eckit::mpi::Comm &,
@@ -124,8 +124,8 @@ StateSet<MODEL>::StateSet(const Geometry_ & resol, const eckit::Configuration & 
 
 // -----------------------------------------------------------------------------
 template<typename MODEL>
-StateSet<MODEL>::StateSet(const std::vector<State_> & states_, 
-		          const int ensNum,
+StateSet<MODEL>::StateSet(const std::vector<State_> & states_,
+                          const int ensNum,
                           const std::vector<util::DateTime> & times,
                           const eckit::mpi::Comm & commTime,
                           const std::vector<int> & ens,
@@ -186,15 +186,15 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm 
            const Geometry_ & DAgeometry, const int ensNum) const
 {
 /* This method collects parts of the distributed StateSet and places all ensemble
-   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet 
+   member states in a smaller patch (1/N the size of Forecast geometry) of a StateSet
    held in the local_ensemble. It is essentially a transpose of a distributed StateSet
    to a locally held vector of StateSets. The std::vector of StateSets is used here because
-   the LocalEnsemble infrastructure still expects that rather than a normal, single StateSet 
-   variable. If that infrastructure changes, the localize call below will support the new 
-   approach and this should be deprecated. The DAgeometry should be have a decomposition 
-   that is spread across N (number of ensemble members) times the number of MPI tasks that 
-   the forecast geometry decomposition. In other words, if the forecast geometry has a 
-   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a 
+   the LocalEnsemble infrastructure still expects that rather than a normal, single StateSet
+   variable. If that infrastructure changes, the localize call below will support the new
+   approach and this should be deprecated. The DAgeometry should be have a decomposition
+   that is spread across N (number of ensemble members) times the number of MPI tasks that
+   the forecast geometry decomposition. In other words, if the forecast geometry has a
+   layout of [4,4] and there are 9 ensemble members, the DA geometry should have a
    layout that multiplies to 4*4*9 or something like 12,12. Note that the resolution
    of both geometries is the same (e.g. C48, C96, etc.). Just the decomposition
    is different between the geometries.
@@ -219,15 +219,14 @@ State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
            const Geometry_ & FCgeometry, const int ensNum,
            const int transNum) const
 {
-/* This method performs a reverse transpose from a stateset of DA geometry and 
-   returns the full forecast State for the given ensNum
-*/
+/* This method performs a reverse transpose from a stateset of DA geometry and
+   returns the full forecast State for the given ensNum.
 
-  /* Rtranspose stateSet to get all FCState back on the bigger FC geometry */
-  /* Since the StateEnsemble4D is a std::vector of statesets, we this 
-     stateset is always going to point to (0,0) 
-  */
-  State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(), (*this)(0, 0).state().validTime());
+   Since the StateEnsemble4D is a std::vector of statesets, this
+   stateset is always going to point to (0,0)
+*/
+  State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(),
+                (*this)(0, 0).state().validTime());
   FCState.Rtranspose((*this)(0, 0).state(), global, ensNum, transNum);
   return(FCState);
 }
