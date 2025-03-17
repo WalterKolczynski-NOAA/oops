@@ -54,7 +54,6 @@ class PostProcessor {
   }
 
   void process(const FLDS & xx) {
-//  std::cout << "processing flds xx " << xx << std::endl;
     for (auto & jp : processors_) {
       jp->process(xx);
     }

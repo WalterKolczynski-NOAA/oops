@@ -91,48 +91,6 @@ class LocalEnsembleDADriverParameters : public Parameters {
                   false, this};
 };
 
-template <typename MODEL>
-  class LocalEnsembleForecastVars {
-
-  typedef Geometry<MODEL>  Geometry_;
-  typedef Model<MODEL>  Model_;
-  typedef ModelAuxControl<MODEL>  ModelAux_;
-  typedef State<MODEL>  State_;
-  typedef StateSet<MODEL>  StateSet_;
-public:
-//  LocalEnsembleForecastVars();
-  int batchSize;
-  int zpad;
-  std::string pattern;
-  int nmembers;
-  int ntasks;
-  int mytask;
-  int tasks_per_member;
-  // divide by blocks of tasks_per_member
-  int mymember;
-  std::vector<int> ens;  // vector of ensemble numbers
-  eckit::mpi::Comm *patchMember;
-  eckit::mpi::Comm *commMember;
-  util::Duration tstep;
-  util::DateTime enddate;
-  util::Duration fclength;
-  eckit::YAMLConfiguration *memberConf;
- 
-  StateSet_ *bkg_mean;
-  Geometry_ *FCgeometry;
-  ModelAux_ *modelAux_;
-  Model_ *model_;
-  State_ *state_;
-  const eckit::YAMLConfiguration & mConf() { return *memberConf; };
-  const StateSet_ & bkgMean() { return *bkg_mean; };
-  const Geometry_ & geometry() { return *FCgeometry; };
-  const Model_ & model() { return *model_; };
-  const ModelAux_ & modelAux() { return *modelAux_; };
-  State_ & state() { return *state_; };
-  const eckit::mpi::Comm & patch() { return *patchMember; };
-  const eckit::mpi::Comm & commMem() { return *commMember; };
-};
-
 // -----------------------------------------------------------------------------
 /// \brief Top-level options taken by the LocalEnsembleDA application.
 template <typename MODEL>
@@ -222,7 +180,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   typedef State<MODEL>                     State_;
   typedef StateEnsemble4D<MODEL>           StateEnsemble4D_;
   typedef LocalEnsembleDAParameters<MODEL> LocalEnsembleDAParameters_;
-  typedef LocalEnsembleForecastVars<MODEL> LocalEnsembleForecastVars_;
+
  public:
 // -----------------------------------------------------------------------------
 
@@ -244,12 +202,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     std::unique_ptr<Geometry_> geometry;
 
-    LocalEnsembleForecastVars_ FCVars;
-    PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
-    StateSetSaver<MODEL> *saver_;
-    size_t nens;
-    Variables statevars;
-    Variables incvars;
 
     // Instantiate ens_xx depending on whether we are running inline or not
     auto ens_xx = [&] {
@@ -258,13 +210,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         auto object = StateEnsemble4D_(*geometry, params.background);
         return object;
       } else {
-//        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
-//            geometry);
-	std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
-            geometry, post, saver_, FCVars);
-	std::cout << "just finished localizeEnsembleFC" << std::endl;
-	Log::trace() << "localvec[0] is " << localVec[0] << std::endl;
-	Log::trace() << "localvec[0] time is " << (localVec[0])[0].validTime() << std::endl;
+        std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
+            geometry);
         auto object = StateEnsemble4D_(localVec, 0);
         return object;
       }
@@ -274,56 +221,18 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const util::TimeWindow timeWindow(fullConfig.getSubConfiguration("time window"));
     Log::info() << "Observation window: " << timeWindow << std::endl;
 
-    std::cout << "here 1\n";
+
     // Get observations configuration
     const eckit::LocalConfiguration observationsConfig = params.observations;
     eckit::LocalConfiguration obsConfig = observationsConfig.getSubConfiguration("observers");
 
-    std::cout << "here 2\n";
-    Log::trace() << "obsConfig is " << obsConfig << std::endl;
     // if any of the obs. spaces uses Halo distribution it will need to know the geometry
     // of the local grid on this PE
     if (params.driver.value().updateObsConfig) updateConfigWithPatchGeometry(*geometry, obsConfig);
-    std::cout << "here 2.5\n";
 
     // Setup observations
     const eckit::mpi::Comm & time = oops::mpi::myself();
-    size_t ii = 0;
-    bool run_loop = true;
-    while(run_loop) {
-    if( ii != 0) {
-      std::cout << "here 3\n";
-      // use the updated state from ens_xx
-      delete FCVars.state_;
-      std::vector<State_> states_;
-      std::cout << "here 4\n";
-      for(size_t ens=0; ens < ens_xx.size(); ++ens){
-        std::cout << "here 5\n";
-        states_.emplace_back(((ens_xx[ens]).Rtranspose(this->getComm(), FCVars.geometry(),
-           FCVars.mymember,ens)));
-      }
-      FCVars.state_ = new State_(states_[FCVars.mymember - 1]);
-
-      PostProcessor<State_> *post2 = new PostProcessor<State_>();  // Create the post processor where StateSet will be stored
-      std::cout << "calling localEnsStep to advance forecast again " << std::endl;
-      std::vector<StateSet_> localVec = localizeEnsembleStep(fullConfig, params,
-            geometry, *post2, saver_, FCVars);
-      ens_xx = StateEnsemble4D_(localVec, 0);
-      Log::trace() << "State validtime and enddate are " << FCVars.state().validTime() << " " << FCVars.enddate << std::endl;
-      if(FCVars.state().validTime() == FCVars.enddate) run_loop = false;
-      std::cout << "Done calling localEnsStep to advance forecast again " << std::endl;
-      delete post2;
-    } 
-    ii++;
-
-    std::cout << "here 7\n";
-    const util::TimeWindow timeSubWindow =
-      timeWindow.createSubWindow(FCVars.state().validTime(), util::Duration("PT1H"));
-    std::cout << "here 8\n";
-    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeSubWindow, time);
-    std::cout << "here 9\n";
-    Observations_ yobs(obsdb, "ObsValue");
-    std::cout << "here 10\n";
+    ObsSpaces_ obsdb(obsConfig, this->getComm(), timeWindow, time);
 
     // Read all ensemble members and compute the ensemble mean
     const size_t nens = ens_xx.size();
@@ -334,21 +243,19 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     } else {
       incvars += *params.incvars.value();
     }
-    std::cout << "setting bkg mean" << std::endl;
-    FCVars.bkg_mean = new StateSet_(ens_xx.mean());
+    StateSet_ bkg_mean = ens_xx.mean();
     // if control member is present use that instead of the ensemble mean
     if (params.driver.value().useControlMember) {
       StateSet_ controlMember(*geometry, *params.controlMember.value());
-      FCVars.bkg_mean = new StateSet_(controlMember);
+      bkg_mean = controlMember;
     }
 
     util::printRunStats("LocalEnsembleDA before solver ctor");
 
     // set up solver
-    std::cout << "setting up solver " << std::endl;
     std::unique_ptr<LocalSolver_> solver =
          LocalEnsembleSolverFactory<MODEL, OBS>::create(obsdb, *geometry, fullConfig,
-                                                        nens, FCVars.bkgMean(), incvars);
+                                                        nens, bkg_mean, incvars);
 
     // test prints for the prior ensemble
     bool do_test_prints = params.driver.value().doTestPrints;
@@ -361,12 +268,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     util::printRunStats("LocalEnsembleDA before computeHofX");
 
     // compute H(x)
-    std::cout << "computing HofX" << std::endl;
+    Observations_ yobs(obsdb, "ObsValue");
     Observations_ yb_mean = solver->computeHofX(ens_xx, 0, params.driver.value().readHofX);
     if (do_test_prints) {
        Log::test() << "H(x) ensemble background mean: " << std::endl << yb_mean << std::endl;
     }
-    std::cout << "Done computing HofX" << std::endl;
 
     Departures_ ombg(yobs - yb_mean);
     ombg.save("ombg");
@@ -382,11 +288,11 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // print background mean
     if (do_test_prints) {
-      Log::test() << "Background mean :" << FCVars.bkgMean() << std::endl;
+      Log::test() << "Background mean :" << bkg_mean << std::endl;
     }
 
     // calculate background ensemble perturbations
-    IncrementEnsemble4D_ bkg_pert(ens_xx, FCVars.bkgMean(), incvars);
+    IncrementEnsemble4D_ bkg_pert(ens_xx, bkg_mean, incvars);
 
     // initialize empty analysis perturbations
     IncrementEnsemble4D_ ana_pert(*geometry, incvars, ens_xx[0].validTimes(), bkg_pert.size());
@@ -406,7 +312,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // calculate final analysis states
     if (incvars == statevars) {
       for (size_t jj = 0; jj < nens; ++jj) {
-        ens_xx[jj] = FCVars.bkgMean();
+        ens_xx[jj] = bkg_mean;
         ens_xx[jj] += ana_pert[jj];
       }
     } else {
@@ -478,7 +384,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       }
       eckit::LocalConfiguration outConfig = *params.outputPriorMean.value();
       outConfig.set("member", 0);
-      FCVars.bkgMean().write(outConfig);
+      bkg_mean.write(outConfig);
     }
 
     // save the analysis mean increment
@@ -491,7 +397,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       util::setMember(output, 0);
       for (size_t itime = 0; itime < ana_mean.size(); ++itime) {
         Increment_ ana_increment(ana_pert[0][itime], false);
-        ana_increment.diff(ana_mean[itime], FCVars.bkgMean()[itime]);
+        ana_increment.diff(ana_mean[itime], bkg_mean[itime]);
         ana_increment.write(output);
         if (do_test_prints) {
           Log::test() << "Analysis mean increment :" << ana_increment << std::endl;
@@ -553,7 +459,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       obsdb.save();
     }
 
-    }
     return 0;
   }
 
@@ -588,12 +493,12 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     const int tasks_per_member = ntasks / nmembers;
     // divide by blocks of tasks_per_member
     int mymember = mytask / tasks_per_member + 1;
-    Log::trace() << "starting localizeEnsembldFC" << std::endl;
+
     eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
     // the layout here needs to be nmembers * the layout for the forecast geometry
     DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
 
-    Log::info() << "Running " << nmembers << " LETKFApplication members handled by "
+    Log::info() << "Running " << nmembers << " EnsembleGETKFApplication members handled by "
                 << ntasks << " total MPI tasks and "
                 << tasks_per_member << " MPI tasks per member." << std::endl;
 
@@ -652,7 +557,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       if ( m == mymember ) {
          Log::info() << "running on mymember = " << mymember  << " " << mytask << std::endl;
          executeForecast(FCgeometry, memberConf, post);
-         Log::info() << "Done with ens3 execute\n";
+         Log::info() << "Done with ens execute\n";
        }
        if ( batchSize > 0 ) {  // don't divide by zero
          if (m % batchSize == 0) oops::mpi::world().barrier();
@@ -665,10 +570,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     // Pull the values from the local FCgeometry and put them into DAgeom
     std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
        mymember);
-    Log::trace() << "localVec size is " << localVec.size() << std::endl;
-    Log::trace() << "localVec[0] is " << localVec[0] << std::endl;
-    Log::trace() << "localVec[1] is " << localVec[1] << std::endl;
-    Log::trace() << "finished localizeEnsembldFC" << std::endl;
     return(localVec);
   }
 
@@ -678,221 +579,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   std::string appname() const override {
     return "oops::LocalEnsembleDA<" + MODEL::name() + ", " + OBS::name() + ">";
   }
-
-// -----------------------------------------------------------------------------
-
-  std::vector<StateSet_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
-          LocalEnsembleDAParameters_ & params,
-          std::unique_ptr<Geometry_> & DAgeometry, 
-          PostProcessor<State_> & post,
-          StateSetSaver<MODEL> *saver_,
-          LocalEnsembleForecastVars_ & FCVars) const {
-  // This function creates a DA geometry that has the same resolution as the forecast geometry, but
-  // is decomposed into patches that are N times smaller than the forecast geometry, where N is the
-  // number of ensemble members. Note that the DAgeometry layout must be evenly divisible by the
-  // forecast layout. (e.g. DA layout = 4,4, FC layout = 2,2, N = 4)
-  // Also note that DA layout nx * ny = FC layout nx * ny * N
-  // Next, this will run a set of ensemble forecasts (or read in previously computed forecasts)
-  // then "localize" the State variables and return a StateEnsemble4D object with all of the state
-  // variables on the local ensemble of the StateSet held by the StateEnsemble4D variable returned
-  // Note that there is considerable duplication between StateSet and StateEnsemble4D classes, but
-  // the functionality is not simply transferred from one to another. As a result, the data from
-  // the forecasts is converted into a StateEnsemble4D variable for compatibility with previous
-  // LocalEnsembleSolver functionality.
-
-    // Get the MPI partition
-
-    eckit::LocalConfiguration inlineParams = fullConfig.getSubConfiguration("inline parameters");
-    const std::vector<std::string> &files = inlineParams.getStringVector("Forecast configuration");
-    FCVars.batchSize = inlineParams.getInt("forecast batch size");
-    FCVars.zpad = inlineParams.getInt("zero padding");
-   
-    FCVars.pattern = inlineParams.getString("output file pattern");
-    FCVars.nmembers = files.size();
-    FCVars.ntasks = this->getComm().size();
-    FCVars.mytask = this->getComm().rank();  // global rank
-    FCVars.tasks_per_member = FCVars.ntasks / FCVars.nmembers;
-    // divide by blocks of tasks_per_member
-    FCVars.mymember = FCVars.mytask / FCVars.tasks_per_member + 1;
-
-    Log::trace() << "start localizeEnsembleFC 2" << std::endl;
-    eckit::LocalConfiguration subconfig = fullConfig.getSubConfiguration("geometry");
-    // the layout here needs to be nmembers * the layout for the forecast geometry
-//    std::cout << "creating DAgeometry " << std::endl;
-//    std::cout << "subconfig is " << subconfig << std::endl;
-    DAgeometry = std::unique_ptr<Geometry_>(new Geometry_(subconfig, this->getComm() ));
-
-    Log::info() << "Running " << FCVars.nmembers << " LETKFApplication members handled by "
-                << FCVars.ntasks << " total MPI tasks and "
-                << FCVars.tasks_per_member << " MPI tasks per member." << std::endl;
-
-    //  Create the communicator for each ensemble member, named comm_member_{i}:
-    std::string commNameStr = "comm_member_" + std::to_string(FCVars.mymember);
-    char const *commName = commNameStr.c_str();
-    FCVars.commMember = &(this->getComm().split(FCVars.mymember, commName));
-    const int subrank = FCVars.commMember->rank();
-
-    //  Create the communicator for each decomposed patch of geometry
-    std::string patchNameStr = "patch_member_" + std::to_string(subrank);
-    char const *patchName = patchNameStr.c_str();
-    FCVars.patchMember = &(this->getComm().split(subrank, patchName));
-
-    Log::info() << "size of patchMember/ENS comm is " << FCVars.patchMember->size() << std::endl;
-    //  Each member uses a different configuration:
-    eckit::PathName confPath = files[FCVars.mymember-1];
-    FCVars.memberConf = new eckit::YAMLConfiguration(confPath);
-    const eckit::LocalConfiguration fcstparams = eckit::LocalConfiguration(FCVars.mConf());
-
-//    std::cout << "creating FCgeometry " << std::endl;
-//    std::cout << "fcstconfig is " << fcstparams.fcstConf.geometry << std::endl;
-    FCVars.FCgeometry = new Geometry_(fcstparams.getSubConfiguration("geometry"), FCVars.commMem());
-    Log::info() << "done with geometry" << std::endl;
-
-    //  Setup times
-    Log::info() << "setting up times" << std::endl;
-
-    eckit::LocalConfiguration model = fcstparams.getSubConfiguration("model");
-    const util::Duration tstep(model.getString("tstep"));
-    FCVars.tstep = tstep;
-    eckit::LocalConfiguration ic = fcstparams.getSubConfiguration("initial condition");
-    const util::DateTime bgndate(ic.getString("datetime"));
-    const util::Duration fclength(fcstparams.getString("forecast length"));
-    const util::DateTime enddate(bgndate + fclength);
-    std::vector<util::DateTime> times;
-    const Variables vars(ic, "state variables");
-
-//    FCVars.enddate = (bgndate + FCVars.fclength + FCVars.fclength);
-    FCVars.enddate = (bgndate + util::Duration("PT6H"));
-//    FCVars.fclength = FCVars.fclength + FCVars.fclength;
-    FCVars.fclength = util::Duration("PT6H");
-
-    // Don't save the initial state
-/*
-// the line below works for 3H forecast in middle of window
-    for (util::DateTime ii=(bgndate+FCVars.tstep); ii < FCVars.enddate; ii=ii+FCVars.tstep) {
-       Log::info() << "pushing back time " << ii << std::endl;
-       times.push_back(ii);
-    }
-*/
-   times.push_back(bgndate+FCVars.tstep);
-    for (int m = 1; m <=FCVars.nmembers; m++) { FCVars.ens.push_back(m); }
-
-    std::unique_ptr<StateSet_> ens_SS;
-    eckit::LocalConfiguration initialCondition =
-            FCVars.mConf().getSubConfiguration("initial condition");
-    saver_ = new StateSetSaver<MODEL>(FCVars.mConf(), FCVars.geometry(), times, oops::mpi::myself(),
-                    FCVars.ens, FCVars.patch());
-    post.enrollProcessor(saver_);
-
-//      std::cout << "instantiate model" << std::endl;
-    FCVars.model_ = new Model_(FCVars.geometry(), model );
-//      std::cout << "instantiate geometry" << std::endl;
-    FCVars.state_ = new State_(FCVars.geometry(), initialCondition);
-//      std::cout << "DONE instantiate geometry" << std::endl;
-  //  Each member uses a different configuration:
-    for (int m = 1; m <=FCVars.nmembers; m++) {
-       if ( m == FCVars.mymember ) {
-         Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
-         initForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.mConf(), bgndate, FCVars.fclength, post, FCVars);
-         stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
-         Log::info() << "Done with ens1 execute\n";
-       }
-       if ( FCVars.batchSize > 0 ) {  // don't divide by zero
-         if (m % FCVars.batchSize == 0) oops::mpi::world().barrier();
-       }
-    }
-    oops::mpi::world().barrier();
-    std::cout << "moving states to ens_SS" << std::endl;
-    ens_SS = std::move(saver_->getStateSet());
-//       std::cout << "after std::move ens_SS[0] is " << (*ens_SS)[0] << std::endl;
-//       std::cout << "after std::move ens_SS[1] is " << (*ens_SS)[1] << std::endl;
-
-    // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
-    // Pull the values from the local FCgeometry and put them into DAgeom
-    Log::trace() << "ens_SS[0] is " << (*ens_SS)[0] << std::endl;
-    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry, 
-       FCVars.mymember);
-    Log::trace() << "localVec size is " << localVec.size() << std::endl;
-    Log::trace() << "localVec[0] is " << localVec[0] << std::endl;
-    Log::trace() << "localVec[1] is " << localVec[1] << std::endl;
-    Log::trace() << "finished localizeEnsembldeC" << std::endl;
-    return(localVec);
-  }
-
-// -----------------------------------------------------------------------------
-
-  std::vector<StateSet_> localizeEnsembleStep(const eckit::Configuration & fullConfig,
-          LocalEnsembleDAParameters_ & params,
-          std::unique_ptr<Geometry_> & DAgeometry, 
-          PostProcessor<State_> & post,
-          StateSetSaver<MODEL> *saver_,
-          LocalEnsembleForecastVars_ & FCVars) const {
-  // This function creates a DA geometry that has the same resolution as the forecast geometry, but
-  // is decomposed into patches that are N times smaller than the forecast geometry, where N is the
-  // number of ensemble members. Note that the DAgeometry layout must be evenly divisible by the
-  // forecast layout. (e.g. DA layout = 4,4, FC layout = 2,2, N = 4)
-  // Also note that DA layout nx * ny = FC layout nx * ny * N
-  // Next, this will run a set of ensemble forecasts (or read in previously computed forecasts)
-  // then "localize" the State variables and return a StateEnsemble4D object with all of the state
-  // variables on the local ensemble of the StateSet held by the StateEnsemble4D variable returned
-  // Note that there is considerable duplication between StateSet and StateEnsemble4D classes, but
-  // the functionality is not simply transferred from one to another. As a result, the data from
-  // the forecasts is converted into a StateEnsemble4D variable for compatibility with previous
-  // LocalEnsembleSolver functionality.
-
-
-
-
-    Log::trace() << "starting localizeEnsembleStep" << std::endl;
-    Log::info() << "Running " << FCVars.nmembers << " LETKFApplication members handled by "
-                << FCVars.ntasks << " total MPI tasks and "
-                << FCVars.tasks_per_member << " MPI tasks per member." << std::endl;
-
-    std::vector<util::DateTime> times;
-    std::cout << "Step 1\n";
-    for (util::DateTime ii=(FCVars.enddate); ii < FCVars.enddate+FCVars.tstep; ii=ii+FCVars.tstep) {
-       Log::info() << "pushing back time " << ii << std::endl;
-       times.push_back(ii);
-    }
-    std::cout << "Step 2\n";
-    saver_ = new StateSetSaver<MODEL>(FCVars.mConf(), FCVars.geometry(), times, oops::mpi::myself(),
-                    FCVars.ens, FCVars.patch());
-    std::cout << "Step 3\n";
-    util::DateTime enddate("2021-03-23T12:00:00Z");
-    std::cout << "Step 4\n";
-    post.enrollProcessor(saver_);
-    std::cout << "Step 5\n";
-//    Log::trace() << "FCVars state is " << FCVars.state() << std::endl;
-    std::cout << "FCVars state is " << FCVars.state() << std::endl;
-    post.initialize(FCVars.state(), FCVars.enddate, FCVars.fclength);
-    std::cout << "Step 6\n";
-    std::unique_ptr<StateSet_> ens_SS;
-  //  Each member uses a different configuration:
-    for (int m = 1; m <=FCVars.nmembers; m++) {
-    std::cout << "Step 7\n";
-         if ( m == FCVars.mymember ) {
-           Log::trace() << "fcst state after transpose is " << FCVars.state() << std::endl;
-           Log::info() << "running on mymember = " << FCVars.mymember  << " " << FCVars.mytask << std::endl;
-           stepForecast(FCVars.geometry(), FCVars.model(), FCVars.state(), FCVars.modelAux(), post);
-           Log::info() << "Done with ens2 execute\n";
-         }
-         if ( FCVars.batchSize > 0 ) {  // don't divide by zero
-           if (m % FCVars.batchSize == 0) oops::mpi::world().barrier();
-         }
-    }
-    oops::mpi::world().barrier();
-       std::cout << "moving states2 to ens_SS" << std::endl;
-    ens_SS = std::move(saver_->getStateSet());
-
-    // just finished the forecast on FCgeometry that has N times bigger patches than global DAgeom
-    // Pull the values from the local FCgeometry and put them into DAgeom
-    std::vector<StateSet_> localVec = ens_SS->transpose(this->getComm(), *DAgeometry,
-		     FCVars.mymember);
-    Log::trace() << "finished localizeEnsembleStep" << std::endl;
-    return(localVec);
-  }
-
-// -----------------------------------------------------------------------------
 
   void calculate_patchCenter(const Geometry_ & geometry, std::vector<double> & patchCenter) const {
     eckit::geometry::Point3 gptmp3;
@@ -996,54 +682,6 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
   }
 
 // -----------------------------------------------------------------------------
-  void initForecast(const Geometry_ & geometry,
-      const Model_  & model_,
-      State_ & xx,
-      const eckit::Configuration & fullConfig,
-      const util::DateTime & bgndate,
-      util::Duration & fclength,
-      PostProcessor<State_> & post,
-      LocalEnsembleForecastVars_ & FCVars) const {
-//  Deserialize parameters
-    //params.deserialize(fullConfig);
-
-//  Setup Model
-    Log::info() << "Forecast:setting up model" << std::endl;
-
-//  Setup initial state
-
-//  Setup augmented state
-    FCVars.modelAux_ = new ModelAux_(geometry, FCVars.modelAux());
-
-    model_.initialize(xx);
-    post.initialize(xx, bgndate+fclength, fclength);
-//    post.process(xx);
-    
-    Log::trace() << "Forecast:init done" << std::endl;
-  }
-
-// -----------------------------------------------------------------------------
-  void stepForecast(const Geometry_ & geometry,
-      const Model_ & model_,
-      State_ & xx,
-      const ModelAux_ & moderr,
-      PostProcessor<State_> & post) const {
-
-//  Run forecast
-    Log::info() << "Forecast:running forecast" << std::endl;
-//    std::cout << "Forecast:starting forecast state is " << xx << std::endl;
-    std::cout << "Forecast:running forecast from " << xx.validTime() << std::endl;
-    model_.step(xx, moderr);
-    std::cout << "Forecast:stepped forecast to " << xx.validTime() << std::endl;
-//    std::cout << "Forecast:stepped forecast state is " << xx << std::endl;
-    post.process(xx);
-//    std::cout << "Forecast:post state is processed " << std::endl;
-//    post.finalize(xx);
-    Log::info() << "Forecast:done running forecast" << std::endl;
-  }
-
-// -----------------------------------------------------------------------------
-
 
   void executeForecast(const Geometry_ & geometry,
       const eckit::Configuration & fullConfig,

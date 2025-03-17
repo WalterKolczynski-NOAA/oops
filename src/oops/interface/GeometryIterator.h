@@ -65,40 +65,40 @@ class GeometryIterator: public util::Printable,
 
 template<typename TRAIT>
 GeometryIterator<TRAIT>::GeometryIterator(const GeometryIterator& other) {
-  //Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator starting" << std::endl;
   util::Timer timer(classname(), "GeometryIterator");
   geometryiter_.reset(new GeometryIterator_(other.geometryiter()));
-  //Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 
 template<typename TRAIT>
 GeometryIterator<TRAIT>::GeometryIterator(const GeometryIterator_& iter) {
-  //Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator starting" << std::endl;
   util::Timer timer(classname(), "GeometryIterator");
   geometryiter_.reset(new GeometryIterator_(iter));
-  //Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::GeometryIterator done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 
 template<typename TRAIT>
 GeometryIterator<TRAIT>::~GeometryIterator() {
-  //Log::trace() << "GeometryIterator<TRAIT>::~GeometryIterator starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::~GeometryIterator starting" << std::endl;
   util::Timer timer(classname(), "~GeometryIterator");
   geometryiter_.reset();
-  //Log::trace() << "GeometryIterator<TRAIT>::~GeometryIterator done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::~GeometryIterator done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 
 template<typename TRAIT>
 bool GeometryIterator<TRAIT>::operator==(const GeometryIterator& other) {
-  //Log::trace() << "GeometryIterator<TRAIT>::operator== starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator== starting" << std::endl;
   util::Timer timer(classname(), "operator==");
   bool equals = (*geometryiter_ == other.geometryiter());
-  //Log::trace() << "GeometryIterator<TRAIT>::operator== done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator== done" << std::endl;
   return equals;
 }
 
@@ -106,10 +106,10 @@ bool GeometryIterator<TRAIT>::operator==(const GeometryIterator& other) {
 
 template<typename TRAIT>
 bool GeometryIterator<TRAIT>::operator!=(const GeometryIterator& other) {
-  //Log::trace() << "GeometryIterator<TRAIT>::operator!= starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator!= starting" << std::endl;
   util::Timer timer(classname(), "operator!=");
   bool notequals = (*geometryiter_ != other.geometryiter());
-  //Log::trace() << "GeometryIterator<TRAIT>::operator!= done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator!= done" << std::endl;
   return notequals;
 }
 
@@ -118,10 +118,10 @@ bool GeometryIterator<TRAIT>::operator!=(const GeometryIterator& other) {
 
 template<typename TRAIT>
 eckit::geometry::Point3 GeometryIterator<TRAIT>::operator*() const {
-  //Log::trace() << "GeometryIterator<TRAIT>::operator* starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator* starting" << std::endl;
   util::Timer timer(classname(), "operator*");
   eckit::geometry::Point3 loc = *(*geometryiter_);
-  //Log::trace() << "GeometryIterator<TRAIT>::operator* done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator* done" << std::endl;
   return loc;
 }
 
@@ -129,10 +129,10 @@ eckit::geometry::Point3 GeometryIterator<TRAIT>::operator*() const {
 
 template<typename TRAIT>
 GeometryIterator<TRAIT>& GeometryIterator<TRAIT>::operator++() {
-  //Log::trace() << "GeometryIterator<TRAIT>::operator++ starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator++ starting" << std::endl;
   util::Timer timer(classname(), "operator++");
   ++(*geometryiter_);
-  //Log::trace() << "GeometryIterator<TRAIT>::operator++ done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::operator++ done" << std::endl;
   return *this;
 }
 
@@ -140,10 +140,10 @@ GeometryIterator<TRAIT>& GeometryIterator<TRAIT>::operator++() {
 
 template<typename TRAIT>
 void GeometryIterator<TRAIT>::print(std::ostream & os) const {
-  //Log::trace() << "GeometryIterator<TRAIT>::print starting" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::print starting" << std::endl;
   util::Timer timer(classname(), "print");
   os << *geometryiter_;
-  //Log::trace() << "GeometryIterator<TRAIT>::print done" << std::endl;
+  Log::trace() << "GeometryIterator<TRAIT>::print done" << std::endl;
 }
 
 

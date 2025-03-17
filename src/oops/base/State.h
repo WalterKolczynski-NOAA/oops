@@ -89,7 +89,7 @@ State<MODEL>::State(const Geometry_ & resol, const eckit::Configuration & conf) 
 template<typename MODEL>
 State<MODEL>::State(const Geometry_ & resol, const State & other) :
   interface::State<MODEL>(resol, other), resol_(resol)
-{ std::cout << "calling State(other) ctr" << std::endl;}
+{}
 
 // -----------------------------------------------------------------------------
 

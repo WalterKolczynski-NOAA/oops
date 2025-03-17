@@ -104,6 +104,7 @@ StateEnsemble4D<MODEL>::StateEnsemble4D(const Geometry_ & resol,
   : states_() {
   // Abort if both "members" and "members from template" are specified
   getMembers(config);
+
   // Reserve memory to hold ensemble
   states_.reserve(times.size());
 

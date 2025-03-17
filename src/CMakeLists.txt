@@ -529,7 +529,6 @@ test/interface/ObsTestsFixture.h
 test/interface/ObsVector.h
 test/interface/SampledLocations.h
 test/interface/State.h
-test/interface/StateSet.h
 test/interface/UnstructuredInterpolator.h
 test/interface/VariableChange.h
 
@@ -973,12 +972,6 @@ ecbuild_add_test( TARGET  test_util_timewindow
                   SOURCES test/util/TimeWindow.cc
                   ARGS    "test/testinput/empty.yaml"
                   LIBS    oops )
-
-	  #ecbuild_add_test( TARGET  test_base_stateset_mpi
-	  #        MPI     4
-	  #        SOURCES test/base/StateSetMPITest.cc
-	  #        ARGS    "test/testinput/stateset_mpi.yaml"
-	  #        LIBS    oops )
 
 ecbuild_add_test( TARGET  test_util_arrayutil
                   MPI     2
