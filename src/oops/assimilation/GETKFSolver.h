@@ -42,9 +42,9 @@ namespace oops {
 /*!
  * An implementation of the GETKF from Lei 2018 JAMES
  *
- * Lei, L., Whitaker, J. S., & Bishop, C. ( 2018). Improving assimilation 
- * of radiance observations by implementing model space localization in an 
- * ensemble Kalman filter. Journal of Advances in Modeling Earth Systems, 10, 
+ * Lei, L., Whitaker, J. S., & Bishop, C. ( 2018). Improving assimilation
+ * of radiance observations by implementing model space localization in an
+ * ensemble Kalman filter. Journal of Advances in Modeling Earth Systems, 10,
  * 3221– 3232. https://doi.org/10.1029/2018MS001468
  */
 template <typename MODEL, typename OBS>
@@ -234,20 +234,22 @@ Observations<OBS> GETKFSolver<MODEL, OBS>::computeHofX(const StateEnsemble4D_ & 
 
       // QC flags and Obs errors are set to that of the H(mean(Xb))
       this->R_->save("ObsError");
-      // set inverse variances
-      this->invVarR_.reset(new Departures_(this->R_->inverseVariance()));
+      this->initializeAssimilatedMask();
 
-      // mask H(x) ensemble perturbations
+      // mask H(x) ensemble perturbations - i.e. make sure that obs that have
+      // failed QC on one ensemble member fail for all (this is for the case where
+      // different QC procedures are done on different ensemble members)
       for (size_t iens = 0; iens < ens_xx.size(); ++iens) {
-        this->invVarR_->mask(this->Yb_[iens]);
-        this->Yb_[iens].mask(*this->invVarR_);
+        this->updateAssimilatedMask(this->Yb_[iens]);
+        this->applyAssimilatedMask(this->Yb_[iens]);
       }
 
-      // calculate obs departures and mask with qc flag
+      // calculate obs departures
       Observations_ yobs(this->obspaces_, "ObsValue");
       this->omb_ = yobs - yb_mean;
-      this->invVarR_->mask(this->omb_);
-      this->omb_.mask(*this->invVarR_);
+      // Need to mask out any missing departures as well as those that have failed QC
+      this->updateAssimilatedMask(this->omb_);
+      this->applyAssimilatedMask(this->omb_);
 
       // add linearized H(x) to the linear model postprocessor
       linear_hofx.initializeTL(posttrajtl);
@@ -310,6 +312,11 @@ Observations<OBS> GETKFSolver<MODEL, OBS>::computeHofX(const StateEnsemble4D_ & 
         }
       }
     }
+  }
+  // Update mask again, this time for the modulated ensemble members
+  for (size_t iens = 0; iens < nanal_; ++iens) {
+    this->updateAssimilatedMask(HZb_[iens]);
+    this->applyAssimilatedMask(HZb_[iens]);
   }
   return yb_mean;
 }
@@ -440,10 +447,7 @@ void GETKFSolver<MODEL, OBS>::measurementUpdate(const IncrementEnsemble4D_ & bkg
   Departures_ locvector(this->obspaces_);
   locvector.ones();
   this->obsloc().computeLocalization(i, locvector);
-  for (size_t iens = 0; iens < nanal_; ++iens) {
-     (this->invVarR_)->mask(this->HZb_[iens]);
-  }
-  locvector.mask(*(this->invVarR_));
+  this->applyAssimilatedMask(locvector);
   const Eigen::VectorXd local_omb_vec = this->omb_.packEigen(locvector);
 
   if (local_omb_vec.size() == 0) {
