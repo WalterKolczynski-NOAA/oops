@@ -201,6 +201,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     params.deserialize(fullConfig);
 
     std::unique_ptr<Geometry_> geometry;
+    std::unique_ptr<Geometry_> FCgeometry;
 
 
     // Instantiate ens_xx depending on whether we are running inline or not
@@ -211,7 +212,7 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
         return object;
       } else {
         std::vector<StateSet_> localVec = localizeEnsembleFC(fullConfig, params,
-            geometry);
+            geometry, FCgeometry);
         auto object = StateEnsemble4D_(localVec, 0);
         return object;
       }
@@ -364,14 +365,21 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
     // save the posterior ensemble
     if (params.driver.value().savePostEns.value()) {
+
       if (params.output.value() == boost::none) {
         throw eckit::BadValue("`save posterior ensemble` is set to true, but `output` "
                               "configuration not found.");
       }
       eckit::LocalConfiguration outConfig = *params.output.value();
+      std::vector<State_> states_;
+      const int mytask = this->getComm().rank();  // global rank
+      const int tasks_per_member = this->getComm().size() / nens;
+      int mymember = this->getComm().rank()/(this->getComm().size() / nens) + 1;
       for (size_t jj = 0; jj < nens; ++jj) {
         outConfig.set("member", jj+1);
-        ens_xx[jj].write(outConfig);
+        states_.emplace_back(((ens_xx[jj]).reverseTranspose(this->getComm(), *FCgeometry,
+          mymember, jj)));
+	states_[jj].write(outConfig);
       }
     }
 
@@ -466,7 +474,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
 
   std::vector<StateSet_> localizeEnsembleFC(const eckit::Configuration & fullConfig,
           LocalEnsembleDAParameters_ & params,
-          std::unique_ptr<Geometry_> & DAgeometry) const {
+          std::unique_ptr<Geometry_> & DAgeometry,
+          std::unique_ptr<Geometry_> & FCgeometry) const {
   // This function creates a DA geometry that has the same resolution as the forecast geometry, but
   // is decomposed into patches that are N times smaller than the forecast geometry, where N is the
   // number of ensemble members. Note that the DAgeometry layout must be evenly divisible by the
@@ -521,7 +530,8 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     eckit::YAMLConfiguration memberConf(confPath);
     eckit::LocalConfiguration fcstparams = eckit::LocalConfiguration(memberConf);
 
-    const Geometry_ FCgeometry(fcstparams.getSubConfiguration("geometry"), commMember);
+    //const Geometry_ FCgeometry(fcstparams.getSubConfiguration("geometry"), commMember);
+    FCgeometry = std::unique_ptr<Geometry_>(new Geometry_(fcstparams.getSubConfiguration("geometry"), commMember));
     Log::info() << "done with geometry" << std::endl;
 
     //  Setup times
@@ -549,14 +559,14 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
     std::unique_ptr<StateSet_> ens_SS;
     PostProcessor<State_> post;  // Create the post processor where StateSet will be stored
     StateSetSaver<MODEL> *saver_ =
-        new StateSetSaver<MODEL>(memberConf, FCgeometry, times, oops::mpi::myself(),
+        new StateSetSaver<MODEL>(memberConf, *FCgeometry, times, oops::mpi::myself(),
                     ens, patchMember);
     post.enrollProcessor(saver_);
   //  Each member uses a different configuration:
     for (int m = 1; m <=nmembers; m++) {
       if ( m == mymember ) {
          Log::info() << "running on mymember = " << mymember  << " " << mytask << std::endl;
-         executeForecast(FCgeometry, memberConf, post);
+         executeForecast(*FCgeometry, memberConf, post);
          Log::info() << "Done with ens execute\n";
        }
        if ( batchSize > 0 ) {  // don't divide by zero

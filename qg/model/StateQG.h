@@ -83,9 +83,9 @@ class StateQG : public util::Printable,
      const int ensNum, const int transNum) {
      throw eckit::NotImplemented("StateQG::transpose not implemented", Here());
   }
-  void Rtranspose(const StateQG & DAState, const eckit::mpi::Comm & global,
+  void reverseTranspose(const StateQG & DAState, const eckit::mpi::Comm & global,
      const int ensNum, const int transNum) {
-     throw eckit::NotImplemented("StateQG::Rtranspose not implemented", Here());
+     throw eckit::NotImplemented("StateQG::reverseTranspose not implemented", Here());
   }
 
 /// ATLAS FieldSet

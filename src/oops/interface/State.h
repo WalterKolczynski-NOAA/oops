@@ -65,7 +65,7 @@ class State : public util::Printable,
 
   void transpose(const State_ &, const eckit::mpi::Comm &,
        const int, const int);
-  void Rtranspose(const State_ &, const eckit::mpi::Comm &,
+  void reverseTranspose(const State_ &, const eckit::mpi::Comm &,
        const int, const int);
 
   /// Accessor
@@ -212,13 +212,13 @@ void State<MODEL>::transpose(const State_ & DistState, const eckit::mpi::Comm & 
 // -----------------------------------------------------------------------------
 
 template<typename MODEL>
-void State<MODEL>::Rtranspose(const State_ & LocState, const eckit::mpi::Comm & global,
+void State<MODEL>::reverseTranspose(const State_ & LocState, const eckit::mpi::Comm & global,
        const int ensNum, const int transNum) {
-  // The FCState has a distributed set of states. Rtranspose returns a
+  // The FCState has a distributed set of states. reverseTranspose returns a
   // distributed state on the FC geometry
-  Log::trace() << "State<MODEL>::Rtranspose interface starting" << std::endl;
-  state_->Rtranspose(LocState, global, ensNum, transNum);
-  Log::trace() << "State<MODEL>::Rtranspose interface done" << std::endl;
+  Log::trace() << "State<MODEL>::reverseTranspose interface starting" << std::endl;
+  state_->reverseTranspose(LocState, global, ensNum, transNum);
+  Log::trace() << "State<MODEL>::reverseTranspose interface done" << std::endl;
 }
 
 // -----------------------------------------------------------------------------

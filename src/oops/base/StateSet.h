@@ -60,7 +60,7 @@ class StateSet : public DataSetBase< State<MODEL>, Geometry<MODEL> > {
   // Collect distributed states and return a local subset
   std::vector<StateSet> transpose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int ensNum) const;
-  State_ Rtranspose(const eckit::mpi::Comm & global,
+  State_ reverseTranspose(const eckit::mpi::Comm & global,
            const Geometry_ & DAgeometry, const int ensNum,
            const int transNum) const;
   /// Zero
@@ -213,7 +213,7 @@ std::vector<StateSet<MODEL> > StateSet<MODEL>::transpose(const eckit::mpi::Comm 
 }
 
 template<typename MODEL>
-State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
+State<MODEL> StateSet<MODEL>::reverseTranspose(const eckit::mpi::Comm & global,
            const Geometry_ & FCgeometry, const int ensNum,
            const int transNum) const
 {
@@ -225,7 +225,7 @@ State<MODEL> StateSet<MODEL>::Rtranspose(const eckit::mpi::Comm & global,
 */
   State<MODEL> FCState = State<MODEL>(FCgeometry, this->variables(),
                 (*this)(0, 0).state().validTime());
-  FCState.Rtranspose((*this)(0, 0).state(), global, ensNum, transNum);
+  FCState.reverseTranspose((*this)(0, 0).state(), global, ensNum, transNum);
   return(FCState);
 }
 

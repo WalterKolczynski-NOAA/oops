@@ -98,9 +98,9 @@ class StateL95 : public util::Printable,
      const int ensNum, const int transNum) {
      throw eckit::NotImplemented("StateL95::transpose not implemented", Here());
   }
-  void Rtranspose(const StateL95 & DAState, const eckit::mpi::Comm & global,
+  void reverseTranspose(const StateL95 & DAState, const eckit::mpi::Comm & global,
      const int ensNum, const int transNum) {
-     throw eckit::NotImplemented("StateL95::Rtranspose not implemented", Here());
+     throw eckit::NotImplemented("StateL95::reverseTranspose not implemented", Here());
   }
 
  private:

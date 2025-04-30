@@ -44,7 +44,7 @@
 namespace test {
 
 // -----------------------------------------------------------------------------
-/// \brief tests transpose and Rtranspose
+/// \brief tests transpose and reverseTranspose
 ///
 template <typename MODEL>
  void testStateSetTranspose() {
@@ -154,12 +154,12 @@ template <typename MODEL>
     std::vector<StateSet_> daStateSet = fcStateSet.transpose(worldComm, daGeom, mymember);
     oops::mpi::world().barrier();
     std::vector<State_> states_;
-    // after Rtranspose, states are back to distributed across ensemble ranks
+    // after reverseTranspose, states are back to distributed across ensemble ranks
     for (size_t ens=0; ens < daStateSet.size(); ++ens) {
-        states_.emplace_back(((daStateSet[ens]).Rtranspose(worldComm, fcGeom,
+        states_.emplace_back(((daStateSet[ens]).reverseTranspose(worldComm, fcGeom,
           mymember, ens)));
     }
-    oops::Log::info() << "state[0] after Rtranspose is " << states_[0] << std::endl;
+    oops::Log::info() << "state[0] after reverseTranspose is " << states_[0] << std::endl;
     StateSet_ *newFCStateSet = new StateSet_(states_, mymember - 1, times, oops::mpi::myself(),
                    ensMembers, patchMember);
     IncrementSet_ newState(fcGeom, vars, times, oops::mpi::myself(), ensMembers, patchMember);
