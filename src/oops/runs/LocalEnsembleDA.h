@@ -374,9 +374,10 @@ template <typename MODEL, typename OBS> class LocalEnsembleDA : public Applicati
       std::vector<State_> states_;
       const int mytask = this->getComm().rank();  // global rank
       const int tasks_per_member = this->getComm().size() / nens;
-      int mymember = this->getComm().rank()/(this->getComm().size() / nens) + 1;
+      int mymember = mytask / tasks_per_member + 1;
       for (size_t jj = 0; jj < nens; ++jj) {
         outConfig.set("member", jj+1);
+//        ens_xx[jj].write(outConfig);
         states_.emplace_back(((ens_xx[jj]).reverseTranspose(this->getComm(), *FCgeometry,
           mymember, jj)));
 	states_[jj].write(outConfig);
