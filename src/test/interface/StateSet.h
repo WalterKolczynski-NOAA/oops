@@ -120,7 +120,7 @@ template <typename MODEL>
     std::mt19937 gen(123+oops::mpi::world().rank());
 
     // Create distribution for the range you want (e.g., between 0.0 and 1.0)
-    std::uniform_real_distribution<double> dis(0.0d, 1.0d);
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
     std::vector<std::vector<double> > zz(fcStateSet.local_ens_size());
 
     size_t dataSize = fcStateSet(0, 0).serialSize() -3;
